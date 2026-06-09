@@ -1,0 +1,73 @@
+.sidebar-header {
+  margin-bottom: 40px;
+}
+
+.logo-container {
+  display: flex;
+  flex-direction: column;
+}
+
+.ikusi-logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.logo-bars {
+  display: flex;
+  gap: 4px;
+  transform: skewX(-20deg);
+}
+
+.logo-bars span {
+  width: 6px;
+  height: 24px;
+  background-color: var(--ikusi-green);
+  border-radius: 2px;
+  box-shadow: 0 0 10px var(--ikusi-green-glow);
+}
+
+.logo-text {
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -1px;
+  color: white;
+}
+
+.logo-subtext {
+  color: var(--text-muted);
+  font-size: 14px;
+  font-weight: 500;
+  margin-left: 36px;
+  margin-top: -4px;
+}
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  color: var(--text-muted);
+  text-decoration: none;
+  border-radius: 8px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+}
+
+.nav-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-main);
+}
+
+.nav-item.active {
+  background: var(--ikusi-green-glow);
+  color: var(--ikusi-green);
+  border-color: rgba(0, 166, 80, 0.3);
+}
