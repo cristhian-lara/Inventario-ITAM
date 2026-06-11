@@ -15,6 +15,7 @@ interface CreateCollaboratorDTO {
     isLeader?: boolean;
     leaderId?: string | null;
     dynamicAttributes?: Record<string, any>;
+    activationDate?: string | Date;
 }
 
 export class CollaboratorUseCases {
@@ -22,7 +23,7 @@ export class CollaboratorUseCases {
         private readonly collaboratorRepo: ICollaboratorRepository,
         private readonly departmentRepo: IDepartmentRepository,
         private readonly cecosRepo: ICecosRepository
-    ) {}
+    ) { }
 
     async createCollaborator(data: CreateCollaboratorDTO): Promise<Collaborator> {
         const existing = await this.collaboratorRepo.findByEmail(data.email);
@@ -41,7 +42,7 @@ export class CollaboratorUseCases {
             data.email,
             data.department,
             data.location,
-            new Date(), // activationDate
+            data.activationDate ? new Date(data.activationDate) : new Date(), // activationDate
             data.isLeader || false,
             data.leaderId || null,
             data.dynamicAttributes || {}
@@ -116,7 +117,7 @@ export class CollaboratorUseCases {
         if (existing) {
             throw new Error(`Department with ID ${data.id} already exists`);
         }
-        
+
         const department = Department.create(data.id, data.name, data.description || null);
         await this.departmentRepo.save(department);
         return department;
@@ -131,7 +132,7 @@ export class CollaboratorUseCases {
         if (!existing) {
             throw new Error(`Department with ID ${id} not found`);
         }
-        
+
         const updated = new Department(existing.id, name, description || null, existing.createdAt);
         await this.departmentRepo.save(updated);
         return updated;
@@ -167,21 +168,22 @@ export class CollaboratorUseCases {
         status: 'ACTIVE' | 'INACTIVE',
         isLeader: boolean,
         leaderId?: string,
-        dynamicAttributes?: Record<string, any>
+        dynamicAttributes?: Record<string, any>,
+        activationDate?: string | Date
     ): Promise<Collaborator> {
         const collaborator = await this.collaboratorRepo.findById(id);
         if (!collaborator) {
             throw new Error(`El colaborador con ID ${id} no existe.`);
         }
-        
+
         const department = await this.departmentRepo.findById(departmentId);
         if (!department) {
             throw new Error(`El departamento con ID ${departmentId} no existe.`);
         }
-        
+
         const finalLeaderId = isLeader ? null : (leaderId || null);
         const finalDynamicAttributes = dynamicAttributes || collaborator.dynamicAttributes;
-        
+
         const updated = new Collaborator(
             collaborator.id,
             name,
@@ -189,16 +191,16 @@ export class CollaboratorUseCases {
             department.name,
             location,
             status,
-            collaborator.activationDate,
+            activationDate ? new Date(activationDate) : collaborator.activationDate,
             status === 'INACTIVE' ? new Date() : collaborator.deactivationDate,
             collaborator.createdAt,
             isLeader,
             finalLeaderId,
             finalDynamicAttributes
         );
-        
+
         await this.collaboratorRepo.update(updated);
-        
+
         if (collaborator.status !== status) {
             const action = status === 'ACTIVE' ? 'ACTIVATED' : 'DEACTIVATED';
             await this.collaboratorRepo.saveHistory(new CollaboratorHistory(
@@ -209,8 +211,58 @@ export class CollaboratorUseCases {
                 `Actualizado manualmente a ${status}`
             ));
         }
-        
+
         return updated;
     }
 
+    async importCollaborators(records: any[]): Promise<{ successful: number; failed: number; errors: string[] }> {
+        let successful = 0;
+        let failed = 0;
+        const errors: string[] = [];
+
+        const allDepartments = await this.departmentRepo.findAll();
+
+        for (const [index, record] of records.entries()) {
+            try {
+                const name = record.Name || record.name || record.Nombre || record.nombre;
+                const email = record.Email || record.email || record.Correo || record.correo;
+                const departmentName = record.Department || record.department || record.Departamento || record.departamento;
+                const location = record.Location || record.location || record.Ubicacion || record.Ubicación || record.ubicacion;
+                const cecosId = record.CECOS || record.Cecos || record.cecos || record.CentroCostos || record.centroCostos;
+                const activationDate = record.FechaAlta || record.fechaAlta || record.ActivationDate || record.activationDate;
+
+                let isLeader = false;
+
+                if (record.isLeader || record.IsLeader || record.EsLider || record.esLider) {
+                    const val = String(record.isLeader || record.IsLeader || record.EsLider || record.esLider).toLowerCase().trim();
+                    isLeader = val === 'sí' || val === 'si' || val === 'true' || val === '1' || val === 'yes';
+                }
+
+                if (!name || !email || !departmentName || !location) {
+                    throw new Error('Faltan campos obligatorios (Nombre, Email, Departamento, Ubicación)');
+                }
+
+                const department = allDepartments.find(d => d.name.toLowerCase() === String(departmentName).toLowerCase());
+                if (!department) {
+                    throw new Error(`El departamento '${departmentName}' no existe.`);
+                }
+
+                await this.createCollaborator({
+                    name: String(name).trim(),
+                    email: String(email).trim(),
+                    department: department.id,
+                    location: String(location).trim(),
+                    isLeader: isLeader,
+                    dynamicAttributes: cecosId ? { CECOS: String(cecosId).trim() } : {},
+                    activationDate: activationDate ? new Date(activationDate) : new Date()
+                });
+                successful++;
+            } catch (error: any) {
+                failed++;
+                errors.push(`Fila ${index + 2}: ${error.message}`);
+            }
+        }
+
+        return { successful, failed, errors };
+    }
 }

@@ -64,6 +64,10 @@
   color: var(--text-main);
 }
 
+.glass-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
 .table-row:hover td {
   background: #f8fafc;
 }

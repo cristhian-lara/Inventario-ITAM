@@ -1,8 +1,8 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
-import { Plus, Search, UserCheck, UserX, UserPlus, Edit2 } from 'lucide-react';
+import { Plus, Search, UserCheck, UserX, UserPlus, Edit2, Upload, Eye, Crown } from 'lucide-react';
 import './Collaborators.css';
 
 interface Collaborator {
@@ -15,14 +15,41 @@ interface Collaborator {
   isLeader: boolean;
   leaderId: string | null;
   dynamicAttributes: Record<string, any>;
+  activationDate?: string;
 }
 
 export default function Collaborators() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [formData, setFormData] = useState({ name: '', email: '', department: '', location: '', isLeader: false, leaderId: '', cecos: '' });
+  const [formData, setFormData] = useState({ name: '', email: '', department: '', location: '', isLeader: false, leaderId: '', cecos: '', activationDate: new Date().toISOString().split('T')[0] });
   const [locationType, setLocationType] = useState('Medellín');
   const queryClient = useQueryClient();
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<{successful: number, failed: number, errors: string[]} | null>(null);
+
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setImporting(true);
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const response = await axios.post('http://localhost:3000/api/collaborators/import', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      setImportResult(response.data);
+      queryClient.invalidateQueries({ queryKey: ['collaborators'] });
+    } catch (error: any) {
+      alert('Error en la importación: ' + (error.response?.data?.error || error.message));
+    } finally {
+      setImporting(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
 
   const { data: collaborators = [] } = useQuery<Collaborator[]>({
     queryKey: ['collaborators'],
@@ -58,7 +85,7 @@ export default function Collaborators() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['collaborators'] });
       setIsModalOpen(false);
-      setFormData({ name: '', email: '', department: '', location: '', isLeader: false, leaderId: '', cecos: '' });
+      setFormData({ name: '', email: '', department: '', location: '', isLeader: false, leaderId: '', cecos: '', activationDate: new Date().toISOString().split('T')[0] });
     }
   });
 
@@ -68,11 +95,12 @@ export default function Collaborators() {
       const payload = {
         name: formData.name,
         departmentId: formData.department,
-        location: formData.locationType === 'Otra' ? formData.location : formData.locationType,
+        location: locationType === 'Otra' ? formData.location : locationType,
         status: 'ACTIVE',
-        isLeader: formData.isLeader,
-        leaderId: formData.isLeader ? undefined : formData.leaderId,
-        dynamicAttributes: { CECOS: formData.cecos }
+        isLeader: departmentHasLeader ? false : formData.isLeader,
+        leaderId: (departmentHasLeader ? false : formData.isLeader) ? undefined : formData.leaderId,
+        dynamicAttributes: { CECOS: formData.cecos },
+        activationDate: formData.activationDate
       };
       const response = await axios.put(`http://localhost:3000/api/collaborators/${editingId}`, payload);
       return response.data;
@@ -81,7 +109,7 @@ export default function Collaborators() {
       queryClient.invalidateQueries({ queryKey: ['collaborators'] });
       setIsModalOpen(false);
       setEditingId(null);
-      setFormData({ name: '', email: '', department: '', location: '', isLeader: false, leaderId: '', cecos: '' });
+      setFormData({ name: '', email: '', department: '', location: '', isLeader: false, leaderId: '', cecos: '', activationDate: new Date().toISOString().split('T')[0] });
       setLocationType('Medellín');
     }
   });
@@ -97,7 +125,8 @@ export default function Collaborators() {
       location: collab.location,
       isLeader: collab.isLeader || false,
       leaderId: collab.leaderId || '',
-      cecos: collab.dynamicAttributes?.CECOS || ''
+      cecos: collab.dynamicAttributes?.CECOS || '',
+      activationDate: collab.activationDate ? collab.activationDate.split('T')[0] : new Date().toISOString().split('T')[0]
     });
     setIsModalOpen(true);
   };
@@ -110,12 +139,24 @@ export default function Collaborators() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const finalLocation = locationType === 'Otra' ? formData.location : locationType;
-    mutation.mutate({ ...formData, location: finalLocation });
+    const finalIsLeader = departmentHasLeader ? false : formData.isLeader;
+    
+    if (editingId) {
+      editMutation.mutate();
+    } else {
+      mutation.mutate({ ...formData, location: finalLocation, isLeader: finalIsLeader, leaderId: finalIsLeader ? undefined : formData.leaderId });
+    }
   };
 
   const getDepartmentName = (deptId: string) => {
     const dep = departments?.find(d => d.id === deptId);
     return dep ? dep.name : deptId;
+  };
+
+  const getCECOName = (cecoId: string | undefined) => {
+    if (!cecoId) return 'N/A';
+    const ceco = cecosList?.find((c: any) => c.id === cecoId);
+    return ceco ? `${ceco.id} - ${ceco.name}` : cecoId;
   };
   const departmentHasLeader = useMemo(() => {
     if (!formData.department) return false;
@@ -136,10 +177,23 @@ export default function Collaborators() {
           <h1 className="page-title">Directorio de Colaboradores</h1>
           <p className="page-subtitle">Gestión de personal para asignación de equipos</p>
         </div>
-        <button className="btn-primary" onClick={() => setIsModalOpen(true)}>
-          <UserPlus size={20} />
-          Nuevo Colaborador
-        </button>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <input 
+            type="file" 
+            ref={fileInputRef} 
+            style={{ display: 'none' }} 
+            accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel"
+            onChange={handleImport}
+          />
+          <button className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', borderRadius: '12px', background: 'var(--glass-bg)', color: 'var(--text-main)', border: '1px solid var(--border-glass)', cursor: 'pointer', fontWeight: '500', transition: 'all 0.3s ease' }} onClick={() => fileInputRef.current?.click()} disabled={importing}>
+            <Upload size={20} />
+            {importing ? 'Importando...' : 'Importar (.xlsx, .csv)'}
+          </button>
+          <button className="btn-primary" onClick={() => setIsModalOpen(true)}>
+            <UserPlus size={20} />
+            Nuevo Colaborador
+          </button>
+        </div>
       </header>
 
       <div className="glass-panel table-container">
@@ -164,6 +218,7 @@ export default function Collaborators() {
                 <th>Correo Electrónico</th>
                 <th>Departamento</th>
                 <th>Sede</th>
+                <th>CECo</th>
                 <th>Estado</th>
                 <th>Acciones</th>
               </tr>
@@ -172,13 +227,32 @@ export default function Collaborators() {
               {filtered.map(c => (
                 <tr key={c.id} className="table-row">
                   <td className="fw-600">
-                    <Link to={`/collaborators/${c.id}`} style={{ color: 'var(--primary-color)', textDecoration: 'none' }}>
-                      {c.name}
-                    </Link>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Link to={`/collaborators/${c.id}`} style={{ color: 'var(--primary-color)', textDecoration: 'none' }}>
+                        {c.name}
+                      </Link>
+                      {c.isLeader && (
+                        <span 
+                          title="Líder de Departamento" 
+                          style={{ 
+                            display: 'inline-flex', 
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            padding: '4px',
+                            background: 'rgba(245, 158, 11, 0.15)',
+                            color: '#f59e0b',
+                            borderRadius: '50%'
+                          }}
+                        >
+                          <Crown size={14} strokeWidth={2.5} />
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td>{c.email}</td>
                   <td>{getDepartmentName(c.department)}</td>
                   <td>{c.location}</td>
+                  <td>{getCECOName(c.dynamicAttributes?.CECOS)}</td>
                   <td>
                     <span className={`badge badge-${c.status.toLowerCase()}`}>
                       {c.status === 'ACTIVE' ? <UserCheck size={14} /> : <UserX size={14} />}
@@ -186,24 +260,29 @@ export default function Collaborators() {
                     </span>
                   </td>
                   <td>
-                    <button 
-                      className="btn-action" 
-                      style={{ marginRight: '8px' }}
-                      onClick={() => handleEditClick(c)}
-                      title="Editar Colaborador"
-                    >
-                      <Edit2 size={16} />
-                    </button>
-                    <Link to={`/collaborators/${c.id}`} className="btn-action" style={{ marginRight: '8px', textDecoration: 'none' }}>
-                      Perfil
-                    </Link>
-                    <button 
-                      className={`btn-action ${c.status === 'ACTIVE' ? 'btn-danger' : 'btn-success'}`}
-                      style={{ opacity: 1, transform: 'none' }}
-                      onClick={() => toggleStatusMutation.mutate(c.id)}
-                    >
-                      {c.status === 'ACTIVE' ? 'Dar de Baja' : 'Reactivar'}
-                    </button>
+                    <div className="actions-container">
+                      <button 
+                        className="action-icon-btn edit-btn" 
+                        onClick={() => handleEditClick(c)}
+                        title="Editar Colaborador"
+                      >
+                        <Edit2 size={16} />
+                      </button>
+                      <Link 
+                        to={`/collaborators/${c.id}`} 
+                        className="action-icon-btn view-btn" 
+                        title="Ver Perfil"
+                      >
+                        <Eye size={16} />
+                      </Link>
+                      <button 
+                        className={`action-icon-btn ${c.status === 'ACTIVE' ? 'delete-btn' : 'reactivate-btn'}`}
+                        onClick={() => toggleStatusMutation.mutate(c.id)}
+                        title={c.status === 'ACTIVE' ? 'Dar de Baja' : 'Reactivar'}
+                      >
+                        {c.status === 'ACTIVE' ? <UserX size={16} /> : <UserCheck size={16} />}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -237,6 +316,10 @@ export default function Collaborators() {
               <div className="form-group">
                 <label>Correo Electrónico</label>
                 <input required className="glass-input" type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
+              </div>
+              <div className="form-group">
+                <label>Fecha de Alta (Ingreso)</label>
+                <input required className="glass-input" type="date" value={formData.activationDate} onChange={e => setFormData({...formData, activationDate: e.target.value})} />
               </div>
               <div className="form-group">
                 <label>Departamento</label>
@@ -326,6 +409,23 @@ export default function Collaborators() {
                 {editingId ? <Edit2 size={20} /> : <Plus size={20} />} {(mutation.isPending || editMutation.isPending) ? 'Guardando...' : (editingId ? 'Actualizar Registro' : 'Guardar Registro')}
               </button>
             </form>
+          </div>
+        </div>
+      )}
+      {importResult && (
+        <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(4px)' }}>
+          <div className="glass-panel" style={{ width: '400px', padding: '30px' }}>
+            <h3 style={{ marginTop: 0, color: 'var(--text-main)' }}>Resultados de Importación</h3>
+            <p style={{ color: 'var(--text-muted)' }}><strong>Exitosos:</strong> {importResult.successful}</p>
+            <p style={{ color: 'var(--text-muted)' }}><strong>Fallidos:</strong> {importResult.failed}</p>
+            {importResult.errors && importResult.errors.length > 0 && (
+              <div style={{ marginTop: '10px', maxHeight: '200px', overflowY: 'auto', background: 'rgba(255,0,0,0.1)', padding: '10px', borderRadius: '8px', fontSize: '13px', color: '#ff4d4f' }}>
+                {importResult.errors.map((err, i) => <div key={i}>{err}</div>)}
+              </div>
+            )}
+            <button className="btn-primary" style={{ marginTop: '20px', width: '100%', justifyContent: 'center' }} onClick={() => setImportResult(null)}>
+              Cerrar
+            </button>
           </div>
         </div>
       )}

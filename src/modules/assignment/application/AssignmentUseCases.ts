@@ -14,7 +14,7 @@ export class AssignmentUseCases {
     /**
      * Inicia una asignación, genera el JWT de firma y envía el correo.
      */
-    async createAssignment(id: string, assetId: string, collaboratorId: string, collaboratorEmail: string): Promise<Assignment> {
+    async createAssignment(id: string, assetId: string, collaboratorId: string, collaboratorEmail: string, startDate?: string): Promise<Assignment> {
         const existingAssignment = await this.repository.findCurrentByAssetId(assetId);
         
         if (existingAssignment) {
@@ -32,7 +32,7 @@ export class AssignmentUseCases {
             assetId,
             collaboratorId,
             status: 'PENDING_ACCEPTANCE',
-            startDate: new Date()
+            startDate: startDate ? new Date(startDate) : new Date()
         });
 
         // La función inyectada para generar el token usa JWT real

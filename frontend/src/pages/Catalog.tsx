@@ -44,7 +44,8 @@ export default function Catalog() {
     id: `assig-${Math.floor(Math.random() * 1000)}`,
     assetId: '',
     collaboratorId: '',
-    collaboratorEmail: ''
+    collaboratorEmail: '',
+    startDate: new Date().toISOString().split('T')[0]
   });
 
   useEffect(() => {
@@ -125,7 +126,8 @@ export default function Catalog() {
         id: `assig-${Math.floor(Math.random() * 1000)}`,
         assetId: '',
         collaboratorId: '',
-        collaboratorEmail: ''
+        collaboratorEmail: '',
+        startDate: new Date().toISOString().split('T')[0]
       });
       setTimeout(() => setSuccessMsg(''), 8000);
       setAssignModalAssetId(null);
@@ -431,6 +433,12 @@ export default function Catalog() {
                       <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Sin specs</span>
                     }
                     
+                    {asset.purchaseDate && (
+                      <span className="spec-tag" style={{ background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', marginTop: '4px' }}>
+                        📅 Compra: {new Date(asset.purchaseDate).toLocaleDateString('es-CO')}
+                      </span>
+                    )}
+                    
                     {asset.purchaseDate && asset.depreciationYears ? (() => {
                       const purchaseDate = new Date(asset.purchaseDate);
                       const now = new Date();
@@ -660,6 +668,11 @@ export default function Catalog() {
               <div className="form-group">
                 <label>Correo Electrónico (Autocompletado)</label>
                 <input type="email" className="glass-input" name="collaboratorEmail" value={formData.collaboratorEmail} disabled />
+              </div>
+
+              <div className="form-group">
+                <label>Fecha de Asignación</label>
+                <input type="date" className="glass-input" name="startDate" value={formData.startDate} onChange={handleChange} required />
               </div>
 
               <button type="submit" className="btn-primary submit-btn" disabled={assignMutation.isPending}>

@@ -25,7 +25,7 @@ const collaboratorRepo = new PostgresCollaboratorRepository();
 // 1. Iniciar Asignación
 router.post('/', async (req, res) => {
     try {
-        const { id, assetId, collaboratorId, collaboratorEmail } = req.body;
+        const { id, assetId, collaboratorId, collaboratorEmail, startDate } = req.body;
         
         // Validación de Dominio: El activo debe existir y estar DISPONIBLE
         const asset = await catalogUseCases.getAssetById(assetId);
@@ -36,7 +36,7 @@ router.post('/', async (req, res) => {
             return res.status(400).json({ error: `El activo ${assetId} no se puede asignar porque su estado actual es: ${asset.status}` });
         }
 
-        const assignment = await assignmentUseCases.createAssignment(id, assetId, collaboratorId, collaboratorEmail);
+        const assignment = await assignmentUseCases.createAssignment(id, assetId, collaboratorId, collaboratorEmail, startDate);
         
         res.status(201).json({
             message: 'Asignación iniciada y correo enviado exitosamente.',

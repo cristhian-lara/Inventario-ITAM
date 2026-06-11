@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
-import { Plus, Settings as SettingsIcon, Building, Tag, CheckCircle2, AlertCircle, Trash2 } from 'lucide-react';
+import { Plus, Settings as SettingsIcon, Building, Briefcase, Tag, CheckCircle2, AlertCircle, Trash2 } from 'lucide-react';
 import './Settings.css';
 
 export default function Settings() {
@@ -281,10 +281,10 @@ export default function Settings() {
             <Building size={18} /> Departamentos
           </button>
           <button 
-            className={`tab-button ${activeTab === 'cecos' ? 'active' : ''}`}
+            className={`settings-tab ${activeTab === 'cecos' ? 'active' : ''}`}
             onClick={() => setActiveTab('cecos')}
           >
-            <Building size={18} /> CECOS
+            <Briefcase size={18} /> CECOS
           </button>
         </div>
 
@@ -400,7 +400,7 @@ export default function Settings() {
               <div className="list-grid">
                 {cecosList?.length === 0 ? (
                   <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
-                    <Building size={48} style={{ opacity: 0.2, marginBottom: '16px' }} />
+                    <Briefcase size={48} style={{ opacity: 0.2, marginBottom: '16px' }} />
                     <p>No hay CECOS registrados. ¡Crea el primero arriba!</p>
                   </div>
                 ) : cecosList?.map((c: any) => (
