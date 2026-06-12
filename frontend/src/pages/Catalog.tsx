@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { Plus, Search, Tag, Cpu, HardDrive, Wifi, PlusCircle, MonitorSmartphone, RefreshCw, CheckCircle2, AlertCircle, AlertTriangle, UserCheck, Send } from 'lucide-react';
+import { useConfirm } from '../context/ConfirmContext';
 import './Catalog.css';
 
 interface Asset {
@@ -15,6 +16,7 @@ interface Asset {
 
 export default function Catalog() {
   const queryClient = useQueryClient();
+  const { confirm } = useConfirm();
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -238,7 +240,12 @@ export default function Catalog() {
 
   const confirmReturn = () => {
     if (returnId) {
-      returnMutation.mutate(returnId);
+      confirm({
+        title: 'Confirmar Devolución',
+        message: '¿Estás seguro de que deseas iniciar el proceso de devolución para este activo?',
+        type: 'warning',
+        onConfirm: () => returnMutation.mutate(returnId)
+      });
     }
   };
 
@@ -248,7 +255,12 @@ export default function Catalog() {
 
   const handleAssignSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    assignMutation.mutate(formData);
+    confirm({
+      title: 'Confirmar Asignación',
+      message: '¿Estás seguro de asignar este equipo al colaborador seleccionado?',
+      type: 'info',
+      onConfirm: () => assignMutation.mutate(formData)
+    });
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -517,9 +529,12 @@ export default function Catalog() {
                           style={{ borderColor: '#ef4444', color: '#ef4444' }}
                           title="Devolución Forzada (TI)"
                           onClick={() => {
-                            if (window.confirm('¿Deseas forzar la devolución administrativa de este activo sin firma del empleado?')) {
-                              forceReturnMutation.mutate(asset.id);
-                            }
+                            confirm({
+                              title: 'Devolución Forzada',
+                              message: '¿Estás seguro de forzar la devolución? Esta acción es administrativa y no requerirá la firma del colaborador.',
+                              type: 'danger',
+                              onConfirm: () => forceReturnMutation.mutate(asset.id)
+                            });
                           }}
                           disabled={forceReturnMutation.isPending}
                         >
@@ -529,7 +544,14 @@ export default function Catalog() {
                           className="btn-action"
                           style={{ borderColor: '#3b82f6', color: '#3b82f6' }}
                           title="Reenviar Link de Firma"
-                          onClick={() => resendLinkMutation.mutate(asset.id)}
+                          onClick={() => {
+                            confirm({
+                              title: 'Reenviar Enlace',
+                              message: '¿Estás seguro de reenviar el enlace de firma al colaborador?',
+                              type: 'info',
+                              onConfirm: () => resendLinkMutation.mutate(asset.id)
+                            });
+                          }}
                           disabled={resendLinkMutation.isPending}
                         >
                           <Send size={16} />
@@ -544,9 +566,12 @@ export default function Catalog() {
                         onClick={() => {
                           const reason = window.prompt('Por favor, indica el motivo por el cual se da de baja este activo:');
                           if (reason !== null && reason.trim() !== '') {
-                            if (window.confirm('¿Estás seguro de que deseas dar de baja este activo definitivamente? Esta acción es irreversible.')) {
-                              retireAssetMutation.mutate({ id: asset.id, reason: reason.trim() });
-                            }
+                            confirm({
+                              title: 'Dar de Baja',
+                              message: '¿Estás seguro de que deseas dar de baja este activo definitivamente? Esta acción es irreversible.',
+                              type: 'danger',
+                              onConfirm: () => retireAssetMutation.mutate({ id: asset.id, reason: reason.trim() })
+                            });
                           } else if (reason !== null) {
                             alert('Debes proporcionar un motivo válido para dar de baja el activo.');
                           }
@@ -698,11 +723,20 @@ export default function Catalog() {
             </h3>
             <form onSubmit={(e) => { 
               e.preventDefault(); 
-              if (isEditing) {
-                editAssetMutation.mutate(newAsset);
-              } else {
-                addAssetMutation.mutate(newAsset); 
-              }
+              const submitAction = () => {
+                if (isEditing) {
+                  editAssetMutation.mutate(newAsset);
+                } else {
+                  addAssetMutation.mutate(newAsset); 
+                }
+              };
+
+              confirm({
+                title: isEditing ? 'Guardar Cambios' : 'Crear Activo',
+                message: isEditing ? '¿Estás seguro de guardar los cambios de este activo?' : '¿Estás seguro de registrar este nuevo activo?',
+                type: 'info',
+                onConfirm: submitAction
+              });
             }} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div className="form-group">
                 <label>Categoría</label>

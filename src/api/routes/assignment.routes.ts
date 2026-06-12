@@ -161,8 +161,8 @@ router.post('/:id/force-return', async (req, res) => {
 
 router.post('/force-return-by-asset/:assetId', async (req, res) => {
     try {
-        const assignment = await assignmentRepo.findActiveByAssetId(req.params.assetId);
-        if (!assignment) throw new Error('No se encontró asignación activa');
+        const assignment = await assignmentRepo.findCurrentByAssetId(req.params.assetId);
+        if (!assignment) throw new Error('No se encontró asignación activa o pendiente');
         
         const ipAddress = req.ip || req.socket.remoteAddress || 'unknown';
         const returnedAssignment = await assignmentUseCases.forceReturn(assignment.id, ipAddress);

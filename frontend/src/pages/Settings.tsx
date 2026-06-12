@@ -2,10 +2,12 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { Plus, Settings as SettingsIcon, Building, Briefcase, Tag, CheckCircle2, AlertCircle, Trash2 } from 'lucide-react';
+import { useConfirm } from '../context/ConfirmContext';
 import './Settings.css';
 
 export default function Settings() {
   const queryClient = useQueryClient();
+  const { confirm } = useConfirm();
   const [activeTab, setActiveTab] = useState<'categories' | 'departments' | 'cecos'>('categories');
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
@@ -211,20 +213,34 @@ export default function Settings() {
 
   const handleCreateCategory = (e: React.FormEvent) => {
     e.preventDefault();
-    if (editingCatId) {
-      updateCatMutation.mutate();
-    } else {
-      catMutation.mutate();
-    }
+    confirm({
+      title: editingCatId ? 'Guardar Cambios' : 'Crear Categoría',
+      message: editingCatId ? '¿Estás seguro de guardar los cambios de esta categoría?' : '¿Estás seguro de crear esta categoría?',
+      type: 'info',
+      onConfirm: () => {
+        if (editingCatId) {
+          updateCatMutation.mutate();
+        } else {
+          catMutation.mutate();
+        }
+      }
+    });
   };
 
   const handleCreateDepartment = (e: React.FormEvent) => {
     e.preventDefault();
-    if (editingDepId) {
-      updateDepMutation.mutate();
-    } else {
-      depMutation.mutate();
-    }
+    confirm({
+      title: editingDepId ? 'Guardar Cambios' : 'Crear Departamento',
+      message: editingDepId ? '¿Estás seguro de guardar los cambios de este departamento?' : '¿Estás seguro de crear este departamento?',
+      type: 'info',
+      onConfirm: () => {
+        if (editingDepId) {
+          updateDepMutation.mutate();
+        } else {
+          depMutation.mutate();
+        }
+      }
+    });
   };
 
   const handleEditCategory = (cat: any) => {
@@ -694,8 +710,15 @@ export default function Settings() {
             </h3>
             <form onSubmit={e => {
               e.preventDefault();
-              if (editingCecosId) updateCecosMutation.mutate();
-              else cecosMutation.mutate();
+              confirm({
+                title: editingCecosId ? 'Guardar Cambios' : 'Crear CECOS',
+                message: editingCecosId ? '¿Estás seguro de guardar los cambios de este CECOS?' : '¿Estás seguro de crear este CECOS?',
+                type: 'info',
+                onConfirm: () => {
+                  if (editingCecosId) updateCecosMutation.mutate();
+                  else cecosMutation.mutate();
+                }
+              });
             }} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px', background: 'rgba(255,255,255,0.02)', padding: '20px', borderRadius: '12px', border: '1px dashed var(--border-glass)' }}>
                   <div className="form-group" style={{ margin: 0 }}>

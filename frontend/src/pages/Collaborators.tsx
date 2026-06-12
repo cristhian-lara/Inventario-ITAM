@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { Plus, Search, UserCheck, UserX, UserPlus, Edit2, Upload, Eye, Crown } from 'lucide-react';
+import { useConfirm } from '../context/ConfirmContext';
 import './Collaborators.css';
 
 interface Collaborator {
@@ -24,6 +25,7 @@ export default function Collaborators() {
   const [formData, setFormData] = useState({ name: '', email: '', department: '', location: '', isLeader: false, leaderId: '', cecos: '', activationDate: new Date().toISOString().split('T')[0] });
   const [locationType, setLocationType] = useState('Medellín');
   const queryClient = useQueryClient();
+  const { confirm } = useConfirm();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importing, setImporting] = useState(false);
@@ -141,11 +143,20 @@ export default function Collaborators() {
     const finalLocation = locationType === 'Otra' ? formData.location : locationType;
     const finalIsLeader = departmentHasLeader ? false : formData.isLeader;
     
-    if (editingId) {
-      editMutation.mutate();
-    } else {
-      mutation.mutate({ ...formData, location: finalLocation, isLeader: finalIsLeader, leaderId: finalIsLeader ? undefined : formData.leaderId });
-    }
+    const submitAction = () => {
+      if (editingId) {
+        editMutation.mutate();
+      } else {
+        mutation.mutate({ ...formData, location: finalLocation, isLeader: finalIsLeader, leaderId: finalIsLeader ? undefined : formData.leaderId });
+      }
+    };
+
+    confirm({
+      title: editingId ? 'Guardar Cambios' : 'Crear Colaborador',
+      message: editingId ? '¿Estás seguro de guardar los cambios de este colaborador?' : '¿Estás seguro de registrar este nuevo colaborador?',
+      type: 'info',
+      onConfirm: submitAction
+    });
   };
 
   const getDepartmentName = (deptId: string) => {
@@ -277,7 +288,16 @@ export default function Collaborators() {
                       </Link>
                       <button 
                         className={`action-icon-btn ${c.status === 'ACTIVE' ? 'delete-btn' : 'reactivate-btn'}`}
-                        onClick={() => toggleStatusMutation.mutate(c.id)}
+                        onClick={() => {
+                          confirm({
+                            title: c.status === 'ACTIVE' ? 'Dar de Baja' : 'Reactivar',
+                            message: c.status === 'ACTIVE' 
+                              ? '¿Estás seguro de dar de baja a este colaborador?' 
+                              : '¿Estás seguro de reactivar a este colaborador?',
+                            type: c.status === 'ACTIVE' ? 'danger' : 'info',
+                            onConfirm: () => toggleStatusMutation.mutate(c.id)
+                          });
+                        }}
                         title={c.status === 'ACTIVE' ? 'Dar de Baja' : 'Reactivar'}
                       >
                         {c.status === 'ACTIVE' ? <UserX size={16} /> : <UserCheck size={16} />}

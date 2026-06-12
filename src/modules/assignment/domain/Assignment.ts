@@ -94,8 +94,8 @@ export class Assignment {
      * Devolución administrativa forzada sin token del usuario.
      */
     public forceReturn(metadata: SignatureMetadata): void {
-        if (this.props.status !== 'ACCEPTED' && this.props.status !== 'PENDING_RETURN') {
-            throw new Error('Solo se puede forzar la devolución de un activo en uso');
+        if (this.props.status === 'RETURNED') {
+            throw new Error('El activo ya fue devuelto');
         }
         this.props.status = 'RETURNED';
         this.props.endDate = metadata.timestamp;

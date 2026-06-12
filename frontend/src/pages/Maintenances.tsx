@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Settings, Wrench, CheckCircle, AlertTriangle, Calendar, Plus, Clock } from 'lucide-react';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import { useConfirm } from '../context/ConfirmContext';
 import './Maintenances.css';
 
 interface MaintenanceRecord {
@@ -22,6 +23,7 @@ const Maintenances: React.FC = () => {
   const [filterType, setFilterType] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
   const [viewMode, setViewMode] = useState<'general' | 'auditoria' | 'balance'>('general');
+  const { confirm } = useConfirm();
   
   const [showModal, setShowModal] = useState(false);
   const [modalMode, setModalMode] = useState<'create' | 'start' | 'complete'>('create');
@@ -210,18 +212,37 @@ const Maintenances: React.FC = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    let title = '';
+    let message = '';
+    let submitAction: () => void;
+
     if (modalMode === 'create') {
-      createMutation.mutate({
+      title = 'Programar Mantenimiento';
+      message = '¿Estás seguro de programar este mantenimiento?';
+      submitAction = () => createMutation.mutate({
         assetId: formData.assetId,
         type: formData.type,
         scheduledDate: formData.scheduledDate,
         reason: formData.reason
       });
     } else if (modalMode === 'start' && selectedRecord) {
-      startMutation.mutate({ id: selectedRecord.id, reason: formData.reason });
+      title = 'Iniciar Mantenimiento';
+      message = '¿Estás seguro de registrar el inicio de este mantenimiento?';
+      submitAction = () => startMutation.mutate({ id: selectedRecord.id, reason: formData.reason });
     } else if (modalMode === 'complete' && selectedRecord) {
-      completeMutation.mutate({ id: selectedRecord.id, notes: formData.notes });
+      title = 'Completar Mantenimiento';
+      message = '¿Estás seguro de dar por completado este mantenimiento?';
+      submitAction = () => completeMutation.mutate({ id: selectedRecord.id, notes: formData.notes });
+    } else {
+      return;
     }
+
+    confirm({
+      title,
+      message,
+      type: 'info',
+      onConfirm: submitAction
+    });
   };
 
   const openModal = (mode: 'create' | 'start' | 'complete', record?: MaintenanceRecord) => {

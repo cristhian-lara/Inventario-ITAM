@@ -3,12 +3,14 @@ import { useParams } from 'react-router-dom';
 import SignatureCanvas from 'react-signature-canvas';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { CheckCircle } from 'lucide-react';
+import { useConfirm } from '../context/ConfirmContext';
 
 const MaintenanceSign: React.FC = () => {
   const { token } = useParams<{ token: string }>();
   const [signed, setSigned] = useState(false);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const sigCanvas = useRef<any>(null);
+  const { confirm } = useConfirm();
 
   const { data: record, isLoading, isError } = useQuery({
     queryKey: ['verifyMaintenanceToken', token],
@@ -51,8 +53,15 @@ const MaintenanceSign: React.FC = () => {
       alert('Por favor, dibuje su firma antes de confirmar.');
       return;
     }
-    const signatureBase64 = sigCanvas.current.getTrimmedCanvas().toDataURL('image/png');
-    signMutation.mutate(signatureBase64);
+    confirm({
+      title: 'Confirmar Firma',
+      message: 'Al confirmar, acepto que el equipo ha recibido mantenimiento a conformidad.',
+      type: 'info',
+      onConfirm: () => {
+        const signatureBase64 = sigCanvas.current.getTrimmedCanvas().toDataURL('image/png');
+        signMutation.mutate(signatureBase64);
+      }
+    });
   };
 
   if (isLoading) {
