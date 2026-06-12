@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
-import { Plus, Search, Tag, Cpu, HardDrive, Wifi, PlusCircle, MonitorSmartphone, RefreshCw, CheckCircle2, AlertCircle, AlertTriangle, UserCheck, Send } from 'lucide-react';
+import { Plus, Search, Tag, Cpu, HardDrive, Wifi, PlusCircle, MonitorSmartphone, RefreshCw, CheckCircle2, AlertCircle, AlertTriangle, UserCheck, Send, Upload } from 'lucide-react';
 import { useConfirm } from '../context/ConfirmContext';
 import './Catalog.css';
 
@@ -19,6 +19,10 @@ export default function Catalog() {
   const { confirm } = useConfirm();
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<{successful: number, failed: number, errors: string[]} | null>(null);
 
   // Estados de los modales
   const [returnId, setReturnId] = useState<string | null>(null);
@@ -34,7 +38,7 @@ export default function Catalog() {
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [newAsset, setNewAsset] = useState<{ id: string; categoryId: string; serial: string; dynamicAttributes: any; purchaseDate?: string; warrantyMonths?: number; depreciationYears?: number; purchasePrice?: number }>({
+  const [newAsset, setNewAsset] = useState<{ id: string; categoryId: number | ''; serial: string; dynamicAttributes: any; purchaseDate?: string; warrantyMonths?: number; depreciationYears?: number; purchasePrice?: number }>({
     id: '',
     categoryId: '',
     serial: '',
@@ -58,6 +62,33 @@ export default function Catalog() {
       }));
     }
   }, [assignModalAssetId]);
+
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setImporting(true);
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const response = await axios.post('http://localhost:3000/api/catalog/assets/import', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      setImportResult(response.data);
+      queryClient.invalidateQueries({ queryKey: ['assets'] });
+      setSuccessMsg('Importación procesada');
+      setTimeout(() => setSuccessMsg(''), 8000);
+    } catch (error: any) {
+      setErrorMsg('Error en la importación: ' + (error.response?.data?.error || error.message));
+      setTimeout(() => setErrorMsg(''), 8000);
+    } finally {
+      setImporting(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
 
   const { data: assets, isLoading, error } = useQuery<Asset[]>({
     queryKey: ['assets'],
@@ -296,7 +327,7 @@ export default function Catalog() {
     setIsEditing(true);
     setNewAsset({
       id: asset.id,
-      categoryId: asset.categoryId,
+      categoryId: Number(asset.categoryId),
       serial: asset.serial,
       dynamicAttributes: asset.dynamicAttributes || {},
       purchaseDate: asset.purchaseDate ? asset.purchaseDate.split('T')[0] : '',
@@ -338,7 +369,7 @@ export default function Catalog() {
     }
     
     if (filterCategory !== 'all') {
-      if (asset.categoryId !== filterCategory) return false;
+      if (Number(asset.categoryId) !== Number(filterCategory)) return false;
     }
     
     if (filterStatus !== 'all') {
@@ -347,7 +378,7 @@ export default function Catalog() {
 
     return asset.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (asset.serial && asset.serial.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      asset.categoryId.toLowerCase().includes(searchTerm.toLowerCase());
+      String(asset.categoryId).toLowerCase().includes(searchTerm.toLowerCase());
   });
 
   return (
@@ -357,13 +388,30 @@ export default function Catalog() {
           <h1 className="title-glow" style={{ fontSize: '32px', marginBottom: '8px' }}>Catálogo de Activos</h1>
           <p style={{ color: 'var(--text-muted)' }}>Visualiza y administra todos los equipos registrados en el inventario.</p>
         </div>
-        <button className="btn-primary" onClick={() => {
-          setIsEditing(false);
-          setNewAsset({ id: '', categoryId: '', serial: '', dynamicAttributes: {} });
-          setShowAddModal(true);
-        }}>
-          <Plus size={20} /> Nuevo Activo
-        </button>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <input
+            type="file"
+            accept=".xlsx, .xls, .csv"
+            style={{ display: 'none' }}
+            ref={fileInputRef}
+            onChange={handleImport}
+          />
+          <button 
+            className="btn-secondary" 
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', borderRadius: '12px', background: 'var(--glass-bg)', color: 'var(--text-main)', border: '1px solid var(--border-glass)', cursor: 'pointer', fontWeight: '500', transition: 'all 0.3s ease' }} 
+            onClick={() => fileInputRef.current?.click()} 
+            disabled={importing}
+          >
+            {importing ? 'Importando...' : <><Upload size={18} /> Importar (.xlsx, .csv)</>}
+          </button>
+          <button className="btn-primary" onClick={() => {
+            setIsEditing(false);
+            setNewAsset({ id: '', categoryId: '', serial: '', dynamicAttributes: {} });
+            setShowAddModal(true);
+          }}>
+            <Plus size={20} /> Nuevo Activo
+          </button>
+        </div>
       </header>
 
       {successMsg && (
@@ -377,6 +425,42 @@ export default function Catalog() {
         <div className="alert alert-error" style={{ marginBottom: '20px' }}>
           <AlertCircle size={20} />
           {errorMsg}
+        </div>
+      )}
+
+      {importResult && (
+        <div className="glass-panel" style={{ marginBottom: '20px', borderLeft: '4px solid #3b82f6', background: 'rgba(59, 130, 246, 0.05)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div>
+              <h3 style={{ marginTop: 0, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <CheckCircle2 size={20} color="#3b82f6" />
+                Resultados de Importación
+              </h3>
+              <div style={{ display: 'flex', gap: '20px', marginTop: '10px' }}>
+                <p style={{ margin: 0, color: 'var(--text-muted)' }}>
+                  <strong style={{ color: '#22c55e' }}>Exitosos:</strong> {importResult.successful}
+                </p>
+                <p style={{ margin: 0, color: 'var(--text-muted)' }}>
+                  <strong style={{ color: '#ef4444' }}>Fallidos:</strong> {importResult.failed}
+                </p>
+              </div>
+              
+              {importResult.errors && importResult.errors.length > 0 && (
+                <div style={{ marginTop: '15px', padding: '15px', background: 'rgba(239, 68, 68, 0.1)', borderRadius: '8px', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
+                  <h4 style={{ color: '#ef4444', margin: '0 0 10px 0', fontSize: '14px' }}>Detalles de errores:</h4>
+                  <div style={{ maxHeight: '150px', overflowY: 'auto', fontSize: '13px', color: 'var(--text-muted)' }}>
+                    {importResult.errors.map((err, i) => <div key={i} style={{ marginBottom: '4px' }}>• {err}</div>)}
+                  </div>
+                </div>
+              )}
+            </div>
+            <button 
+              onClick={() => setImportResult(null)}
+              style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '5px' }}
+            >
+              ✕
+            </button>
+          </div>
         </div>
       )}
 
@@ -868,7 +952,7 @@ export default function Catalog() {
                   value={newAsset.categoryId}
                   disabled={isEditing}
                   onChange={e => {
-                    const catId = e.target.value;
+                    const catId = Number(e.target.value);
                     const cat = categories?.find((c: any) => c.id === catId);
                     const newDynamicAttr: any = {};
                     if (cat && cat.schemaDefinition?.fields) {

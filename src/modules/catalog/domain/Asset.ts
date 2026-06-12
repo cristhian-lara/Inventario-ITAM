@@ -4,7 +4,7 @@ export type AssetStatus = 'AVAILABLE' | 'IN_USE' | 'IN_MAINTENANCE' | 'PENDING_I
 
 export interface AssetProps {
     id: string;
-    categoryId: string;
+    categoryId: number;
     serial?: string;
     status: AssetStatus;
     dynamicAttributes: Record<string, any>;
@@ -30,7 +30,7 @@ export class Asset {
     }
 
     get id(): string { return this.props.id; }
-    get categoryId(): string { return this.props.categoryId; }
+    get categoryId(): number { return this.props.categoryId; }
     get serial(): string | undefined { return this.props.serial; }
     get status(): AssetStatus { return this.props.status; }
     get dynamicAttributes(): Record<string, any> { return this.props.dynamicAttributes; }

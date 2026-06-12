@@ -25,12 +25,12 @@ collaboratorRouter.get('/departments', async (req, res) => {
 
 collaboratorRouter.post('/departments', async (req, res) => {
     try {
-        const { id, name, description } = req.body;
-        if (!id || !name) {
-            return res.status(400).json({ error: 'Missing required fields (id, name)' });
+        const { name, description } = req.body;
+        if (!name) {
+            return res.status(400).json({ error: 'Missing required fields (name)' });
         }
-        const department = await useCases.createDepartment({ id, name, description });
-        res.status(201).json(department);
+        const departmentObj = await useCases.createDepartment({ name, description });
+        res.status(201).json(departmentObj);
     } catch (error: any) {
         if (error.message.includes('already exists')) {
             return res.status(409).json({ error: error.message });
@@ -45,8 +45,8 @@ collaboratorRouter.put('/departments/:id', async (req, res) => {
         if (!name) {
             return res.status(400).json({ error: 'Missing required fields (name)' });
         }
-        const department = await useCases.updateDepartment(req.params.id, name, description);
-        res.json(department);
+        const departmentObj = await useCases.updateDepartment(Number(req.params.id), name, description);
+        res.json(departmentObj);
     } catch (error: any) {
         if (error.message.includes('not found')) {
             return res.status(404).json({ error: error.message });
@@ -144,7 +144,7 @@ collaboratorRouter.post('/', async (req, res) => {
         }
 
         const collaborator = await useCases.createCollaborator({ 
-            name, email, department, location, isLeader, leaderId, dynamicAttributes, activationDate 
+            name, email, department: Number(department), location, isLeader, leaderId, dynamicAttributes, activationDate 
         });
         res.status(201).json(collaborator);
     } catch (error: any) {

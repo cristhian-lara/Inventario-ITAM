@@ -9,7 +9,7 @@ export interface FieldDefinition {
 }
 
 export interface CategoryProps {
-    id: string;
+    id?: number;
     name: string;
     schemaDefinition: { 
         requiresPlacaIkusi?: boolean; // Default should be true if not provided
@@ -28,7 +28,7 @@ export class Category {
         this.props = props;
     }
 
-    get id(): string { return this.props.id; }
+    get id(): number | undefined { return this.props.id; }
     get name(): string { return this.props.name; }
     get schemaDefinition(): Record<string, any> { return this.props.schemaDefinition; }
 

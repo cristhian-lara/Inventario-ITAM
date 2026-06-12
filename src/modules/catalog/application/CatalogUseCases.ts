@@ -5,8 +5,8 @@ import { ICatalogRepository } from '../domain/ICatalogRepository';
 export class CatalogUseCases {
     constructor(private readonly repository: ICatalogRepository) {}
 
-    async createCategory(id: string, name: string, schema: Record<string, any>): Promise<Category> {
-        const category = new Category({ id, name, schemaDefinition: schema as any });
+    async createCategory(name: string, schema: Record<string, any>): Promise<Category> {
+        const category = new Category({ name, schemaDefinition: schema as any });
         await this.repository.saveCategory(category);
         return category;
     }
@@ -15,7 +15,7 @@ export class CatalogUseCases {
         return this.repository.getAllCategories();
     }
 
-    async updateCategory(id: string, name: string, schema: Record<string, any>): Promise<Category> {
+    async updateCategory(id: number, name: string, schema: Record<string, any>): Promise<Category> {
         const existing = await this.repository.getCategoryById(id);
         if (!existing) {
             throw new Error(`La categoría con ID ${id} no existe.`);
@@ -25,7 +25,7 @@ export class CatalogUseCases {
         return updatedCategory;
     }
 
-    async createAsset(id: string, categoryId: string, serial: string, dynamicAttributes: Record<string, any>, purchaseDate?: Date, warrantyMonths?: number, depreciationYears?: number): Promise<Asset> {
+    async createAsset(id: string, categoryId: number, serial: string, dynamicAttributes: Record<string, any>, purchaseDate?: Date, warrantyMonths?: number, depreciationYears?: number): Promise<Asset> {
         const category = await this.repository.getCategoryById(categoryId);
         if (!category) {
             throw new Error(`La categoría con ID ${categoryId} no existe.`);
@@ -90,5 +90,74 @@ export class CatalogUseCases {
 
         await this.repository.saveAsset(asset);
         return asset;
+    }
+
+    async importAssets(records: any[]): Promise<{ successful: number; failed: number; errors: string[] }> {
+        let successful = 0;
+        let failed = 0;
+        const errors: string[] = [];
+
+        const allCategories = await this.repository.getAllCategories();
+
+        for (const [index, record] of records.entries()) {
+            try {
+                // Known columns
+                const rawId = record['Placa Ikusi'] || record.PlacaIkusi || record.ID || record.id || '';
+                const categoryRaw = record['Categoría'] || record.Categoria || record.Category || record.category || record.categoryId;
+                const serial = record['Serial'] || record.serial || record.SerialNumber;
+                const purchaseDateRaw = record['Fecha de Compra'] || record.PurchaseDate || record.purchaseDate;
+                const warrantyMonthsRaw = record['Meses Garantía'] || record.WarrantyMonths || record.warrantyMonths;
+                const depreciationYearsRaw = record['Años Depreciación'] || record.DepreciationYears || record.depreciationYears;
+
+                if (!categoryRaw || !serial) {
+                    throw new Error('Faltan campos obligatorios (Categoría, Serial)');
+                }
+
+                const category = allCategories.find(c => c.id === Number(categoryRaw) || c.name.toLowerCase() === String(categoryRaw).toLowerCase().trim());
+                if (!category) {
+                    throw new Error(`La categoría '${categoryRaw}' no existe.`);
+                }
+
+                // Dynamic attributes
+                const knownKeys = ['Placa Ikusi', 'PlacaIkusi', 'ID', 'id', 'Categoría', 'Categoria', 'Category', 'category', 'categoryId', 'Serial', 'serial', 'SerialNumber', 'Fecha de Compra', 'PurchaseDate', 'purchaseDate', 'Meses Garantía', 'WarrantyMonths', 'warrantyMonths', 'Años Depreciación', 'DepreciationYears', 'depreciationYears', 'Precio Compra', 'PurchasePrice', 'purchasePrice'];
+                const dynamicAttributes: Record<string, any> = {};
+                for (const key of Object.keys(record)) {
+                    if (!knownKeys.includes(key)) {
+                        dynamicAttributes[key] = record[key];
+                    }
+                }
+
+                // parse dates and numbers safely
+                let purchaseDate: Date | undefined = undefined;
+                if (purchaseDateRaw) {
+                    // Excel might return a number for dates, or a string
+                    if (typeof purchaseDateRaw === 'number') {
+                        purchaseDate = new Date((purchaseDateRaw - (25567 + 2)) * 86400 * 1000); // Excel date conversion
+                    } else {
+                        purchaseDate = new Date(purchaseDateRaw);
+                    }
+                }
+
+                const warrantyMonths = warrantyMonthsRaw ? parseInt(String(warrantyMonthsRaw), 10) : undefined;
+                const depreciationYears = depreciationYearsRaw ? parseInt(String(depreciationYearsRaw), 10) : undefined;
+
+                await this.createAsset(
+                    String(rawId).trim(),
+                    category.id as number,
+                    String(serial).trim(),
+                    dynamicAttributes,
+                    purchaseDate,
+                    warrantyMonths,
+                    depreciationYears
+                );
+                
+                successful++;
+            } catch (error: any) {
+                failed++;
+                errors.push(`Fila ${index + 2}: ${error.message}`);
+            }
+        }
+
+        return { successful, failed, errors };
     }
 }

@@ -7,7 +7,7 @@ export class AssetOrmEntity {
     id!: string;
 
     @Column()
-    category_id!: string;
+    category_id!: number;
 
     @Column({ nullable: true })
     serial?: string;

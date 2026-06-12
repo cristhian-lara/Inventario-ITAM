@@ -1,6 +1,6 @@
 export class Department {
     constructor(
-        public readonly id: string,
+        public readonly id: number | undefined,
         public readonly name: string,
         public readonly description: string | null,
         public readonly createdAt: Date
@@ -10,7 +10,7 @@ export class Department {
         }
     }
 
-    static create(id: string, name: string, description: string | null = null): Department {
+    static create(name: string, description: string | null = null, id?: number): Department {
         return new Department(id, name, description, new Date());
     }
 }

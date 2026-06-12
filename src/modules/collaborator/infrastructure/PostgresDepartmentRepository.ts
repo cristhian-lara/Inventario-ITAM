@@ -16,7 +16,7 @@ export class PostgresDepartmentRepository implements IDepartmentRepository {
         await this.repo.save(ormEntity);
     }
 
-    async findById(id: string): Promise<Department | null> {
+    async findById(id: number): Promise<Department | null> {
         const ormEntity = await this.repo.findOneBy({ id });
         if (!ormEntity) return null;
         

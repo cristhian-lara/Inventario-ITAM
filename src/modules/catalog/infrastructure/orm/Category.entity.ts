@@ -1,9 +1,9 @@
-import { Entity, PrimaryColumn, Column } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
 
 @Entity('categories', { schema: 'public' })
 export class CategoryOrmEntity {
-    @PrimaryColumn()
-    id!: string;
+    @PrimaryGeneratedColumn('increment')
+    id!: number;
 
     @Column()
     name!: string;

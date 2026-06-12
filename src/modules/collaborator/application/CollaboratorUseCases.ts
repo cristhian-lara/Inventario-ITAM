@@ -10,7 +10,7 @@ import { ICecosRepository } from '../domain/ICecosRepository';
 interface CreateCollaboratorDTO {
     name: string;
     email: string;
-    department: string;
+    department: number;
     location: string;
     isLeader?: boolean;
     leaderId?: string | null;
@@ -112,13 +112,8 @@ export class CollaboratorUseCases {
 
     // --- Department Use Cases ---
 
-    async createDepartment(data: { id: string, name: string, description?: string }): Promise<Department> {
-        const existing = await this.departmentRepo.findById(data.id);
-        if (existing) {
-            throw new Error(`Department with ID ${data.id} already exists`);
-        }
-
-        const department = Department.create(data.id, data.name, data.description || null);
+    async createDepartment(data: { name: string, description?: string }): Promise<Department> {
+        const department = Department.create(data.name, data.description || null);
         await this.departmentRepo.save(department);
         return department;
     }
@@ -127,7 +122,7 @@ export class CollaboratorUseCases {
         return this.departmentRepo.findAll();
     }
 
-    async updateDepartment(id: string, name: string, description?: string): Promise<Department> {
+    async updateDepartment(id: number, name: string, description?: string): Promise<Department> {
         const existing = await this.departmentRepo.findById(id);
         if (!existing) {
             throw new Error(`Department with ID ${id} not found`);
@@ -163,7 +158,7 @@ export class CollaboratorUseCases {
     async updateCollaborator(
         id: string,
         name: string,
-        departmentId: string,
+        departmentId: number,
         location: string,
         status: 'ACTIVE' | 'INACTIVE',
         isLeader: boolean,
@@ -188,7 +183,7 @@ export class CollaboratorUseCases {
             collaborator.id,
             name,
             collaborator.email,
-            department.name,
+            department.id!,
             location,
             status,
             activationDate ? new Date(activationDate) : collaborator.activationDate,
@@ -250,7 +245,7 @@ export class CollaboratorUseCases {
                 await this.createCollaborator({
                     name: String(name).trim(),
                     email: String(email).trim(),
-                    department: department.id,
+                    department: Number(department.id),
                     location: String(location).trim(),
                     isLeader: isLeader,
                     dynamicAttributes: cecosId ? { CECOS: String(cecosId).trim() } : {},

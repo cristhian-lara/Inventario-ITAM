@@ -18,7 +18,7 @@ export class PostgresCatalogRepository implements ICatalogRepository {
         await this.categoryRepo.save(ormEntity);
     }
 
-    async getCategoryById(id: string): Promise<Category | null> {
+    async getCategoryById(id: number): Promise<Category | null> {
         const ormEntity = await this.categoryRepo.findOneBy({ id });
         if (!ormEntity) return null;
         
@@ -97,7 +97,7 @@ export class PostgresCatalogRepository implements ICatalogRepository {
         return assets;
     }
 
-    async generateIncrementalId(categoryId: string): Promise<string> {
+    async generateIncrementalId(categoryId: number): Promise<string> {
         const count = await this.assetRepo.count({
             where: { category_id: categoryId }
         });

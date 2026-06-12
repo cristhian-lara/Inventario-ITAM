@@ -13,13 +13,11 @@ export default function Settings() {
   const [errorMsg, setErrorMsg] = useState('');
 
   // Estados form Categoría
-  const [newCatId, setNewCatId] = useState('');
   const [newCatName, setNewCatName] = useState('');
   const [newCatRequiresPlaca, setNewCatRequiresPlaca] = useState(true);
   const [fields, setFields] = useState<FieldConfig[]>([{ name: '', isRequired: true, type: 'text', options: [], unit: '', newOptionValue: '' }]);
 
   // Estados form Departamento
-  const [newDepId, setNewDepId] = useState('');
   const [newDepName, setNewDepName] = useState('');
   const [newDepDesc, setNewDepDesc] = useState('');
 
@@ -30,8 +28,8 @@ export default function Settings() {
   const [editingCecosId, setEditingCecosId] = useState<string | null>(null);
   const [showCecosModal, setShowCecosModal] = useState(false);
 
-  const [editingCatId, setEditingCatId] = useState<string | null>(null);
-  const [editingDepId, setEditingDepId] = useState<string | null>(null);
+  const [editingCatId, setEditingCatId] = useState<number | null>(null);
+  const [editingDepId, setEditingDepId] = useState<number | null>(null);
   const [showCatModal, setShowCatModal] = useState(false);
   const [showDepModal, setShowDepModal] = useState(false);
 
@@ -69,7 +67,6 @@ export default function Settings() {
         unit: f.unit || undefined
       }));
       const payload = {
-        id: newCatId,
         name: newCatName,
         schema: { 
           requiresPlacaIkusi: newCatRequiresPlaca,
@@ -81,7 +78,7 @@ export default function Settings() {
     },
     onSuccess: () => {
       setSuccessMsg('Categoría creada con éxito');
-      setNewCatId(''); setNewCatName(''); setNewCatRequiresPlaca(true); setFields([{name: '', isRequired: true, type: 'text', options: [], unit: '', newOptionValue: ''}]); setShowCatModal(false);
+      setNewCatName(''); setNewCatRequiresPlaca(true); setFields([{name: '', isRequired: true, type: 'text', options: [], unit: '', newOptionValue: ''}]); setShowCatModal(false);
       queryClient.invalidateQueries({ queryKey: ['categories'] });
       setTimeout(() => setSuccessMsg(''), 5000);
     },
@@ -111,7 +108,7 @@ export default function Settings() {
     },
     onSuccess: () => {
       setSuccessMsg('Categoría actualizada con éxito');
-      setNewCatId(''); setNewCatName(''); setFields([{name: '', isRequired: true, type: 'text', options: [], unit: '', newOptionValue: ''}]); setShowCatModal(false); setEditingCatId(null);
+      setNewCatName(''); setFields([{name: '', isRequired: true, type: 'text', options: [], unit: '', newOptionValue: ''}]); setShowCatModal(false); setEditingCatId(null);
       queryClient.invalidateQueries({ queryKey: ['categories'] });
       setTimeout(() => setSuccessMsg(''), 5000);
     },
@@ -124,7 +121,6 @@ export default function Settings() {
   const depMutation = useMutation({
     mutationFn: async () => {
       const res = await axios.post('http://localhost:3000/api/collaborators/departments', {
-        id: newDepId,
         name: newDepName,
         description: newDepDesc
       });
@@ -132,7 +128,7 @@ export default function Settings() {
     },
     onSuccess: () => {
       setSuccessMsg('Departamento creado con éxito');
-      setNewDepId(''); setNewDepName(''); setNewDepDesc(''); setShowDepModal(false);
+      setNewDepName(''); setNewDepDesc(''); setShowDepModal(false);
       queryClient.invalidateQueries({ queryKey: ['departments'] });
       setTimeout(() => setSuccessMsg(''), 5000);
     },
@@ -152,7 +148,7 @@ export default function Settings() {
     },
     onSuccess: () => {
       setSuccessMsg('Departamento actualizado con éxito');
-      setNewDepId(''); setNewDepName(''); setNewDepDesc(''); setShowDepModal(false); setEditingDepId(null);
+      setNewDepName(''); setNewDepDesc(''); setShowDepModal(false); setEditingDepId(null);
       queryClient.invalidateQueries({ queryKey: ['departments'] });
       setTimeout(() => setSuccessMsg(''), 5000);
     },
@@ -245,7 +241,6 @@ export default function Settings() {
 
   const handleEditCategory = (cat: any) => {
     setEditingCatId(cat.id);
-    setNewCatId(cat.id);
     setNewCatName(cat.name);
     setNewCatRequiresPlaca(cat.schemaDefinition?.requiresPlacaIkusi !== false);
     const catFields = cat.schemaDefinition?.fields || [];
@@ -311,7 +306,6 @@ export default function Settings() {
                 <h3 style={{ margin: 0 }}>Categorías Existentes</h3>
                 <button className="btn-primary" onClick={() => {
                   setEditingCatId(null);
-                  setNewCatId('');
                   setNewCatName('');
                   setNewCatRequiresPlaca(true);
                   setFields([{name: '', isRequired: true, type: 'text', options: [], unit: '', newOptionValue: ''}]);
@@ -358,7 +352,6 @@ export default function Settings() {
                 <h3 style={{ margin: 0 }}>Departamentos Existentes</h3>
                 <button className="btn-primary" onClick={() => {
                   setEditingDepId(null);
-                  setNewDepId('');
                   setNewDepName('');
                   setNewDepDesc('');
                   setShowDepModal(true);
@@ -378,7 +371,6 @@ export default function Settings() {
                       <button 
                         onClick={() => {
                           setEditingDepId(dep.id);
-                          setNewDepId(dep.id);
                           setNewDepName(dep.name);
                           setNewDepDesc(dep.description || '');
                           setShowDepModal(true);
@@ -453,10 +445,6 @@ export default function Settings() {
             </h3>
             <form onSubmit={handleCreateCategory} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px', background: 'rgba(255,255,255,0.02)', padding: '20px', borderRadius: '12px', border: '1px dashed var(--border-glass)' }}>
-                  <div className="form-group" style={{ margin: 0 }}>
-                    <label>ID (Ej: laptop, mobile)</label>
-                    <input required className="glass-input" disabled={!!editingCatId} value={newCatId} onChange={e => setNewCatId(e.target.value.toLowerCase())} />
-                  </div>
                   <div className="form-group" style={{ margin: 0 }}>
                     <label>Nombre (Ej: Laptop, Teléfono Móvil)</label>
                     <input required className="glass-input" value={newCatName} onChange={e => setNewCatName(e.target.value)} />
@@ -644,7 +632,7 @@ export default function Settings() {
                     <Plus size={16} /> {editingCatId ? 'Guardar Cambios' : 'Crear Categoría'}
                   </button>
                   {editingCatId && (
-                    <button type="button" className="btn-secondary" style={{ padding: '10px 16px', background: 'transparent', border: '1px solid var(--border-glass)', color: 'white', cursor: 'pointer' }} onClick={() => { setEditingCatId(null); setNewCatId(''); setNewCatName(''); setFields([{name: '', isRequired: true, type: 'text', options: ''}]); }}>
+                    <button type="button" className="btn-secondary" style={{ padding: '10px 16px', background: 'transparent', border: '1px solid var(--border-glass)', color: 'white', cursor: 'pointer' }} onClick={() => { setEditingCatId(null); setNewCatName(''); setFields([{name: '', isRequired: true, type: 'text', options: []} as any]); setShowCatModal(false); }}>
                       Cancelar
                     </button>
                   )}
@@ -669,10 +657,6 @@ export default function Settings() {
             <form onSubmit={handleCreateDepartment} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px', background: 'rgba(255,255,255,0.02)', padding: '20px', borderRadius: '12px', border: '1px dashed var(--border-glass)' }}>
                   <div className="form-group" style={{ margin: 0 }}>
-                    <label>ID (Ej: ti, rh, ventas)</label>
-                    <input required className="glass-input" disabled={!!editingDepId} value={newDepId} onChange={e => setNewDepId(e.target.value.toLowerCase())} />
-                  </div>
-                  <div className="form-group" style={{ margin: 0 }}>
                     <label>Nombre del Departamento</label>
                     <input required className="glass-input" value={newDepName} onChange={e => setNewDepName(e.target.value)} />
                   </div>
@@ -686,7 +670,7 @@ export default function Settings() {
                     <Plus size={16} /> {editingDepId ? 'Guardar Cambios' : 'Crear Departamento'}
                   </button>
                   {editingDepId && (
-                    <button type="button" className="btn-secondary" style={{ padding: '10px 16px', background: 'transparent', border: '1px solid var(--border-glass)', color: 'white', cursor: 'pointer' }} onClick={() => { setEditingDepId(null); setNewDepId(''); setNewDepName(''); setNewDepDesc(''); setShowDepModal(false); }}>
+                    <button type="button" className="btn-secondary" style={{ padding: '10px 16px', background: 'transparent', border: '1px solid var(--border-glass)', color: 'white', cursor: 'pointer' }} onClick={() => { setEditingDepId(null); setNewDepName(''); setNewDepDesc(''); setShowDepModal(false); }}>
                       Cancelar
                     </button>
                   )}

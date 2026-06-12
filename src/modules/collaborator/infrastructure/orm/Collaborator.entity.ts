@@ -12,7 +12,7 @@ export class CollaboratorOrmEntity {
     email!: string;
 
     @Column()
-    department!: string;
+    department!: number;
 
     @Column()
     location!: string;

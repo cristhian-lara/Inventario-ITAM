@@ -81,6 +81,7 @@ export default function Collaborators() {
   const mutation = useMutation({
     mutationFn: (newCollab: any) => axios.post('http://localhost:3000/api/collaborators', {
       ...newCollab,
+      department: Number(newCollab.department),
       leaderId: newCollab.leaderId || null,
       dynamicAttributes: { CECOS: newCollab.cecos }
     }),
@@ -96,7 +97,7 @@ export default function Collaborators() {
     mutationFn: async () => {
       const payload = {
         name: formData.name,
-        departmentId: formData.department,
+        departmentId: Number(formData.department),
         location: locationType === 'Otra' ? formData.location : locationType,
         status: 'ACTIVE',
         isLeader: departmentHasLeader ? false : formData.isLeader,
