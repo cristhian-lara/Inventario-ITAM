@@ -4,6 +4,7 @@ import SignatureCanvas from 'react-signature-canvas';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { CheckCircle } from 'lucide-react';
 import { useConfirm } from '../context/ConfirmContext';
+import { API_URL } from '../config';
 
 const MaintenanceSign: React.FC = () => {
   const { token } = useParams<{ token: string }>();
@@ -93,7 +94,7 @@ const MaintenanceSign: React.FC = () => {
           
           {pdfUrl && (
             <a 
-              href={`http://localhost:3000${pdfUrl}`} 
+              href={`${API_URL}${pdfUrl}`} 
               target="_blank" 
               rel="noreferrer"
               style={{

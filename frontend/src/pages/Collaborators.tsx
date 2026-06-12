@@ -5,6 +5,7 @@ import axios from 'axios';
 import { Plus, Search, UserCheck, UserX, UserPlus, Edit2, Upload, Eye, Crown } from 'lucide-react';
 import { useConfirm } from '../context/ConfirmContext';
 import './Collaborators.css';
+import { API_URL } from '../config';
 
 interface Collaborator {
   id: string;
@@ -40,7 +41,7 @@ export default function Collaborators() {
     formData.append('file', file);
 
     try {
-      const response = await axios.post('http://localhost:3000/api/collaborators/import', formData, {
+      const response = await axios.post(`${API_URL}/api/collaborators/import`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       setImportResult(response.data);
@@ -56,14 +57,14 @@ export default function Collaborators() {
   const { data: collaborators = [] } = useQuery<Collaborator[]>({
     queryKey: ['collaborators'],
     queryFn: async () => {
-      const response = await axios.get('http://localhost:3000/api/collaborators');
+      const response = await axios.get(`${API_URL}/api/collaborators`);
       return response.data;
     }
   });
   const { data: cecosList } = useQuery({
     queryKey: ['cecos'],
     queryFn: async () => {
-      const response = await axios.get('http://localhost:3000/api/collaborators/cecos');
+      const response = await axios.get(`${API_URL}/api/collaborators/cecos`);
       return response.data;
     }
   });
@@ -73,13 +74,13 @@ export default function Collaborators() {
   const { data: departments } = useQuery<any[]>({
     queryKey: ['departments'],
     queryFn: async () => {
-      const response = await axios.get('http://localhost:3000/api/collaborators/departments');
+      const response = await axios.get(`${API_URL}/api/collaborators/departments`);
       return response.data;
     }
   });
 
   const mutation = useMutation({
-    mutationFn: (newCollab: any) => axios.post('http://localhost:3000/api/collaborators', {
+    mutationFn: (newCollab: any) => axios.post(`${API_URL}/api/collaborators`, {
       ...newCollab,
       department: Number(newCollab.department),
       leaderId: newCollab.leaderId || null,
@@ -105,7 +106,7 @@ export default function Collaborators() {
         dynamicAttributes: { CECOS: formData.cecos },
         activationDate: formData.activationDate
       };
-      const response = await axios.put(`http://localhost:3000/api/collaborators/${editingId}`, payload);
+      const response = await axios.put(`${API_URL}/api/collaborators/${editingId}`, payload);
       return response.data;
     },
     onSuccess: () => {
@@ -135,7 +136,7 @@ export default function Collaborators() {
   };
 
   const toggleStatusMutation = useMutation({
-    mutationFn: (id: string) => axios.patch(`http://localhost:3000/api/collaborators/${id}/toggle-status`),
+    mutationFn: (id: string) => axios.patch(`${API_URL}/api/collaborators/${id}/toggle-status`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['collaborators'] })
   });
 

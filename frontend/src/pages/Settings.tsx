@@ -4,6 +4,7 @@ import axios from 'axios';
 import { Plus, Settings as SettingsIcon, Building, Briefcase, Tag, CheckCircle2, AlertCircle, Trash2 } from 'lucide-react';
 import { useConfirm } from '../context/ConfirmContext';
 import './Settings.css';
+import { API_URL } from '../config';
 
 export default function Settings() {
   const queryClient = useQueryClient();
@@ -36,7 +37,7 @@ export default function Settings() {
   const { data: categories, isLoading: loadingCat } = useQuery({
     queryKey: ['categories'],
     queryFn: async () => {
-      const response = await axios.get('http://localhost:3000/api/catalog/categories');
+      const response = await axios.get(`${API_URL}/api/catalog/categories`);
       return response.data;
     }
   });
@@ -44,7 +45,7 @@ export default function Settings() {
   const { data: departments, isLoading: loadingDep } = useQuery({
     queryKey: ['departments'],
     queryFn: async () => {
-      const response = await axios.get('http://localhost:3000/api/collaborators/departments');
+      const response = await axios.get(`${API_URL}/api/collaborators/departments`);
       return response.data;
     }
   });
@@ -52,7 +53,7 @@ export default function Settings() {
   const { data: cecosList, isLoading: loadingCecos } = useQuery({
     queryKey: ['cecos'],
     queryFn: async () => {
-      const response = await axios.get('http://localhost:3000/api/collaborators/cecos');
+      const response = await axios.get(`${API_URL}/api/collaborators/cecos`);
       return response.data;
     }
   });
@@ -73,7 +74,7 @@ export default function Settings() {
           fields: cleanFields 
         }
       };
-      const res = await axios.post('http://localhost:3000/api/catalog/categories', payload);
+      const res = await axios.post(`${API_URL}/api/catalog/categories`, payload);
       return res.data;
     },
     onSuccess: () => {
@@ -97,7 +98,7 @@ export default function Settings() {
         options: Array.isArray(f.options) ? f.options : [],
         unit: f.unit || undefined
       }));
-      const res = await axios.put(`http://localhost:3000/api/catalog/categories/${editingCatId}`, {
+      const res = await axios.put(`${API_URL}/api/catalog/categories/${editingCatId}`, {
         name: newCatName,
         schema: {
           requiresPlacaIkusi: newCatRequiresPlaca,
@@ -120,7 +121,7 @@ export default function Settings() {
 
   const depMutation = useMutation({
     mutationFn: async () => {
-      const res = await axios.post('http://localhost:3000/api/collaborators/departments', {
+      const res = await axios.post(`${API_URL}/api/collaborators/departments`, {
         name: newDepName,
         description: newDepDesc
       });
@@ -140,7 +141,7 @@ export default function Settings() {
 
   const updateDepMutation = useMutation({
     mutationFn: async () => {
-      const res = await axios.put(`http://localhost:3000/api/collaborators/departments/${editingDepId}`, {
+      const res = await axios.put(`${API_URL}/api/collaborators/departments/${editingDepId}`, {
         name: newDepName,
         description: newDepDesc
       });
@@ -160,7 +161,7 @@ export default function Settings() {
 
   const cecosMutation = useMutation({
     mutationFn: async () => {
-      const res = await axios.post('http://localhost:3000/api/collaborators/cecos', {
+      const res = await axios.post(`${API_URL}/api/collaborators/cecos`, {
         id: newCecosId,
         name: newCecosName,
         description: newCecosDesc
@@ -181,7 +182,7 @@ export default function Settings() {
 
   const updateCecosMutation = useMutation({
     mutationFn: async () => {
-      const res = await axios.put(`http://localhost:3000/api/collaborators/cecos/${editingCecosId}`, {
+      const res = await axios.put(`${API_URL}/api/collaborators/cecos/${editingCecosId}`, {
         name: newCecosName,
         description: newCecosDesc
       });

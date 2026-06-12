@@ -5,6 +5,7 @@ import axios from 'axios';
 import { Plus, Search, Tag, Cpu, HardDrive, Wifi, PlusCircle, MonitorSmartphone, RefreshCw, CheckCircle2, AlertCircle, AlertTriangle, UserCheck, Send, Upload } from 'lucide-react';
 import { useConfirm } from '../context/ConfirmContext';
 import './Catalog.css';
+import { API_URL } from '../config';
 
 interface Asset {
   id: string;
@@ -72,7 +73,7 @@ export default function Catalog() {
     formData.append('file', file);
 
     try {
-      const response = await axios.post('http://localhost:3000/api/catalog/assets/import', formData, {
+      const response = await axios.post(`${API_URL}/api/catalog/assets/import`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       setImportResult(response.data);
@@ -93,7 +94,7 @@ export default function Catalog() {
   const { data: assets, isLoading, error } = useQuery<Asset[]>({
     queryKey: ['assets'],
     queryFn: async () => {
-      const response = await axios.get('http://localhost:3000/api/catalog/assets');
+      const response = await axios.get(`${API_URL}/api/catalog/assets`);
       return response.data;
     }
   });
@@ -101,7 +102,7 @@ export default function Catalog() {
   const { data: categories } = useQuery<any[]>({
     queryKey: ['categories'],
     queryFn: async () => {
-      const response = await axios.get('http://localhost:3000/api/catalog/categories');
+      const response = await axios.get(`${API_URL}/api/catalog/categories`);
       return response.data;
     }
   });
@@ -109,7 +110,7 @@ export default function Catalog() {
   const { data: assignments } = useQuery<any[]>({
     queryKey: ['assignments'],
     queryFn: async () => {
-      const response = await axios.get('http://localhost:3000/api/assignments');
+      const response = await axios.get(`${API_URL}/api/assignments`);
       return response.data;
     }
   });
@@ -121,7 +122,7 @@ export default function Catalog() {
   const { data: collaborators } = useQuery<any[]>({
     queryKey: ['collaborators'],
     queryFn: async () => {
-      const response = await axios.get('http://localhost:3000/api/collaborators');
+      const response = await axios.get(`${API_URL}/api/collaborators`);
       return response.data;
     }
   });
@@ -129,7 +130,7 @@ export default function Catalog() {
   // MUTACIÓN PARA DEVOLVER
   const returnMutation = useMutation({
     mutationFn: async (assetId: string) => {
-      const response = await axios.post(`http://localhost:3000/api/assignments/return-by-asset/${assetId}`, {
+      const response = await axios.post(`${API_URL}/api/assignments/return-by-asset/${assetId}`, {
         email: 'test@ikusi.com'
       });
       return response.data;
@@ -150,7 +151,7 @@ export default function Catalog() {
   // MUTACIÓN PARA ASIGNAR
   const assignMutation = useMutation({
     mutationFn: async (newAssignment: typeof formData) => {
-      const response = await axios.post('http://localhost:3000/api/assignments', newAssignment);
+      const response = await axios.post(`${API_URL}/api/assignments`, newAssignment);
       return response.data;
     },
     onSuccess: () => {
@@ -175,7 +176,7 @@ export default function Catalog() {
 
   const addAssetMutation = useMutation({
     mutationFn: async (assetData: typeof newAsset) => {
-      const response = await axios.post('http://localhost:3000/api/catalog/assets', {
+      const response = await axios.post(`${API_URL}/api/catalog/assets`, {
         id: assetData.id,
         categoryId: assetData.categoryId,
         serial: assetData.serial,
@@ -199,7 +200,7 @@ export default function Catalog() {
 
   const editAssetMutation = useMutation({
     mutationFn: async (asset: any) => {
-      const response = await axios.put(`http://localhost:3000/api/catalog/assets/${asset.id}`, asset);
+      const response = await axios.put(`${API_URL}/api/catalog/assets/${asset.id}`, asset);
       return response.data;
     },
     onSuccess: () => {
@@ -218,7 +219,7 @@ export default function Catalog() {
 
   const retireAssetMutation = useMutation({
     mutationFn: async ({ id, reason }: { id: string, reason: string }) => {
-      const response = await axios.put(`http://localhost:3000/api/catalog/assets/${id}/status`, { status: 'RETIRED', reason });
+      const response = await axios.put(`${API_URL}/api/catalog/assets/${id}/status`, { status: 'RETIRED', reason });
       return response.data;
     },
     onSuccess: () => {
@@ -234,14 +235,14 @@ export default function Catalog() {
 
   const forceAcceptMutation = useMutation({
     mutationFn: async (assetId: string) => {
-      const response = await axios.post(`http://localhost:3000/api/assignments/force-accept-by-asset/${assetId}`);
+      const response = await axios.post(`${API_URL}/api/assignments/force-accept-by-asset/${assetId}`);
       return response.data;
     },
     onSuccess: (data) => {
       setSuccessMsg(`Firma forzada completada (Administrativa).`);
       queryClient.invalidateQueries({ queryKey: ['assets'] });
       if (data.documentPath) {
-        window.open(`http://localhost:3000${data.documentPath}`, '_blank');
+        window.open(`${API_URL}${data.documentPath}`, '_blank');
       }
     },
     onError: (err: any) => {
@@ -252,14 +253,14 @@ export default function Catalog() {
 
   const forceReturnMutation = useMutation({
     mutationFn: async (assetId: string) => {
-      const response = await axios.post(`http://localhost:3000/api/assignments/force-return-by-asset/${assetId}`);
+      const response = await axios.post(`${API_URL}/api/assignments/force-return-by-asset/${assetId}`);
       return response.data;
     },
     onSuccess: (data) => {
       setSuccessMsg(`Devolución forzada completada (Administrativa).`);
       queryClient.invalidateQueries({ queryKey: ['assets'] });
       if (data.documentPath) {
-        window.open(`http://localhost:3000${data.documentPath}`, '_blank');
+        window.open(`${API_URL}${data.documentPath}`, '_blank');
       }
     },
     onError: (err: any) => {
@@ -270,7 +271,7 @@ export default function Catalog() {
 
   const resendLinkMutation = useMutation({
     mutationFn: async (assetId: string) => {
-      const response = await axios.post(`http://localhost:3000/api/assignments/resend-link-by-asset/${assetId}`);
+      const response = await axios.post(`${API_URL}/api/assignments/resend-link-by-asset/${assetId}`);
       return response.data;
     },
     onSuccess: () => {

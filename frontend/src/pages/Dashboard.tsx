@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import './Dashboard.css';
+import { API_URL } from '../config';
 
 interface DashboardMetrics {
   totalAssets: number;
@@ -28,7 +29,7 @@ export default function Dashboard() {
   const { data: metrics, isLoading, error } = useQuery<DashboardMetrics>({
     queryKey: ['dashboard_metrics'],
     queryFn: async () => {
-      const response = await axios.get('http://localhost:3000/api/dashboard');
+      const response = await axios.get(`${API_URL}/api/dashboard`);
       return response.data;
     }
   });
@@ -51,7 +52,7 @@ export default function Dashboard() {
           <div className="hero-actions">
             <button onClick={async () => {
               try {
-                const res = await axios.get('http://localhost:3000/api/catalog/assets');
+                const res = await axios.get(`${API_URL}/api/catalog/assets`);
                 const data = res.data;
                 const csvRows = ['ID,Status,Categoria,FechaCompra,GarantiaMeses,DepreciacionAnos'];
                 for(const row of data) {

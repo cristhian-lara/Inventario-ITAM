@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
 import { ArrowLeft, User, Mail, MapPin, Building, Calendar, Clock, MonitorSmartphone, Activity, Tag, Hash, Box } from 'lucide-react';
 import './CollaboratorProfile.css';
+import { API_URL } from '../config';
 
 interface HistoryEvent {
   id: string;
@@ -21,7 +22,7 @@ export default function CollaboratorProfile() {
   const { data: collaborator, isLoading: isLoadingCollab } = useQuery({
     queryKey: ['collaborator', id],
     queryFn: async () => {
-      const response = await axios.get(`http://localhost:3000/api/collaborators/${id}`);
+      const response = await axios.get(`${API_URL}/api/collaborators/${id}`);
       return response.data;
     }
   });
@@ -29,7 +30,7 @@ export default function CollaboratorProfile() {
   const { data: history, isLoading: isLoadingHistory } = useQuery<HistoryEvent[]>({
     queryKey: ['collaborator-history', id],
     queryFn: async () => {
-      const response = await axios.get(`http://localhost:3000/api/collaborators/${id}/history`);
+      const response = await axios.get(`${API_URL}/api/collaborators/${id}/history`);
       return response.data;
     }
   });
@@ -37,7 +38,7 @@ export default function CollaboratorProfile() {
   const { data: assets } = useQuery<any[]>({
     queryKey: ['assets'],
     queryFn: async () => {
-      const response = await axios.get('http://localhost:3000/api/catalog/assets');
+      const response = await axios.get(`${API_URL}/api/catalog/assets`);
       return response.data;
     }
   });
@@ -45,7 +46,7 @@ export default function CollaboratorProfile() {
   const { data: activeAssignments } = useQuery({
     queryKey: ['assignments'],
     queryFn: async () => {
-      const response = await axios.get(`http://localhost:3000/api/assignments`);
+      const response = await axios.get(`${API_URL}/api/assignments`);
       return response.data.filter((a: any) => a.collaboratorId === collaborator?.id);
     },
     enabled: !!collaborator
@@ -156,7 +157,7 @@ export default function CollaboratorProfile() {
                           Asignado el: {new Date(a.startDate).toLocaleDateString()}
                         </p>
                         {a.documentPath && (
-                          <a href={`http://localhost:3000${a.documentPath}`} target="_blank" rel="noreferrer" className="btn-link" style={{ fontSize: '12px', textDecoration: 'none', color: 'var(--primary-color)' }}>
+                          <a href={`${API_URL}${a.documentPath}`} target="_blank" rel="noreferrer" className="btn-link" style={{ fontSize: '12px', textDecoration: 'none', color: 'var(--primary-color)' }}>
                             Ver Acta Firmada
                           </a>
                         )}

@@ -4,6 +4,7 @@ import { Settings, Wrench, CheckCircle, AlertTriangle, Calendar, Plus, Clock } f
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { useConfirm } from '../context/ConfirmContext';
 import './Maintenances.css';
+import { API_URL } from '../config';
 
 interface MaintenanceRecord {
   id: string;
@@ -42,7 +43,7 @@ const Maintenances: React.FC = () => {
   const { data: maintenances, isLoading } = useQuery<MaintenanceRecord[]>({
     queryKey: ['maintenances'],
     queryFn: async () => {
-      const res = await fetch('http://localhost:3000/api/maintenances');
+      const res = await fetch(`${API_URL}/api/maintenances`);
       if (!res.ok) throw new Error('Error cargando mantenimientos');
       return res.json();
     }
@@ -52,7 +53,7 @@ const Maintenances: React.FC = () => {
   const { data: assets } = useQuery<any[]>({
     queryKey: ['assets_list'],
     queryFn: async () => {
-      const res = await fetch('http://localhost:3000/api/catalog/assets');
+      const res = await fetch(`${API_URL}/api/catalog/assets`);
       if (!res.ok) return [];
       return res.json();
     }
@@ -60,7 +61,7 @@ const Maintenances: React.FC = () => {
 
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
-      const res = await fetch('http://localhost:3000/api/maintenances', {
+      const res = await fetch(`${API_URL}/api/maintenances`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
@@ -76,7 +77,7 @@ const Maintenances: React.FC = () => {
 
   const startMutation = useMutation({
     mutationFn: async (data: { id: string, reason: string }) => {
-      const res = await fetch(`http://localhost:3000/api/maintenances/${data.id}/start`, {
+      const res = await fetch(`${API_URL}/api/maintenances/${data.id}/start`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ reason: data.reason })
@@ -95,7 +96,7 @@ const Maintenances: React.FC = () => {
 
   const completeMutation = useMutation({
     mutationFn: async (data: { id: string, notes: string }) => {
-      const res = await fetch(`http://localhost:3000/api/maintenances/${data.id}/complete`, {
+      const res = await fetch(`${API_URL}/api/maintenances/${data.id}/complete`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ notes: data.notes })
