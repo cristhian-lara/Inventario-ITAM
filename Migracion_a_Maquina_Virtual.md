@@ -210,3 +210,78 @@ sudo systemctl restart nginx
 
 ¡Felicidades! 🎉 
 Si visitas en tu navegador `http://DIRECCION_IP_DE_TU_MAQUINA`, ya deberías poder ver el sistema funcionando perfectamente en producción.
+
+---
+
+## Parte 7: Acceso Global (Internet) usando Ngrok
+
+Para que tu sistema pueda ser accedido desde cualquier dispositivo (celular, laptop en otra red) sin configurar tu módem, usaremos **Ngrok**, que nos dará una URL pública gratuita.
+
+### 1. Crear una cuenta en Ngrok
+1. Ve a [https://dashboard.ngrok.com/signup](https://dashboard.ngrok.com/signup) y regístrate gratuitamente.
+2. Una vez en el panel (Dashboard), ve al menú lateral izquierdo, haz clic en **"Domains"** y luego en **"Create Domain"** (si está disponible, de lo contrario Ngrok generará uno al arrancar). Ngrok te asignará un dominio estático gratuito (ej. `tu-nombre.ngrok-free.app`). Cópialo.
+3. En el menú principal de Ngrok, busca tu **Authtoken** (Suele estar en *Your Authtoken* o en *Getting Started*).
+
+### 2. Instalar Ngrok en tu Máquina Virtual
+Vuelve a la terminal de tu máquina virtual y pega todo este bloque de código (presiona Enter al final):
+
+```bash
+curl -sSL https://ngrok-agent.s3.amazonaws.com/ngrok.asc \
+  | sudo tee /etc/apt/keyrings/ngrok.asc >/dev/null \
+  && echo "deb [signed-by=/etc/apt/keyrings/ngrok.asc] https://ngrok-agent.s3.amazonaws.com buster main" \
+  | sudo tee /etc/apt/sources.list.d/ngrok.list \
+  && sudo apt update \
+  && sudo apt install ngrok
+```
+
+### 3. Configurar tu cuenta
+Usa tu token para vincular tu máquina con tu cuenta de Ngrok (reemplaza `TU_TOKEN_AQUI` con tu token real):
+```bash
+ngrok config add-authtoken TU_TOKEN_AQUI
+```
+
+### 4. Actualizar el Frontend con tu nueva URL
+Tu sistema frontend debe saber que ahora la API vive en la nueva URL pública (en vez de usar tu IP local).
+
+1. Abre el archivo `.env.production` en la carpeta del frontend:
+```bash
+nano ~/Inventario-ITAM/frontend/.env.production
+```
+2. Reemplaza la línea para usar tu nuevo dominio de Ngrok:
+```env
+VITE_API_URL=https://TU_DOMINIO_NGROK.ngrok-free.app
+```
+*(Guarda con `Ctrl + O`, `Enter` y sal con `Ctrl + X`).*
+
+3. Como cambiamos la variable, debes re-construir el frontend:
+```bash
+cd ~/Inventario-ITAM/frontend
+npm run build
+```
+
+### 5. Lanzar el Túnel de Ngrok en segundo plano
+Ya que NGINX está corriendo en tu puerto 80, le diremos a Ngrok que exponga ese puerto hacia tu dominio de manera permanente usando PM2:
+
+1. Crea un pequeño script de arranque:
+```bash
+nano ~/start_ngrok.sh
+```
+2. Pega esto adentro (reemplaza tu dominio):
+```bash
+#!/bin/bash
+ngrok http --domain=TU_DOMINIO_NGROK.ngrok-free.app 80
+```
+*(Guarda y sal con `Ctrl+O`, `Enter`, `Ctrl+X`).*
+
+3. Dale permisos de ejecución:
+```bash
+chmod +x ~/start_ngrok.sh
+```
+
+4. Árranquelo con PM2 para que siempre esté activo:
+```bash
+pm2 start ~/start_ngrok.sh --name "ngrok-tunnel"
+pm2 save
+```
+
+¡Listo! A partir de ahora, puedes ingresar a `https://TU_DOMINIO_NGROK.ngrok-free.app` desde tu celular en la calle o compartirlo con tu equipo, y entrarán directamente a tu máquina virtual.
