@@ -1,3 +1,4 @@
+import { In } from 'typeorm';
 import { AppDataSource } from '../../../shared/infrastructure/database/postgres';
 import { Assignment, AssignmentStatus } from '../domain/Assignment';
 import { IAssignmentRepository } from '../domain/IAssignmentRepository';
@@ -37,7 +38,9 @@ export class PostgresAssignmentRepository implements IAssignmentRepository {
     }
 
     async findAllActive(): Promise<Assignment[]> {
-        const ormEntities = await this.repo.find({ where: { status: 'ACCEPTED' } });
+        const ormEntities = await this.repo.find({ 
+            where: { status: In(['ACCEPTED', 'PENDING_ACCEPTANCE', 'PENDING_RETURN']) } 
+        });
         return ormEntities.map(ormEntity => new Assignment({
             id: ormEntity.id,
             assetId: ormEntity.asset_id,

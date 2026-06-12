@@ -201,6 +201,24 @@ export default function Catalog() {
     }
   });
 
+  const forceAcceptMutation = useMutation({
+    mutationFn: async (assetId: string) => {
+      const response = await axios.post(`http://localhost:3000/api/assignments/force-accept-by-asset/${assetId}`);
+      return response.data;
+    },
+    onSuccess: (data) => {
+      setSuccessMsg(`Firma forzada completada (Administrativa).`);
+      queryClient.invalidateQueries({ queryKey: ['assets'] });
+      if (data.documentPath) {
+        window.open(`http://localhost:3000${data.documentPath}`, '_blank');
+      }
+    },
+    onError: (err: any) => {
+      setErrorMsg(err.response?.data?.error || err.message);
+      setTimeout(() => setErrorMsg(''), 8000);
+    }
+  });
+
   const forceReturnMutation = useMutation({
     mutationFn: async (assetId: string) => {
       const response = await axios.post(`http://localhost:3000/api/assignments/force-return-by-asset/${assetId}`);
@@ -250,6 +268,13 @@ export default function Catalog() {
   };
 
   const handleAssignClick = (assetId: string) => {
+    setFormData({
+      id: `assig-${Math.floor(Math.random() * 1000)}`,
+      assetId: assetId,
+      collaboratorId: '',
+      collaboratorEmail: '',
+      startDate: new Date().toISOString().split('T')[0]
+    });
     setAssignModalAssetId(assetId);
   };
 
@@ -475,89 +500,177 @@ export default function Catalog() {
                     })() : null}
                   </td>
                   <td>
-                    <span className={`badge badge-status badge-${asset.status.toLowerCase()}`}>
-                      {asset.status === 'AVAILABLE' ? 'Disponible' :
-                        asset.status === 'IN_USE' ? 'En Uso' : asset.status}
-                    </span>
-                    {asset.status === 'IN_USE' && (
-                      <div style={{ marginTop: '8px', fontSize: '12px' }}>
-                        {getActiveAssignmentForAsset(asset.id) ? (
-                          <span style={{ color: 'var(--text-muted)' }}>
-                            En uso por:{' '}
-                            <Link to={`/collaborators/${getActiveAssignmentForAsset(asset.id).collaboratorId}`} style={{ color: 'var(--accent-blue)', textDecoration: 'none' }}>
-                              Ver perfil
-                            </Link>
+                    {(() => {
+                      const activeAssignment = getActiveAssignmentForAsset(asset.id);
+                      if (activeAssignment?.status === 'PENDING_ACCEPTANCE') {
+                        return (
+                          <>
+                            <span className="badge badge-status badge-in_use" style={{ background: 'rgba(234, 179, 8, 0.15)', color: '#ca8a04' }}>
+                              Pendiente de Firma
+                            </span>
+                            <div style={{ marginTop: '8px', fontSize: '12px' }}>
+                              <span style={{ color: 'var(--text-muted)' }}>En proceso de asignación</span>
+                            </div>
+                          </>
+                        );
+                      }
+                      if (activeAssignment?.status === 'PENDING_RETURN') {
+                        return (
+                          <>
+                            <span className="badge badge-status badge-in_use" style={{ background: 'rgba(234, 179, 8, 0.15)', color: '#ca8a04' }}>
+                              Pendiente Devolución
+                            </span>
+                            <div style={{ marginTop: '8px', fontSize: '12px' }}>
+                              <span style={{ color: 'var(--text-muted)' }}>Esperando firma de devolución</span>
+                            </div>
+                          </>
+                        );
+                      }
+                      
+                      return (
+                        <>
+                          <span className={`badge badge-status badge-${asset.status.toLowerCase()}`}>
+                            {asset.status === 'AVAILABLE' ? 'Disponible' :
+                              asset.status === 'IN_USE' ? 'En Uso' : asset.status}
                           </span>
-                        ) : (
-                          <span style={{ color: 'var(--text-muted)' }}>Asignado (Pendiente firma)</span>
-                        )}
-                      </div>
-                    )}
+                          {asset.status === 'IN_USE' && (
+                            <div style={{ marginTop: '8px', fontSize: '12px' }}>
+                              {activeAssignment ? (
+                                <span style={{ color: 'var(--text-muted)' }}>
+                                  En uso por:{' '}
+                                  <Link to={`/collaborators/${activeAssignment.collaboratorId}`} style={{ color: 'var(--accent-blue)', textDecoration: 'none' }}>
+                                    Ver perfil
+                                  </Link>
+                                </span>
+                              ) : (
+                                <span style={{ color: 'var(--text-muted)' }}>Asignado</span>
+                              )}
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
                   </td>
                   <td style={{ display: 'flex', gap: '8px' }}>
-                    {asset.status === 'AVAILABLE' && (
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                        <button
-                          className="btn-action"
-                          style={{ borderColor: 'var(--text-muted)', color: 'var(--text-muted)' }}
-                          title="Editar Activo"
-                          onClick={() => handleEditClick(asset)}
-                        >
-                          ✏️
-                        </button>
-                        <button
-                          className="btn-action btn-assign"
-                          title="Asignar Activo"
-                          onClick={() => handleAssignClick(asset.id)}
-                        >
-                          <PlusCircle size={16} /> Asignar
-                        </button>
-                      </div>
-                    )}
-                    {asset.status === 'IN_USE' && (
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                        <button
-                          className="btn-action btn-return"
-                          title="Iniciar Devolución"
-                          onClick={() => handleReturnClick(asset.id)}
-                          disabled={returnMutation.isPending}
-                        >
-                          <RefreshCw size={16} /> Devolver
-                        </button>
-                        <button
-                          className="btn-action"
-                          style={{ borderColor: '#ef4444', color: '#ef4444' }}
-                          title="Devolución Forzada (TI)"
-                          onClick={() => {
-                            confirm({
-                              title: 'Devolución Forzada',
-                              message: '¿Estás seguro de forzar la devolución? Esta acción es administrativa y no requerirá la firma del colaborador.',
-                              type: 'danger',
-                              onConfirm: () => forceReturnMutation.mutate(asset.id)
-                            });
-                          }}
-                          disabled={forceReturnMutation.isPending}
-                        >
-                          <AlertTriangle size={16} />
-                        </button>
-                        <button
-                          className="btn-action"
-                          style={{ borderColor: '#3b82f6', color: '#3b82f6' }}
-                          title="Reenviar Link de Firma"
-                          onClick={() => {
-                            confirm({
-                              title: 'Reenviar Enlace',
-                              message: '¿Estás seguro de reenviar el enlace de firma al colaborador?',
-                              type: 'info',
-                              onConfirm: () => resendLinkMutation.mutate(asset.id)
-                            });
-                          }}
-                          disabled={resendLinkMutation.isPending}
-                        >
-                          <Send size={16} />
-                        </button>
-                      </div>
-                    )}
+                    {(() => {
+                      const activeAssignment = getActiveAssignmentForAsset(asset.id);
+                      const isPendingAcceptance = activeAssignment?.status === 'PENDING_ACCEPTANCE';
+                      const isPendingReturn = activeAssignment?.status === 'PENDING_RETURN';
+                      
+                      if (isPendingAcceptance) {
+                        return (
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <button
+                              className="btn-action"
+                              style={{ borderColor: '#22c55e', color: '#22c55e' }}
+                              title="Firma Forzada (TI)"
+                              onClick={() => {
+                                confirm({
+                                  title: 'Firma Forzada (Asignación)',
+                                  message: '¿Estás seguro de forzar la firma de esta asignación? Esta acción es administrativa.',
+                                  type: 'info',
+                                  onConfirm: () => forceAcceptMutation.mutate(asset.id)
+                                });
+                              }}
+                              disabled={forceAcceptMutation.isPending}
+                            >
+                              <AlertTriangle size={16} /> Forzar Firma
+                            </button>
+                            <button
+                              className="btn-action"
+                              style={{ borderColor: '#3b82f6', color: '#3b82f6' }}
+                              title="Reenviar Link de Firma"
+                              onClick={() => {
+                                confirm({
+                                  title: 'Reenviar Enlace',
+                                  message: '¿Estás seguro de reenviar el enlace de firma al colaborador?',
+                                  type: 'info',
+                                  onConfirm: () => resendLinkMutation.mutate(asset.id)
+                                });
+                              }}
+                              disabled={resendLinkMutation.isPending}
+                            >
+                              <RefreshCw size={16} /> Reenviar
+                            </button>
+                          </div>
+                        );
+                      }
+
+                      if (asset.status === 'AVAILABLE' && !isPendingAcceptance && !isPendingReturn) {
+                        return (
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <button
+                              className="btn-action"
+                              style={{ borderColor: 'var(--text-muted)', color: 'var(--text-muted)' }}
+                              title="Editar Activo"
+                              onClick={() => handleEditClick(asset)}
+                            >
+                              ✏️
+                            </button>
+                            <button
+                              className="btn-action btn-assign"
+                              title="Asignar Activo"
+                              onClick={() => handleAssignClick(asset.id)}
+                            >
+                              <PlusCircle size={16} /> Asignar
+                            </button>
+                          </div>
+                        );
+                      }
+
+                      if (asset.status === 'IN_USE' || isPendingReturn) {
+                        return (
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            {!isPendingReturn && (
+                              <button
+                                className="btn-action btn-return"
+                                title="Iniciar Devolución"
+                                onClick={() => handleReturnClick(asset.id)}
+                                disabled={returnMutation.isPending}
+                              >
+                                <RefreshCw size={16} /> Devolver
+                              </button>
+                            )}
+                            <button
+                              className="btn-action"
+                              style={{ borderColor: '#ef4444', color: '#ef4444' }}
+                              title="Devolución Forzada (TI)"
+                              onClick={() => {
+                                confirm({
+                                  title: 'Devolución Forzada',
+                                  message: '¿Estás seguro de forzar la devolución? Esta acción es administrativa.',
+                                  type: 'danger',
+                                  onConfirm: () => forceReturnMutation.mutate(asset.id)
+                                });
+                              }}
+                              disabled={forceReturnMutation.isPending}
+                            >
+                              <AlertTriangle size={16} /> Forzar
+                            </button>
+                            {isPendingReturn && (
+                              <button
+                                className="btn-action"
+                                style={{ borderColor: '#3b82f6', color: '#3b82f6' }}
+                                title="Reenviar Link de Firma"
+                                onClick={() => {
+                                  confirm({
+                                    title: 'Reenviar Enlace',
+                                    message: '¿Estás seguro de reenviar el enlace de firma al colaborador?',
+                                    type: 'info',
+                                    onConfirm: () => resendLinkMutation.mutate(asset.id)
+                                  });
+                                }}
+                                disabled={resendLinkMutation.isPending}
+                              >
+                                <RefreshCw size={16} /> Reenviar
+                              </button>
+                            )}
+                          </div>
+                        );
+                      }
+                      
+                      return null;
+                    })()}
                     {asset.status !== 'RETIRED' && (
                       <button
                         className="btn-action"
@@ -633,7 +746,16 @@ export default function Catalog() {
 
           <div className="glass-panel form-container" style={{ position: 'relative', width: '100%', maxWidth: '900px', margin: 0 }}>
             <button
-              onClick={() => setAssignModalAssetId(null)}
+              onClick={() => {
+                setAssignModalAssetId(null);
+                setFormData({
+                  id: `assig-${Math.floor(Math.random() * 1000)}`,
+                  assetId: '',
+                  collaboratorId: '',
+                  collaboratorEmail: '',
+                  startDate: new Date().toISOString().split('T')[0]
+                });
+              }}
               style={{ position: 'absolute', top: '15px', right: '15px', background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '5px' }}
             >
               ✕

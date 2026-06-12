@@ -164,4 +164,18 @@ export class AssignmentUseCases {
         await this.repository.save(assignment);
         return assignment;
     }
+
+    async forceAccept(assignmentId: string, ipAddress: string): Promise<Assignment> {
+        const assignment = await this.repository.findById(assignmentId);
+        if (!assignment) throw new Error('Asignación no encontrada');
+
+        assignment.forceAccept({
+            ipAddress,
+            userAgent: 'ADMIN_CONSOLE',
+            timestamp: new Date()
+        });
+
+        await this.repository.save(assignment);
+        return assignment;
+    }
 }

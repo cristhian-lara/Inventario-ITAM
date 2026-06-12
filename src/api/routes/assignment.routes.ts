@@ -207,6 +207,56 @@ router.post('/force-return-by-asset/:assetId', async (req, res) => {
     }
 });
 
+// Aceptación Forzada (Administrativa)
+router.post('/force-accept-by-asset/:assetId', async (req, res) => {
+    try {
+        const assignment = await assignmentRepo.findCurrentByAssetId(req.params.assetId);
+        if (!assignment) throw new Error('No se encontró asignación para forzar aceptación');
+        
+        const ipAddress = req.ip || req.socket.remoteAddress || 'unknown';
+        const acceptedAssignment = await assignmentUseCases.forceAccept(assignment.id, ipAddress);
+        
+        await catalogUseCases.changeAssetStatus(acceptedAssignment.assetId, 'IN_USE');
+
+        const asset = await catalogUseCases.getAssetById(acceptedAssignment.assetId);
+        const category = asset ? await catalogRepo.getCategoryById(asset.categoryId) : null;
+        const requiresPlaca = category ? category.schemaDefinition.requiresPlacaIkusi !== false : true;
+        
+        const documentPath = await documentService.generateAssignmentAct({
+            actType: 'ASSIGNMENT',
+            assignmentId: acceptedAssignment.id,
+            collaboratorName: 'ADMINISTRADOR TI (Aceptación Forzada)',
+            collaboratorEmail: 'admin@ikusi.com',
+            department: 'Sistemas',
+            assetId: acceptedAssignment.assetId,
+            assetSerial: asset ? (asset.serial || 'N/A') : 'N/A',
+            assetType: 'Laptop',
+            assetModel: asset && asset.dynamicAttributes ? asset.dynamicAttributes.modelo || 'Generico' : 'Generico',
+            assetMac: asset && asset.dynamicAttributes ? asset.dynamicAttributes.macAddress || 'N/A' : 'N/A',
+            assetRam: asset && asset.dynamicAttributes ? asset.dynamicAttributes.ram || 'N/A' : 'N/A',
+            assetProcessor: asset && asset.dynamicAttributes ? asset.dynamicAttributes.processor || 'N/A' : 'N/A',
+            assetStorage: asset && asset.dynamicAttributes ? asset.dynamicAttributes.storage || 'N/A' : 'N/A',
+            requiresPlacaIkusi: requiresPlaca,
+            ipAddress,
+            timestamp: new Date()
+        });
+
+        await assignmentUseCases.updateDocumentPath(acceptedAssignment.id, documentPath);
+        
+        await collaboratorRepo.saveHistory(new CollaboratorHistory(
+            uuidv4(),
+            acceptedAssignment.collaboratorId,
+            'ASSET_ASSIGNED' as any,
+            new Date(),
+            `Activo ${acceptedAssignment.assetId} asignado forzadamente`
+        ));
+
+        res.json({ message: 'Aceptación forzada exitosa', documentPath });
+    } catch (error: any) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
 // Confirmar devolución (Firma del Paz y Salvo)
 router.get('/:id/confirm-return', async (req, res) => {
     try {

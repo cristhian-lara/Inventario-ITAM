@@ -102,4 +102,16 @@ export class Assignment {
         this.props.signatureMetadata = metadata;
         this.props.signatureToken = undefined;
     }
+
+    /**
+     * Aceptación administrativa forzada sin token del usuario.
+     */
+    public forceAccept(metadata: SignatureMetadata): void {
+        if (this.props.status !== 'PENDING_ACCEPTANCE') {
+            throw new Error('Solo se puede forzar la aceptación de asignaciones pendientes');
+        }
+        this.props.status = 'ACCEPTED';
+        this.props.signatureMetadata = metadata;
+        this.props.signatureToken = undefined;
+    }
 }
