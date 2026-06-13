@@ -51,7 +51,7 @@ router.post('/assets/import', upload.single('file'), async (req, res) => {
             return res.status(400).json({ error: 'No se subió ningún archivo' });
         }
 
-        const workbook = xlsx.read(req.file.buffer, { type: 'buffer' });
+        const workbook = xlsx.read(req.file.buffer, { type: 'buffer', cellDates: true });
         const sheetName = workbook.SheetNames[0];
         const sheet = workbook.Sheets[sheetName];
         const records = xlsx.utils.sheet_to_json(sheet);

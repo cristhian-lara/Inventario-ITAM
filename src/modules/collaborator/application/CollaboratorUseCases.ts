@@ -207,6 +207,17 @@ export class CollaboratorUseCases {
             ));
         }
 
+        if (String(collaborator.department) !== String(department.id)) {
+            const oldDepartment = await this.departmentRepo.findById(Number(collaborator.department));
+            await this.collaboratorRepo.saveHistory(new CollaboratorHistory(
+                uuidv4(),
+                updated.id,
+                'DEPARTMENT_CHANGED',
+                new Date(),
+                `Cambió del departamento "${oldDepartment?.name || collaborator.department}" a "${department.name}"`
+            ));
+        }
+
         return updated;
     }
 
@@ -216,6 +227,7 @@ export class CollaboratorUseCases {
         const errors: string[] = [];
 
         const allDepartments = await this.departmentRepo.findAll();
+        const allCecos = await this.cecosRepo.findAll();
 
         for (const [index, record] of records.entries()) {
             try {
@@ -223,13 +235,14 @@ export class CollaboratorUseCases {
                 const email = record.Email || record.email || record.Correo || record.correo;
                 const departmentName = record.Department || record.department || record.Departamento || record.departamento;
                 const location = record.Location || record.location || record.Ubicacion || record.Ubicación || record.ubicacion;
-                const cecosId = record.CECOS || record.Cecos || record.cecos || record.CentroCostos || record.centroCostos;
-                const activationDate = record.FechaAlta || record.fechaAlta || record.ActivationDate || record.activationDate;
+                const cecosId = record.CECOS || record.Cecos || record.cecos || record.CentroCostos || record.centroCostos || record['Centro de costos'] || record['Centro de Costos'];
+                const activationDateRaw = record.FechaAlta || record.fechaAlta || record.ActivationDate || record.activationDate || record['Fecha de Alta'] || record['Fecha de alta'];
 
                 let isLeader = false;
+                const leaderRaw = record.isLeader || record.IsLeader || record.EsLider || record.esLider || record['Es Líder'] || record['Es lider'];
 
-                if (record.isLeader || record.IsLeader || record.EsLider || record.esLider) {
-                    const val = String(record.isLeader || record.IsLeader || record.EsLider || record.esLider).toLowerCase().trim();
+                if (leaderRaw !== undefined) {
+                    const val = String(leaderRaw).toLowerCase().trim();
                     isLeader = val === 'sí' || val === 'si' || val === 'true' || val === '1' || val === 'yes';
                 }
 
@@ -242,14 +255,38 @@ export class CollaboratorUseCases {
                     throw new Error(`El departamento '${departmentName}' no existe.`);
                 }
 
+                let finalCecosId = cecosId ? String(cecosId).trim() : undefined;
+                if (finalCecosId) {
+                    const cecoMatch = allCecos.find(c => String(c.id) === finalCecosId || c.name.toLowerCase() === finalCecosId!.toLowerCase());
+                    if (cecoMatch) {
+                        finalCecosId = String(cecoMatch.id);
+                    }
+                }
+
+                let parsedDate = new Date();
+                if (activationDateRaw) {
+                    if (activationDateRaw instanceof Date) {
+                        parsedDate = activationDateRaw;
+                    } else if (typeof activationDateRaw === 'string') {
+                        const parts = activationDateRaw.split('/');
+                        if (parts.length === 3) {
+                            parsedDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}T12:00:00Z`);
+                        } else {
+                            parsedDate = new Date(activationDateRaw);
+                        }
+                    } else if (typeof activationDateRaw === 'number') {
+                        parsedDate = new Date(Math.round((activationDateRaw - 25569) * 86400 * 1000));
+                    }
+                }
+
                 await this.createCollaborator({
                     name: String(name).trim(),
                     email: String(email).trim(),
                     department: Number(department.id),
                     location: String(location).trim(),
                     isLeader: isLeader,
-                    dynamicAttributes: cecosId ? { CECOS: String(cecosId).trim() } : {},
-                    activationDate: activationDate ? new Date(activationDate) : new Date()
+                    dynamicAttributes: finalCecosId ? { CECOS: finalCecosId } : {},
+                    activationDate: parsedDate
                 });
                 successful++;
             } catch (error: any) {

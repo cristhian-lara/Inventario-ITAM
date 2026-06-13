@@ -161,8 +161,8 @@ export default function Collaborators() {
     });
   };
 
-  const getDepartmentName = (deptId: string) => {
-    const dep = departments?.find(d => d.id === deptId);
+  const getDepartmentName = (deptId: string | number) => {
+    const dep = departments?.find(d => String(d.id) === String(deptId));
     return dep ? dep.name : deptId;
   };
 

@@ -121,9 +121,43 @@ export class CatalogUseCases {
                 // Dynamic attributes
                 const knownKeys = ['Placa Ikusi', 'PlacaIkusi', 'ID', 'id', 'Categoría', 'Categoria', 'Category', 'category', 'categoryId', 'Serial', 'serial', 'SerialNumber', 'Fecha de Compra', 'PurchaseDate', 'purchaseDate', 'Meses Garantía', 'WarrantyMonths', 'warrantyMonths', 'Años Depreciación', 'DepreciationYears', 'depreciationYears', 'Precio Compra', 'PurchasePrice', 'purchasePrice'];
                 const dynamicAttributes: Record<string, any> = {};
+                
+                // Copy all unknown keys first
                 for (const key of Object.keys(record)) {
                     if (!knownKeys.includes(key)) {
                         dynamicAttributes[key] = record[key];
+                    }
+                }
+
+                // Match with category schema fields
+                if (category.schemaDefinition && category.schemaDefinition.fields) {
+                    for (const field of category.schemaDefinition.fields) {
+                        const matchedKey = Object.keys(dynamicAttributes).find(k => 
+                            k.toLowerCase().trim() === field.name.toLowerCase().trim() ||
+                            k.toLowerCase().replace('fehca', 'fecha') === field.name.toLowerCase().trim()
+                        );
+
+                        if (matchedKey) {
+                            let val = dynamicAttributes[matchedKey];
+                            
+                            if (matchedKey !== field.name) {
+                                delete dynamicAttributes[matchedKey];
+                            }
+
+                            if (field.type === 'select' && field.options) {
+                                const strVal = String(val).trim().toLowerCase();
+                                const optionMatch = field.options.find((opt: string) => String(opt).trim().toLowerCase() === strVal);
+                                if (optionMatch) {
+                                    val = optionMatch;
+                                } else {
+                                    val = String(val).trim();
+                                }
+                            } else if (val instanceof Date) {
+                                val = val.toISOString().split('T')[0];
+                            }
+
+                            dynamicAttributes[field.name] = val;
+                        }
                     }
                 }
 

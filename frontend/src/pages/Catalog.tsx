@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
-import { Plus, Search, Tag, Cpu, HardDrive, Wifi, PlusCircle, MonitorSmartphone, RefreshCw, CheckCircle2, AlertCircle, AlertTriangle, UserCheck, Send, Upload } from 'lucide-react';
+import { Plus, Search, Tag, Cpu, HardDrive, Wifi, PlusCircle, MonitorSmartphone, RefreshCw, CheckCircle2, AlertCircle, AlertTriangle, UserCheck, Send, Upload , Trash2} from 'lucide-react';
 import { useConfirm } from '../context/ConfirmContext';
 import './Catalog.css';
 import { API_URL } from '../config';
@@ -532,11 +532,27 @@ export default function Catalog() {
                   <td className="fw-600">{asset.id}</td>
                   <td>
                     <span className="badge badge-category">
-                      <Tag size={12} /> {asset.categoryId}
+                      <Tag size={12} /> {categories?.find((c: any) => c.id === Number(asset.categoryId))?.name || asset.categoryId}
                     </span>
                   </td>
-                  <td style={{ fontFamily: 'monospace', color: 'var(--text-muted)' }}>{asset.serial}</td>
+                  <td style={{ color: 'var(--text-muted)' }}>
+                    {(() => {
+                      const activeAssignment = getActiveAssignmentForAsset(asset.id);
+                      if (activeAssignment && activeAssignment.collaboratorId) {
+                        const coll = collaborators?.find(c => c.id === activeAssignment.collaboratorId);
+                        return coll ? (
+                          <Link to={`/collaborators/${activeAssignment.collaboratorId}`} style={{ color: 'var(--accent-blue)', textDecoration: 'none', fontWeight: '500' }}>
+                            {coll.email}
+                          </Link>
+                        ) : 'Sin asignar';
+                      }
+                      return 'Sin asignar';
+                    })()}
+                  </td>
                   <td className="specs-cell">
+                    <span className="spec-tag" title="Serial">
+                      <HardDrive size={12} /> {asset.serial || 'N/A'}
+                    </span>
                     {Object.entries(asset.dynamicAttributes || {}).map(([key, value]) => {
                       if (!value || String(value).trim() === '') return null;
                       const lowerKey = key.toLowerCase();
@@ -636,7 +652,8 @@ export default function Catalog() {
                       );
                     })()}
                   </td>
-                  <td style={{ display: 'flex', gap: '8px' }}>
+                  <td>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                     {(() => {
                       const activeAssignment = getActiveAssignmentForAsset(asset.id);
                       const isPendingAcceptance = activeAssignment?.status === 'PENDING_ACCEPTANCE';
@@ -659,7 +676,7 @@ export default function Catalog() {
                               }}
                               disabled={forceAcceptMutation.isPending}
                             >
-                              <AlertTriangle size={16} /> Forzar Firma
+                              <AlertTriangle size={16} />
                             </button>
                             <button
                               className="btn-action"
@@ -675,7 +692,7 @@ export default function Catalog() {
                               }}
                               disabled={resendLinkMutation.isPending}
                             >
-                              <RefreshCw size={16} /> Reenviar
+                              <RefreshCw size={16} />
                             </button>
                           </div>
                         );
@@ -697,7 +714,7 @@ export default function Catalog() {
                               title="Asignar Activo"
                               onClick={() => handleAssignClick(asset.id)}
                             >
-                              <PlusCircle size={16} /> Asignar
+                              <PlusCircle size={16} />
                             </button>
                           </div>
                         );
@@ -713,7 +730,7 @@ export default function Catalog() {
                                 onClick={() => handleReturnClick(asset.id)}
                                 disabled={returnMutation.isPending}
                               >
-                                <RefreshCw size={16} /> Devolver
+                                <RefreshCw size={16} />
                               </button>
                             )}
                             <button
@@ -730,7 +747,7 @@ export default function Catalog() {
                               }}
                               disabled={forceReturnMutation.isPending}
                             >
-                              <AlertTriangle size={16} /> Forzar
+                              <AlertTriangle size={16} />
                             </button>
                             {isPendingReturn && (
                               <button
@@ -747,7 +764,7 @@ export default function Catalog() {
                                 }}
                                 disabled={resendLinkMutation.isPending}
                               >
-                                <RefreshCw size={16} /> Reenviar
+                                <RefreshCw size={16} />
                               </button>
                             )}
                           </div>
@@ -776,9 +793,10 @@ export default function Catalog() {
                         }}
                         disabled={retireAssetMutation.isPending}
                       >
-                        <AlertTriangle size={16} /> Baja
+                        <Trash2 size={16} />
                       </button>
                     )}
+                    </div>
                   </td>
                 </tr>
               ))}

@@ -9,7 +9,7 @@ import { API_URL } from '../config';
 interface HistoryEvent {
   id: string;
   collaboratorId: string;
-  action: 'CREATED' | 'ACTIVATED' | 'DEACTIVATED' | 'ASSET_ASSIGNED' | 'ASSET_RETURNED';
+  action: 'CREATED' | 'ACTIVATED' | 'DEACTIVATED' | 'ASSET_ASSIGNED' | 'ASSET_RETURNED' | 'DEPARTMENT_CHANGED';
   timestamp: string;
   reason: string;
 }
@@ -39,6 +39,14 @@ export default function CollaboratorProfile() {
     queryKey: ['assets'],
     queryFn: async () => {
       const response = await axios.get(`${API_URL}/api/catalog/assets`);
+      return response.data;
+    }
+  });
+
+  const { data: departments } = useQuery<any[]>({
+    queryKey: ['departments'],
+    queryFn: async () => {
+      const response = await axios.get(`${API_URL}/api/collaborators/departments`);
       return response.data;
     }
   });
@@ -81,7 +89,7 @@ export default function CollaboratorProfile() {
             </div>
             <div className="detail-item">
               <Building size={18} />
-              <span>{collaborator.department}</span>
+              <span>{departments?.find(d => String(d.id) === String(collaborator.department))?.name || collaborator.department}</span>
             </div>
             <div className="detail-item">
               <MapPin size={18} />

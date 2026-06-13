@@ -165,6 +165,7 @@
 .timeline-dot.deactivated { background: #ef4444; }
 .timeline-dot.asset_assigned { background: #8b5cf6; }
 .timeline-dot.asset_returned { background: #f59e0b; }
+.timeline-dot.department_changed { background: #0ea5e9; }
 
 .timeline-content {
     background: #f8fafc;
@@ -206,6 +207,7 @@
 .badge-deactivated { background: rgba(239, 68, 68, 0.1); color: #dc2626; border: 1px solid rgba(239, 68, 68, 0.3); }
 .badge-asset_assigned { background: rgba(139, 92, 246, 0.1); color: #7c3aed; border: 1px solid rgba(139, 92, 246, 0.3); }
 .badge-asset_returned { background: rgba(245, 158, 11, 0.1); color: #d97706; border: 1px solid rgba(245, 158, 11, 0.3); }
+.badge-department_changed { background: rgba(14, 165, 233, 0.1); color: #0284c7; border: 1px solid rgba(14, 165, 233, 0.3); }
 
 /* Assets Grid */
 .assets-grid {
