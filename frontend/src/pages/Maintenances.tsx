@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Settings, Wrench, CheckCircle, AlertTriangle, Calendar, Plus, Clock } from 'lucide-react';
-import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import { Settings, Wrench, CheckCircle, AlertTriangle, Calendar, Plus, Clock, X } from 'lucide-react';
+import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, Legend } from 'recharts';
 import { useConfirm } from '../context/ConfirmContext';
 import './Maintenances.css';
 import { API_URL } from '../config';
@@ -19,18 +19,28 @@ interface MaintenanceRecord {
   collaboratorInTurnName?: string;
 }
 
+const TYPE_LABELS: Record<string, string> = {
+  PREVENTIVE: 'Preventivo',
+  CORRECTIVE: 'Correctivo',
+};
+const STATUS_LABELS: Record<string, string> = {
+  SCHEDULED: 'Programado',
+  IN_PROGRESS: 'En Progreso',
+  COMPLETED: 'Completado',
+  CANCELLED: 'Cancelado',
+};
+
 const Maintenances: React.FC = () => {
   const queryClient = useQueryClient();
   const [filterType, setFilterType] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
   const [viewMode, setViewMode] = useState<'general' | 'auditoria' | 'balance'>('general');
   const { confirm } = useConfirm();
-  
+
   const [showModal, setShowModal] = useState(false);
   const [modalMode, setModalMode] = useState<'create' | 'start' | 'complete'>('create');
   const [selectedRecord, setSelectedRecord] = useState<MaintenanceRecord | null>(null);
-  
-  // Formulario temporal
+
   const [formData, setFormData] = useState({
     assetId: '',
     type: 'PREVENTIVE',
@@ -49,7 +59,6 @@ const Maintenances: React.FC = () => {
     }
   });
 
-  // Fetch assets for autocomplete
   const { data: assets } = useQuery<any[]>({
     queryKey: ['assets_list'],
     queryFn: async () => {
@@ -62,149 +71,117 @@ const Maintenances: React.FC = () => {
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
       const res = await fetch(`${API_URL}/api/maintenances`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data)
       });
       if (!res.ok) throw new Error('Error al programar mantenimiento');
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['maintenances'] });
-      setShowModal(false);
-    }
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['maintenances'] }); setShowModal(false); }
   });
 
   const startMutation = useMutation({
     mutationFn: async (data: { id: string, reason: string }) => {
       const res = await fetch(`${API_URL}/api/maintenances/${data.id}/start`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reason: data.reason })
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason: data.reason })
       });
       if (!res.ok) throw new Error('Error al iniciar');
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['maintenances'] });
-      setShowModal(false);
-    },
-    onError: (error: Error) => {
-      alert(error.message);
-    }
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['maintenances'] }); setShowModal(false); },
+    onError: (error: Error) => { alert(error.message); }
   });
 
   const completeMutation = useMutation({
     mutationFn: async (data: { id: string, notes: string }) => {
       const res = await fetch(`${API_URL}/api/maintenances/${data.id}/complete`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ notes: data.notes })
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ notes: data.notes })
       });
       if (!res.ok) throw new Error('Error al completar');
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['maintenances'] });
-      setShowModal(false);
-    },
-    onError: (error: Error) => {
-      alert(error.message);
-    }
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['maintenances'] }); setShowModal(false); },
+    onError: (error: Error) => { alert(error.message); }
   });
 
-  if (isLoading) return <div style={{ padding: '20px', color: 'white' }}>Cargando módulo de mantenimientos...</div>;
+  if (isLoading) return <div style={{ padding: '40px', color: 'var(--text-main)' }}>Cargando módulo de mantenimientos...</div>;
 
-  // KPIs
+  const now = new Date();
+
+  // ── KPIs ──────────────────────────────────────────────────────────────────
   const totalScheduled = maintenances?.filter(m => m.status === 'SCHEDULED').length || 0;
   const totalInProgress = maintenances?.filter(m => m.status === 'IN_PROGRESS').length || 0;
-  const now = new Date();
+  const totalCompleted = maintenances?.filter(m => m.status === 'COMPLETED').length || 0;
   const overdue = maintenances?.filter(m => m.status === 'SCHEDULED' && new Date(m.scheduledDate) < now).length || 0;
-  
   const preventiveCount = maintenances?.filter(m => m.type === 'PREVENTIVE').length || 0;
   const correctiveCount = maintenances?.filter(m => m.type === 'CORRECTIVE').length || 0;
-  
-  const preventiveRatio = maintenances && maintenances.length > 0 
-    ? Math.round((preventiveCount / maintenances.length) * 100) 
-    : 0;
-  const correctiveRatio = maintenances && maintenances.length > 0 
-    ? Math.round((correctiveCount / maintenances.length) * 100) 
-    : 0;
+  const correctiveRatio = maintenances && maintenances.length > 0
+    ? Math.round((correctiveCount / maintenances.length) * 100) : 0;
 
+  // ── Charts data ────────────────────────────────────────────────────────────
   const typeData = [
     { name: 'Preventivo', value: preventiveCount },
     { name: 'Correctivo', value: correctiveCount }
   ];
+  const COLORS_TYPE = ['#22c55e', '#a855f7'];
 
   const statusData = [
     { status: 'Programado', count: totalScheduled },
     { status: 'En Progreso', count: totalInProgress },
-    { status: 'Completado', count: maintenances?.filter(m => m.status === 'COMPLETED').length || 0 }
+    { status: 'Completado', count: totalCompleted }
   ];
 
-  const COLORS_TYPE = ['#22c55e', '#a855f7'];
+  // Monthly trend — last 6 months
+  const monthlyData = Array.from({ length: 6 }, (_, i) => {
+    const d = new Date();
+    d.setDate(1);
+    d.setMonth(d.getMonth() - (5 - i));
+    const yr = d.getFullYear();
+    const mo = d.getMonth();
+    return {
+      month: d.toLocaleString('es-CO', { month: 'short' }),
+      Preventivo: maintenances?.filter(m => {
+        const md = new Date(m.scheduledDate);
+        return m.type === 'PREVENTIVE' && md.getFullYear() === yr && md.getMonth() === mo;
+      }).length || 0,
+      Correctivo: maintenances?.filter(m => {
+        const md = new Date(m.scheduledDate);
+        return m.type === 'CORRECTIVE' && md.getFullYear() === yr && md.getMonth() === mo;
+      }).length || 0,
+    };
+  });
 
+  // ── Filters ────────────────────────────────────────────────────────────────
   const handleCardClick = (statusFilter: string) => {
-    if (filterStatus === statusFilter) {
-      setFilterStatus('all');
-    } else {
-      setFilterStatus(statusFilter);
-    }
+    setFilterStatus(filterStatus === statusFilter ? 'all' : statusFilter);
   };
 
-  // Vistas predeterminadas
   const filteredData = maintenances?.filter(m => {
-    // 1. Vistas predeterminadas
     if (viewMode === 'auditoria') {
-      // Auditoría: solo mostrar vencidos
-      const isLate = m.status === 'SCHEDULED' && new Date(m.scheduledDate) < now;
-      if (!isLate) return false;
+      if (!(m.status === 'SCHEDULED' && new Date(m.scheduledDate) < now)) return false;
     } else if (viewMode === 'balance') {
-      // Balance: mostrar todos para ver el historial, podrías resaltar, pero dejaremos pasar todos 
-      // o solo mostrar correctivos si queremos analizar fallos.
-      // Mostraremos solo correctivos para el balance de fallos.
       if (m.type !== 'CORRECTIVE') return false;
     }
-
-    // 2. Filtros normales
     if (filterType !== 'all' && m.type !== filterType) return false;
     if (filterStatus !== 'all' && m.status !== filterStatus) return false;
     return true;
   });
 
+  // ── CSV Export ─────────────────────────────────────────────────────────────
   const exportToCSV = () => {
     if (!filteredData || filteredData.length === 0) return;
-    
     const headers = ['ID Mantenimiento', 'Placa Ikusi', 'Tipo', 'Estado', 'Fecha Programada', 'Fecha Ejecución', 'Dias Retraso', 'Usuario en Turno', 'Motivo', 'Notas Resolución'];
-    
     const rows = filteredData.map(m => {
       let delayDays = 0;
       if (m.status === 'COMPLETED' && m.executionDate) {
-         delayDays = Math.max(0, Math.floor((new Date(m.executionDate).getTime() - new Date(m.scheduledDate).getTime()) / (1000 * 3600 * 24)));
+        delayDays = Math.max(0, Math.floor((new Date(m.executionDate).getTime() - new Date(m.scheduledDate).getTime()) / (1000 * 3600 * 24)));
       } else if (m.status === 'SCHEDULED' && new Date(m.scheduledDate) < new Date()) {
-         delayDays = Math.max(0, Math.floor((new Date().getTime() - new Date(m.scheduledDate).getTime()) / (1000 * 3600 * 24)));
+        delayDays = Math.max(0, Math.floor((new Date().getTime() - new Date(m.scheduledDate).getTime()) / (1000 * 3600 * 24)));
       }
-
-      return [
-        m.id,
-        m.assetId,
-        m.type === 'PREVENTIVE' ? 'Preventivo' : 'Correctivo',
-        m.status,
-        m.scheduledDate.split('T')[0],
-        m.executionDate ? m.executionDate.split('T')[0] : 'N/A',
-        delayDays.toString(),
-        m.collaboratorInTurnName || 'N/A',
-        `"${(m.reason || '').replace(/"/g, '""')}"`,
-        `"${(m.notes || '').replace(/"/g, '""')}"`
-      ];
+      return [m.id, m.assetId, m.type === 'PREVENTIVE' ? 'Preventivo' : 'Correctivo', m.status, m.scheduledDate.split('T')[0], m.executionDate ? m.executionDate.split('T')[0] : 'N/A', delayDays.toString(), m.collaboratorInTurnName || 'N/A', `"${(m.reason || '').replace(/"/g, '""')}"`, `"${(m.notes || '').replace(/"/g, '""')}"`];
     });
-
-    const csvContent = "data:text/csv;charset=utf-8," 
-      + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
-    
-    const encodedUri = encodeURI(csvContent);
+    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
     const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
+    link.setAttribute("href", encodeURI(csvContent));
     link.setAttribute("download", `reporte_mantenimientos_${new Date().toISOString().split('T')[0]}.csv`);
     document.body.appendChild(link);
     link.click();
@@ -213,195 +190,183 @@ const Maintenances: React.FC = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    let title = '';
-    let message = '';
-    let submitAction: () => void;
-
+    let title = '', message = '', submitAction: () => void;
     if (modalMode === 'create') {
-      title = 'Programar Mantenimiento';
-      message = '¿Estás seguro de programar este mantenimiento?';
-      submitAction = () => createMutation.mutate({
-        assetId: formData.assetId,
-        type: formData.type,
-        scheduledDate: formData.scheduledDate,
-        reason: formData.reason
-      });
+      title = 'Programar Mantenimiento'; message = '¿Estás seguro de programar este mantenimiento?';
+      submitAction = () => createMutation.mutate({ assetId: formData.assetId, type: formData.type, scheduledDate: formData.scheduledDate, reason: formData.reason });
     } else if (modalMode === 'start' && selectedRecord) {
-      title = 'Iniciar Mantenimiento';
-      message = '¿Estás seguro de registrar el inicio de este mantenimiento?';
+      title = 'Iniciar Mantenimiento'; message = '¿Estás seguro de registrar el inicio de este mantenimiento?';
       submitAction = () => startMutation.mutate({ id: selectedRecord.id, reason: formData.reason });
     } else if (modalMode === 'complete' && selectedRecord) {
-      title = 'Completar Mantenimiento';
-      message = '¿Estás seguro de dar por completado este mantenimiento?';
+      title = 'Completar Mantenimiento'; message = '¿Estás seguro de dar por completado este mantenimiento?';
       submitAction = () => completeMutation.mutate({ id: selectedRecord.id, notes: formData.notes });
-    } else {
-      return;
-    }
-
-    confirm({
-      title,
-      message,
-      type: 'info',
-      onConfirm: submitAction
-    });
+    } else return;
+    confirm({ title, message, type: 'info', onConfirm: submitAction });
   };
 
   const openModal = (mode: 'create' | 'start' | 'complete', record?: MaintenanceRecord) => {
-    setModalMode(mode);
-    setSelectedRecord(record || null);
-    if (mode === 'create') {
-      setFormData({ assetId: '', type: 'PREVENTIVE', scheduledDate: new Date().toISOString().split('T')[0], reason: '', notes: '', executionDate: new Date().toISOString().split('T')[0] });
-    } else if (record) {
-      setFormData({ ...formData, reason: record.reason || '', notes: record.notes || '' });
-    }
+    setModalMode(mode); setSelectedRecord(record || null);
+    if (mode === 'create') setFormData({ assetId: '', type: 'PREVENTIVE', scheduledDate: new Date().toISOString().split('T')[0], reason: '', notes: '', executionDate: new Date().toISOString().split('T')[0] });
+    else if (record) setFormData({ ...formData, reason: record.reason || '', notes: record.notes || '' });
     setShowModal(true);
   };
 
   return (
     <div className="maintenances-page slide-in">
-      <header className="page-header">
+
+      {/* ── Header ──────────────────────────────────────────────────────────── */}
+      <header className="dash-header">
         <div>
-          <h1 className="title-glow">Gestión de Mantenimientos</h1>
-          <p style={{ color: 'var(--text-muted)' }}>Programa, ejecuta y audita el historial de mantenimientos de tus equipos.</p>
+          <h1 className="title-glow">Dashboard de Mantenimientos</h1>
+          <p style={{ color: 'var(--text-muted)', margin: 0, fontSize: '14px' }}>Gestión y auditoría del ciclo de vida de los equipos</p>
         </div>
         <div style={{ display: 'flex', gap: '10px' }}>
-          <button className="btn-glass" onClick={exportToCSV}>
-             Exportar CSV
-          </button>
-          <button className="btn-primary" onClick={() => openModal('create')}>
-            <Plus size={18} /> Programar
-          </button>
+          <button className="btn-glass" onClick={exportToCSV}>Exportar CSV</button>
+          <button className="btn-primary" onClick={() => openModal('create')}><Plus size={18} /> Programar</button>
         </div>
       </header>
 
-      {/* DASHBOARD LOCAL */}
-      <div className="bento-grid" style={{ marginBottom: '30px', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
-        <div className="bento-card" style={{ cursor: 'pointer', border: filterStatus === 'SCHEDULED' ? '2px solid #3b82f6' : '1px solid rgba(255,255,255,0.1)' }} onClick={() => handleCardClick('SCHEDULED')}>
-          <div className="bento-header">
-            <div className="stat-icon" style={{ background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6' }}>
-              <Calendar size={24} />
-            </div>
-          </div>
-          <div className="bento-body">
-            <h3>Programados</h3>
-            <p className="stat-value" style={{ color: '#3b82f6' }}>{totalScheduled}</p>
+      {/* ── KPI Cards ───────────────────────────────────────────────────────── */}
+      <div className="maint-kpi-row">
+        <div className="maint-kpi-card kpi-blue" style={{ cursor: 'pointer', outline: filterStatus === 'SCHEDULED' ? '2px solid #3b82f6' : 'none' }} onClick={() => handleCardClick('SCHEDULED')}>
+          <div className="kpi-icon" style={{ background: 'rgba(59,130,246,0.12)', color: '#3b82f6' }}><Calendar size={22} /></div>
+          <div className="kpi-body">
+            <span className="kpi-label">Programados</span>
+            <span className="kpi-value" style={{ color: '#3b82f6' }}>{totalScheduled}</span>
+            <span className="kpi-sub">clic para filtrar</span>
           </div>
         </div>
 
-        <div className="bento-card" style={{ cursor: 'pointer', border: filterStatus === 'IN_PROGRESS' ? '2px solid #ca8a04' : '1px solid rgba(255,255,255,0.1)' }} onClick={() => handleCardClick('IN_PROGRESS')}>
-          <div className="bento-header">
-            <div className="stat-icon" style={{ background: 'rgba(234, 179, 8, 0.1)', color: '#ca8a04' }}>
-              <Settings size={24} />
-            </div>
-          </div>
-          <div className="bento-body">
-            <h3>En Progreso</h3>
-            <p className="stat-value" style={{ color: '#ca8a04' }}>{totalInProgress}</p>
+        <div className="maint-kpi-card kpi-amber" style={{ cursor: 'pointer', outline: filterStatus === 'IN_PROGRESS' ? '2px solid #f59e0b' : 'none' }} onClick={() => handleCardClick('IN_PROGRESS')}>
+          <div className="kpi-icon" style={{ background: 'rgba(245,158,11,0.12)', color: '#f59e0b' }}><Settings size={22} /></div>
+          <div className="kpi-body">
+            <span className="kpi-label">En Progreso</span>
+            <span className="kpi-value" style={{ color: '#f59e0b' }}>{totalInProgress}</span>
           </div>
         </div>
 
-        <div className="bento-card" style={{ cursor: 'pointer', border: viewMode === 'auditoria' ? '2px solid #ef4444' : '1px solid rgba(255,255,255,0.1)' }} onClick={() => setViewMode(viewMode === 'auditoria' ? 'general' : 'auditoria')}>
-          <div className="bento-header">
-            <div className="stat-icon" style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444' }}>
-              <AlertTriangle size={24} />
-            </div>
-          </div>
-          <div className="bento-body">
-            <h3>Vencidos</h3>
-            <p className="stat-value" style={{ color: '#ef4444' }}>{overdue}</p>
+        <div className="maint-kpi-card kpi-red" style={{ cursor: 'pointer', outline: viewMode === 'auditoria' ? '2px solid #ef4444' : 'none' }} onClick={() => setViewMode(viewMode === 'auditoria' ? 'general' : 'auditoria')}>
+          <div className="kpi-icon" style={{ background: 'rgba(239,68,68,0.12)', color: '#ef4444' }}><AlertTriangle size={22} /></div>
+          <div className="kpi-body">
+            <span className="kpi-label">Vencidos</span>
+            <span className="kpi-value" style={{ color: '#ef4444' }}>{overdue}</span>
+            <span className="kpi-sub">sin atender</span>
           </div>
         </div>
 
-        <div className="bento-card">
-          <div className="bento-header">
-            <div className="stat-icon" style={{ background: 'rgba(34, 197, 94, 0.1)', color: '#22c55e' }}>
-              <CheckCircle size={24} />
-            </div>
-          </div>
-          <div className="bento-body">
-            <h3>Preventivo</h3>
-            <p className="stat-value" style={{ color: '#22c55e' }}>{preventiveRatio}%</p>
+        <div className="maint-kpi-card kpi-green" style={{ cursor: 'pointer', outline: filterStatus === 'COMPLETED' ? '2px solid #22c55e' : 'none' }} onClick={() => handleCardClick('COMPLETED')}>
+          <div className="kpi-icon" style={{ background: 'rgba(34,197,94,0.12)', color: '#22c55e' }}><CheckCircle size={22} /></div>
+          <div className="kpi-body">
+            <span className="kpi-label">Completados</span>
+            <span className="kpi-value" style={{ color: '#22c55e' }}>{totalCompleted}</span>
           </div>
         </div>
 
-        <div className="bento-card">
-          <div className="bento-header">
-            <div className="stat-icon" style={{ background: 'rgba(168, 85, 247, 0.1)', color: '#a855f7' }}>
-              <Wrench size={24} />
-            </div>
-          </div>
-          <div className="bento-body">
-            <h3>Correctivo</h3>
-            <p className="stat-value" style={{ color: '#a855f7' }}>{correctiveRatio}%</p>
+        <div className="maint-kpi-card kpi-purple" style={{ cursor: 'pointer', outline: viewMode === 'balance' ? '2px solid #a855f7' : 'none' }} onClick={() => setViewMode(viewMode === 'balance' ? 'general' : 'balance')}>
+          <div className="kpi-icon" style={{ background: 'rgba(168,85,247,0.12)', color: '#a855f7' }}><Wrench size={22} /></div>
+          <div className="kpi-body">
+            <span className="kpi-label">Correctivos %</span>
+            <span className="kpi-value" style={{ color: '#a855f7' }}>{correctiveRatio}%</span>
+            <span className="kpi-sub">del total</span>
           </div>
         </div>
       </div>
 
-      {/* CHARTS ROW */}
-      <section className="bento-grid" style={{ marginBottom: '30px' }}>
-        <div className="glass-panel" style={{ padding: '20px', minHeight: '350px' }}>
-          <h3 style={{ marginBottom: '20px', color: 'var(--text-main)' }}>Preventivo vs Correctivo</h3>
-          <ResponsiveContainer width="100%" height={300}>
+      {/* ── Charts Row ──────────────────────────────────────────────────────── */}
+      <div className="dash-row" style={{ marginBottom: '20px' }}>
+
+        {/* Donut */}
+        <div className="dash-card" style={{ flex: '1 1 220px' }}>
+          <h3 className="dash-card-title">Preventivo vs Correctivo</h3>
+          <ResponsiveContainer width="100%" height={220}>
             <PieChart>
-              <Pie
-                data={typeData}
-                cx="50%"
-                cy="50%"
-                innerRadius={60}
-                outerRadius={80}
-                paddingAngle={5}
-                dataKey="value"
-                nameKey="name"
-                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-              >
-                {typeData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS_TYPE[index % COLORS_TYPE.length]} />
-                ))}
+              <Pie data={typeData} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={4} dataKey="value" nameKey="name" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
+                {typeData.map((_, i) => <Cell key={i} fill={COLORS_TYPE[i]} />)}
               </Pie>
-              <Tooltip formatter={(value: number, name: string) => [value, name]} />
+              <Tooltip formatter={(v: any, n: string) => [v, n]} />
             </PieChart>
           </ResponsiveContainer>
         </div>
 
-        <div className="glass-panel" style={{ padding: '20px', minHeight: '350px' }}>
-          <h3 style={{ marginBottom: '20px', color: 'var(--text-main)' }}>Mantenimientos por Estado</h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={statusData}>
-              <XAxis dataKey="status" stroke="var(--text-muted)" />
-              <YAxis allowDecimals={false} stroke="var(--text-muted)" />
-              <Tooltip cursor={{ fill: 'rgba(255, 255, 255, 0.1)' }} />
-              <Bar dataKey="count" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+        {/* Bar */}
+        <div className="dash-card" style={{ flex: '1 1 260px' }}>
+          <h3 className="dash-card-title">Mantenimientos por Estado</h3>
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={statusData} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
+              <XAxis dataKey="status" stroke="var(--text-muted)" fontSize={12} />
+              <YAxis allowDecimals={false} stroke="var(--text-muted)" fontSize={12} />
+              <Tooltip cursor={{ fill: 'rgba(59,130,246,0.05)' }} />
+              <Bar dataKey="count" fill="#3b82f6" radius={[6, 6, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
-      </section>
 
-      {/* LISTA Y FILTROS */}
-      <div className="glass-panel">
-        <div style={{ display: 'flex', gap: '15px', marginBottom: '20px', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ display: 'flex', gap: '15px' }}>
-            <select className="glass-input" value={filterType} onChange={e => setFilterType(e.target.value)} style={{ width: '180px' }}>
-              <option value="all">Todos los Tipos</option>
-              <option value="PREVENTIVE">Preventivo</option>
-              <option value="CORRECTIVE">Correctivo</option>
-            </select>
-            <select className="glass-input" value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={{ width: '180px' }}>
-              <option value="all">Todos los Estados</option>
-              <option value="SCHEDULED">Programado</option>
-              <option value="IN_PROGRESS">En Progreso</option>
-              <option value="COMPLETED">Completado</option>
-              <option value="CANCELLED">Cancelado</option>
-            </select>
-          </div>
-          <div>
-            <select className="glass-input" value={viewMode} onChange={e => setViewMode(e.target.value as any)} style={{ width: '250px', borderColor: '#3b82f6', color: 'var(--text-color)' }}>
-              <option value="general">📄 Vista General</option>
-              <option value="auditoria">🚨 Reporte: Auditoría de Vencidos</option>
-              <option value="balance">⚙️ Reporte: Análisis de Correctivos</option>
-            </select>
-          </div>
+        {/* Line — Tendencia Mensual */}
+        <div className="dash-card" style={{ flex: '1 1 300px' }}>
+          <h3 className="dash-card-title">Tendencia Mensual (últimos 6 meses)</h3>
+          <ResponsiveContainer width="100%" height={220}>
+            <LineChart data={monthlyData} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
+              <XAxis dataKey="month" stroke="var(--text-muted)" fontSize={12} />
+              <YAxis allowDecimals={false} stroke="var(--text-muted)" fontSize={12} />
+              <Tooltip />
+              <Legend iconType="circle" iconSize={10} />
+              <Line type="monotone" dataKey="Preventivo" stroke="#22c55e" strokeWidth={2} dot={{ r: 4 }} />
+              <Line type="monotone" dataKey="Correctivo" stroke="#a855f7" strokeWidth={2} dot={{ r: 4 }} />
+            </LineChart>
+          </ResponsiveContainer>
         </div>
 
+      </div>
+
+      {/* ── Filters + Table ──────────────────────────────────────────────────── */}
+      <div className="dash-card">
+
+        {/* Filter bar */}
+        <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
+          <select className="glass-input" value={filterType} onChange={e => setFilterType(e.target.value)} style={{ width: '170px' }}>
+            <option value="all">Todos los Tipos</option>
+            <option value="PREVENTIVE">Preventivo</option>
+            <option value="CORRECTIVE">Correctivo</option>
+          </select>
+          <select className="glass-input" value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={{ width: '170px' }}>
+            <option value="all">Todos los Estados</option>
+            <option value="SCHEDULED">Programado</option>
+            <option value="IN_PROGRESS">En Progreso</option>
+            <option value="COMPLETED">Completado</option>
+            <option value="CANCELLED">Cancelado</option>
+          </select>
+          <select className="glass-input" value={viewMode} onChange={e => setViewMode(e.target.value as any)} style={{ width: '230px', borderColor: '#3b82f6' }}>
+            <option value="general">📄 Vista General</option>
+            <option value="auditoria">🚨 Auditoría de Vencidos</option>
+            <option value="balance">⚙️ Análisis de Correctivos</option>
+          </select>
+
+          {/* Active filter pills */}
+          {(filterType !== 'all' || filterStatus !== 'all' || viewMode !== 'general') && (
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginLeft: 'auto' }}>
+              {filterType !== 'all' && (
+                <span className="filter-pill">
+                  {TYPE_LABELS[filterType]}
+                  <button onClick={() => setFilterType('all')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 0 0 4px', color: 'inherit' }}><X size={12} /></button>
+                </span>
+              )}
+              {filterStatus !== 'all' && (
+                <span className="filter-pill">
+                  {STATUS_LABELS[filterStatus]}
+                  <button onClick={() => setFilterStatus('all')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 0 0 4px', color: 'inherit' }}><X size={12} /></button>
+                </span>
+              )}
+              {viewMode !== 'general' && (
+                <span className="filter-pill filter-pill-blue">
+                  {viewMode === 'auditoria' ? '🚨 Auditoría Vencidos' : '⚙️ Análisis Correctivos'}
+                  <button onClick={() => setViewMode('general')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 0 0 4px', color: 'inherit' }}><X size={12} /></button>
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Table */}
         <div className="table-responsive">
           <table className="glass-table">
             <thead>
@@ -410,6 +375,7 @@ const Maintenances: React.FC = () => {
                 <th>Tipo</th>
                 <th>Estado</th>
                 <th>Fecha Prog.</th>
+                <th>Días de Retraso</th>
                 <th>Usuario en Turno</th>
                 <th>Acciones</th>
               </tr>
@@ -417,24 +383,42 @@ const Maintenances: React.FC = () => {
             <tbody>
               {filteredData?.map(m => {
                 const isLate = m.status === 'SCHEDULED' && new Date(m.scheduledDate) < now;
+                const delayDays = (() => {
+                  if (m.status === 'COMPLETED' && m.executionDate) {
+                    return Math.max(0, Math.floor((new Date(m.executionDate).getTime() - new Date(m.scheduledDate).getTime()) / (1000 * 3600 * 24)));
+                  } else if (m.status === 'SCHEDULED' && new Date(m.scheduledDate) < now) {
+                    return Math.floor((now.getTime() - new Date(m.scheduledDate).getTime()) / (1000 * 3600 * 24));
+                  }
+                  return null;
+                })();
+
                 return (
                   <tr key={m.id}>
                     <td className="fw-600">{m.assetId}</td>
                     <td>
-                      <span className="spec-tag" style={{ background: m.type === 'PREVENTIVE' ? 'rgba(59, 130, 246, 0.15)' : 'rgba(239, 68, 68, 0.15)', color: m.type === 'PREVENTIVE' ? '#3b82f6' : '#ef4444' }}>
+                      <span className="spec-tag" style={{ background: m.type === 'PREVENTIVE' ? 'rgba(59,130,246,0.12)' : 'rgba(239,68,68,0.12)', color: m.type === 'PREVENTIVE' ? '#3b82f6' : '#ef4444' }}>
                         {m.type === 'PREVENTIVE' ? 'Preventivo' : 'Correctivo'}
                       </span>
                     </td>
                     <td>
                       <span className={`badge badge-status badge-${m.status.toLowerCase()}`}>
-                        {m.status === 'SCHEDULED' ? 'Programado' : m.status === 'IN_PROGRESS' ? 'En Progreso' : m.status === 'COMPLETED' ? 'Completado' : 'Cancelado'}
+                        {STATUS_LABELS[m.status] || m.status}
                       </span>
-                      {isLate && <span style={{ color: '#ef4444', fontSize: '12px', marginLeft: '5px' }}>⚠ Vencido</span>}
+                      {isLate && <span style={{ color: '#ef4444', fontSize: '12px', marginLeft: '6px' }}>⚠ Vencido</span>}
                     </td>
-                    <td>{new Date(m.scheduledDate).toLocaleDateString()}</td>
+                    <td>{new Date(m.scheduledDate).toLocaleDateString('es-CO')}</td>
+                    <td>
+                      {delayDays === null ? (
+                        <span style={{ color: 'var(--text-muted)' }}>—</span>
+                      ) : delayDays === 0 ? (
+                        <span style={{ color: '#10b981', fontWeight: 600 }}>A tiempo</span>
+                      ) : (
+                        <span style={{ color: m.status === 'COMPLETED' ? '#f59e0b' : '#ef4444', fontWeight: 600 }}>{delayDays} días</span>
+                      )}
+                    </td>
                     <td>{m.collaboratorInTurnName || <span style={{ color: 'var(--text-muted)' }}>N/A</span>}</td>
                     <td>
-                      <div className="actions-cell">
+                      <div style={{ display: 'flex', gap: '6px' }}>
                         {m.status === 'SCHEDULED' && (
                           <button className="btn-action" style={{ borderColor: '#eab308', color: '#eab308' }} title="Iniciar Mantenimiento" onClick={() => openModal('start', m)}>
                             <Wrench size={16} />
@@ -450,71 +434,72 @@ const Maintenances: React.FC = () => {
                   </tr>
                 );
               })}
+              {(!filteredData || filteredData.length === 0) && (
+                <tr>
+                  <td colSpan={7} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+                    No hay registros que coincidan con los filtros aplicados.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
       </div>
 
-      {/* MODAL */}
+      {/* ── Modal ───────────────────────────────────────────────────────────── */}
       {showModal && (
         <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(4px)' }}>
           <div className="glass-panel" style={{ padding: '30px', maxWidth: '500px', width: '100%' }}>
             <h3 style={{ marginBottom: '20px', color: 'white' }}>
               {modalMode === 'create' ? 'Programar Mantenimiento' : modalMode === 'start' ? 'Iniciar Mantenimiento' : 'Completar Mantenimiento'}
             </h3>
-            
             <form onSubmit={handleSubmit}>
               {modalMode === 'create' && (
                 <>
                   <div className="form-group">
                     <label>ID del Activo (Placa Ikusi)</label>
-                    <input required type="text" list="assets-list" className="glass-input" value={formData.assetId} onChange={e => setFormData({...formData, assetId: e.target.value})} placeholder="Escribe para buscar..." />
+                    <input required type="text" list="assets-list" className="glass-input" value={formData.assetId} onChange={e => setFormData({ ...formData, assetId: e.target.value })} placeholder="Escribe para buscar..." />
                     <datalist id="assets-list">
-                      {assets?.map(a => (
-                        <option key={a.id} value={a.id}>{a.dynamicAttributes?.Nombre || 'Activo'} - {a.id}</option>
-                      ))}
+                      {assets?.map(a => <option key={a.id} value={a.id}>{a.dynamicAttributes?.Nombre || 'Activo'} - {a.id}</option>)}
                     </datalist>
                   </div>
                   <div className="form-group">
                     <label>Tipo</label>
-                    <select className="glass-input" value={formData.type} onChange={e => setFormData({...formData, type: e.target.value as any})}>
+                    <select className="glass-input" value={formData.type} onChange={e => setFormData({ ...formData, type: e.target.value as any })}>
                       <option value="PREVENTIVE">Preventivo</option>
                       <option value="CORRECTIVE">Correctivo</option>
                     </select>
                   </div>
                   <div className="form-group">
                     <label>Fecha Programada</label>
-                    <input required type="date" className="glass-input" value={formData.scheduledDate} onChange={e => setFormData({...formData, scheduledDate: e.target.value})} />
+                    <input required type="date" className="glass-input" value={formData.scheduledDate} onChange={e => setFormData({ ...formData, scheduledDate: e.target.value })} />
                   </div>
                   <div className="form-group">
                     <label>Motivo Inicial (Opcional)</label>
-                    <input type="text" className="glass-input" value={formData.reason} onChange={e => setFormData({...formData, reason: e.target.value})} />
+                    <input type="text" className="glass-input" value={formData.reason} onChange={e => setFormData({ ...formData, reason: e.target.value })} />
                   </div>
                 </>
               )}
-
               {modalMode === 'start' && (
                 <>
                   <p style={{ color: 'var(--text-muted)', marginBottom: '15px' }}>Iniciando mantenimiento para el activo <b>{selectedRecord?.assetId}</b>.</p>
                   <div className="form-group">
                     <label>Motivo / Problema Detectado</label>
-                    <input required type="text" className="glass-input" value={formData.reason} onChange={e => setFormData({...formData, reason: e.target.value})} placeholder="Ej. Limpieza interna, Cambio de pasta térmica..." />
+                    <input required type="text" className="glass-input" value={formData.reason} onChange={e => setFormData({ ...formData, reason: e.target.value })} placeholder="Ej. Limpieza interna, Cambio de pasta térmica..." />
                   </div>
                 </>
               )}
-
               {modalMode === 'complete' && (
                 <>
                   <p style={{ color: 'var(--text-muted)', marginBottom: '15px' }}>
-                    Al completar este mantenimiento, <b>se programará automáticamente el siguiente servicio preventivo</b> para dentro de un año a partir de hoy.
+                    Al completar, <b>se programará automáticamente el siguiente servicio preventivo</b> para dentro de un año.
                   </p>
                   <div className="form-group">
                     <label>Notas de Resolución</label>
-                    <textarea required className="glass-input" value={formData.notes} onChange={e => setFormData({...formData, notes: e.target.value})} placeholder="Ej. Se limpió ventilador y se actualizó BIOS..." style={{ minHeight: '100px', resize: 'vertical' }} />
+                    <textarea required className="glass-input" value={formData.notes} onChange={e => setFormData({ ...formData, notes: e.target.value })} placeholder="Ej. Se limpió ventilador y se actualizó BIOS..." style={{ minHeight: '100px', resize: 'vertical' }} />
                   </div>
                 </>
               )}
-
               <div style={{ display: 'flex', gap: '10px', marginTop: '20px', justifyContent: 'flex-end' }}>
                 <button type="button" className="btn-glass" onClick={() => setShowModal(false)}>Cancelar</button>
                 <button type="submit" className="btn-primary" disabled={createMutation.isPending || startMutation.isPending || completeMutation.isPending}>
@@ -525,7 +510,6 @@ const Maintenances: React.FC = () => {
           </div>
         </div>
       )}
-
     </div>
   );
 };

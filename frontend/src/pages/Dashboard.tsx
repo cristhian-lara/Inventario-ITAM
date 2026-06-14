@@ -1,8 +1,8 @@
-import { Activity, ShieldCheck, MonitorSmartphone, ArrowRight, UserPlus, Clock } from 'lucide-react';
+import { Activity, ShieldCheck, MonitorSmartphone, ArrowRight, Clock, Package, FileDown, Users } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
-import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import './Dashboard.css';
 import { API_URL } from '../config';
 
@@ -23,10 +23,24 @@ interface DashboardMetrics {
   assetsByCategory?: Array<{ categoryName: string; count: number }>;
 }
 
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#a855f7'];
+const STATUS_COLORS: Record<string, string> = {
+  AVAILABLE: '#10b981',
+  IN_USE: '#3b82f6',
+  PENDING_ACCEPTANCE: '#f59e0b',
+  RETIRED: '#94a3b8',
+  MAINTENANCE: '#a855f7',
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  AVAILABLE: 'Disponible',
+  IN_USE: 'En Uso',
+  PENDING_ACCEPTANCE: 'Pend. Firma',
+  RETIRED: 'Retirado',
+  MAINTENANCE: 'Mantenimiento',
+};
 
 export default function Dashboard() {
-  const { data: metrics, isLoading, error } = useQuery<DashboardMetrics>({
+  const { data: metrics, isLoading } = useQuery<DashboardMetrics>({
     queryKey: ['dashboard_metrics'],
     queryFn: async () => {
       const response = await axios.get(`${API_URL}/api/dashboard`);
@@ -34,170 +48,314 @@ export default function Dashboard() {
     }
   });
 
-  if (isLoading) return <div className="dashboard-container"><p className="title-glow">Cargando métricas...</p></div>;
-  if (error) return <div className="dashboard-container"><p style={{color: 'red'}}>Error al cargar dashboard: {(error as Error).message}</p></div>;
+  const { data: assignments } = useQuery<any[]>({
+    queryKey: ['assignments'],
+    queryFn: async () => {
+      const response = await axios.get(`${API_URL}/api/assignments`);
+      return response.data;
+    }
+  });
+
+  const { data: assets } = useQuery<any[]>({
+    queryKey: ['assets'],
+    queryFn: async () => {
+      const response = await axios.get(`${API_URL}/api/catalog/assets`);
+      return response.data;
+    }
+  });
+
+  const { data: collaborators } = useQuery<any[]>({
+    queryKey: ['collaborators'],
+    queryFn: async () => {
+      const response = await axios.get(`${API_URL}/api/collaborators`);
+      return response.data;
+    }
+  });
+
+  if (isLoading) return (
+    <div className="dashboard-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
+      <p className="title-glow">Cargando métricas...</p>
+    </div>
+  );
+
+  // ── Computed KPIs ──────────────────────────────────────────────────────────
+  const pendingFirma = assignments?.filter(a => a.status === 'PENDING_ACCEPTANCE').length || 0;
+
+  const availableAssets = assets?.filter(a => {
+    const hasPending = assignments?.some(asgn => asgn.assetId === a.id && asgn.status === 'PENDING_ACCEPTANCE');
+    return a.status === 'AVAILABLE' && !hasPending;
+  }).length || 0;
+
+  // ── Warranty expiry table (next 5) ─────────────────────────────────────────
+  const today = new Date();
+  const warrantyAssets = (assets || [])
+    .filter(a => a.purchaseDate && a.warrantyMonths)
+    .map(a => {
+      const expiryDate = new Date(a.purchaseDate);
+      expiryDate.setMonth(expiryDate.getMonth() + Number(a.warrantyMonths));
+      const daysLeft = Math.floor((expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      return { ...a, expiryDate, daysLeft };
+    })
+    .sort((a, b) => a.daysLeft - b.daysLeft)
+    .slice(0, 5);
+
+  // ── Top 5 collaborators by accepted equipment count ───────────────────────
+  const collabStats = (collaborators || [])
+    .map(c => {
+      const count = (assignments || []).filter(a => a.collaboratorId === c.id && a.status === 'ACCEPTED').length;
+      return { name: c.name || c.email || c.id, count };
+    })
+    .filter(c => c.count > 0)
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5);
+
+  const maxCollabCount = collabStats[0]?.count || 1;
+
+  // ── Pie data (include pending) ─────────────────────────────────────────────
+  const pieData = [
+    ...(metrics?.assetsByStatus || []).map(s => ({
+      name: STATUS_LABELS[s.status] || s.status,
+      count: s.count,
+      fill: STATUS_COLORS[s.status] || '#94a3b8',
+    })),
+    ...(pendingFirma > 0
+      ? [{ name: 'Pend. Firma', count: pendingFirma, fill: '#f59e0b' }]
+      : []),
+  ];
+
+  const exportCSV = async () => {
+    try {
+      const res = await axios.get(`${API_URL}/api/catalog/assets`);
+      const data = res.data;
+      const rows = ['ID,Status,Categoria,FechaCompra,GarantiaMeses,DepreciacionAnos'];
+      for (const row of data) {
+        rows.push([row.id, row.status, row.categoryId, row.purchaseDate || '', row.warrantyMonths || '', row.depreciationYears || ''].join(','));
+      }
+      const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Inventario_Ikusi_${new Date().toISOString().split('T')[0]}.csv`;
+      a.click();
+    } catch { alert('Error exportando reporte'); }
+  };
 
   return (
     <div className="dashboard-container">
-      
-      {/* Hero Card */}
-      <section className="hero-card">
-        <div className="hero-content">
-          <h1 className="title-glow" style={{ fontSize: '36px', marginBottom: '16px' }}>
-            Inventario General
+
+      {/* ── Header ─────────────────────────────────────────────────────────── */}
+      <header className="dash-header">
+        <div>
+          <h1 className="title-glow" style={{ fontSize: '28px', marginBottom: '4px' }}>
+            Dashboard General
           </h1>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '18px', lineHeight: '1.6', maxWidth: '600px', marginBottom: '32px' }}>
-            Mantén el control total de los activos de Ikusi. Aquí puedes revisar de un vistazo el hardware disponible, equipos asignados y el ciclo de vida de los dispositivos.
+          <p style={{ color: 'var(--text-muted)', fontSize: '14px', margin: 0 }}>
+            Resumen ejecutivo del parque tecnológico · Ikusi
           </p>
-          <div className="hero-actions">
-            <button onClick={async () => {
-              try {
-                const res = await axios.get(`${API_URL}/api/catalog/assets`);
-                const data = res.data;
-                const csvRows = ['ID,Status,Categoria,FechaCompra,GarantiaMeses,DepreciacionAnos'];
-                for(const row of data) {
-                  csvRows.push([row.id, row.status, row.categoryId, row.purchaseDate || '', row.warrantyMonths || '', row.depreciationYears || ''].join(','));
-                }
-                const blob = new Blob([csvRows.join('\\n')], { type: 'text/csv' });
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = 'Inventario_Ikusi.csv';
-                a.click();
-              } catch(e) {
-                alert('Error exportando reporte');
-              }
-            }} className="btn-primary" style={{ padding: '12px 24px', fontSize: '16px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <ArrowRight size={20} />
-              Exportar Reporte (JSON/CSV)
-            </button>
-            <Link to="/assets?filter=risk" className="btn-glass" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              Auditoría de Riesgos
-              <ShieldCheck size={18} />
-            </Link>
-          </div>
         </div>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button onClick={exportCSV} className="btn-glass" style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+            <FileDown size={16} /> Exportar CSV
+          </button>
+          <Link to="/assets?filter=risk" className="btn-primary" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <ShieldCheck size={16} /> Auditoría de Riesgos
+          </Link>
+        </div>
+      </header>
+
+      {/* ── KPI Cards ──────────────────────────────────────────────────────── */}
+      <section className="kpi-row">
+
+        <Link to="/assets" className="kpi-card kpi-green" style={{ textDecoration: 'none', color: 'inherit' }}>
+          <div className="kpi-icon" style={{ background: 'rgba(16,185,129,0.12)', color: '#10b981' }}>
+            <MonitorSmartphone size={22} />
+          </div>
+          <div className="kpi-body">
+            <span className="kpi-label">Activos Totales</span>
+            <span className="kpi-value">{metrics?.totalAssets || 0}</span>
+            <span className="kpi-sub">equipos registrados</span>
+          </div>
+        </Link>
+
+        <Link to="/assets?status=IN_USE" className="kpi-card kpi-blue" style={{ textDecoration: 'none', color: 'inherit' }}>
+          <div className="kpi-icon" style={{ background: 'rgba(59,130,246,0.12)', color: '#3b82f6' }}>
+            <Activity size={22} />
+          </div>
+          <div className="kpi-body">
+            <span className="kpi-label">Asignados (En Uso)</span>
+            <span className="kpi-value" style={{ color: '#3b82f6' }}>{metrics?.activeAssignments || 0}</span>
+            <span className="kpi-sub">con firma aceptada</span>
+          </div>
+        </Link>
+
+        <Link to="/assets?status=PENDING_ACCEPTANCE" className="kpi-card kpi-amber" style={{ textDecoration: 'none', color: 'inherit' }}>
+          <div className="kpi-icon" style={{ background: 'rgba(245,158,11,0.12)', color: '#f59e0b' }}>
+            <Clock size={22} />
+          </div>
+          <div className="kpi-body">
+            <span className="kpi-label">Pendientes de Firma</span>
+            <span className="kpi-value" style={{ color: '#f59e0b' }}>{pendingFirma}</span>
+            <span className="kpi-sub">esperando aceptación</span>
+          </div>
+        </Link>
+
+        <Link to="/assets?filter=risk" className="kpi-card kpi-red" style={{ textDecoration: 'none', color: 'inherit' }}>
+          <div className="kpi-icon" style={{ background: 'rgba(239,68,68,0.12)', color: '#ef4444' }}>
+            <ShieldCheck size={22} />
+          </div>
+          <div className="kpi-body">
+            <span className="kpi-label">En Riesgo</span>
+            <span className="kpi-value" style={{ color: '#ef4444' }}>{metrics?.obsoleteAssets || 0}</span>
+            <span className="kpi-sub">garantía o deprec. vencida</span>
+          </div>
+        </Link>
+
+        <Link to="/assets?status=AVAILABLE" className="kpi-card kpi-ikusi" style={{ textDecoration: 'none', color: 'inherit' }}>
+          <div className="kpi-icon" style={{ background: 'rgba(0,166,80,0.12)', color: '#00A650' }}>
+            <Package size={22} />
+          </div>
+          <div className="kpi-body">
+            <span className="kpi-label">Disponibles</span>
+            <span className="kpi-value" style={{ color: '#00A650' }}>{availableAssets}</span>
+            <span className="kpi-sub">listos para asignar</span>
+          </div>
+        </Link>
+
       </section>
 
-      {/* Floating Cards Grid */}
-      <section className="bento-grid">
-        <Link to="/assets" className="floating-card bento-card" style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}>
-          <div className="bento-header">
-            <div className="stat-icon" style={{ background: 'var(--ikusi-green-light)', color: 'var(--status-active)' }}>
-              <MonitorSmartphone size={24} />
-            </div>
-          </div>
-          <div className="bento-body">
-            <h3>Activos Totales</h3>
-            <p className="stat-value">{metrics?.totalAssets || 0}</p>
-            <span className="stat-label">Equipos registrados en el sistema</span>
-          </div>
-        </Link>
+      {/* ── Charts Row ─────────────────────────────────────────────────────── */}
+      <section className="dash-row">
 
-        <Link to="/assets?status=IN_USE" className="floating-card bento-card" style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}>
-          <div className="bento-header">
-            <div className="stat-icon" style={{ background: 'rgba(37, 99, 235, 0.1)', color: 'var(--accent-blue)' }}>
-              <Activity size={24} />
-            </div>
-          </div>
-          <div className="bento-body">
-            <h3>Asignaciones Activas</h3>
-            <p className="stat-value">{metrics?.activeAssignments || 0}</p>
-            <span className="stat-label">Equipos actualmente en uso</span>
-          </div>
-        </Link>
+        {/* Donut */}
+        <div className="dash-card" style={{ flex: '1 1 260px' }}>
+          <h3 className="dash-card-title">Estado del Inventario</h3>
+          <ResponsiveContainer width="100%" height={240}>
+            <PieChart>
+              <Pie data={pieData} cx="50%" cy="50%" innerRadius={55} outerRadius={85} paddingAngle={3} dataKey="count" nameKey="name">
+                {pieData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
+              </Pie>
+              <Tooltip formatter={(v: any, n: string) => [v, n]} />
+              <Legend iconType="circle" iconSize={10} />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
 
+        {/* Bar chart */}
+        <div className="dash-card" style={{ flex: '1 1 300px' }}>
+          <h3 className="dash-card-title">Activos por Categoría</h3>
+          <ResponsiveContainer width="100%" height={240}>
+            <BarChart data={metrics?.assetsByCategory || []} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
+              <XAxis dataKey="categoryName" stroke="var(--text-muted)" fontSize={12} />
+              <YAxis allowDecimals={false} stroke="var(--text-muted)" fontSize={12} />
+              <Tooltip cursor={{ fill: 'rgba(0,166,80,0.05)' }} />
+              <Bar dataKey="count" fill="#00A650" radius={[6, 6, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
 
-        <Link to="/assets?filter=risk" className="floating-card bento-card" style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}>
-          <div className="bento-header">
-            <div className="stat-icon" style={{ background: 'rgba(220, 38, 38, 0.1)', color: 'var(--accent-red)' }}>
-              <ShieldCheck size={24} />
-            </div>
-          </div>
-          <div className="bento-body">
-            <h3>Equipos en Riesgo</h3>
-            <p className="stat-value" style={{ color: 'var(--accent-red)' }}>{metrics?.obsoleteAssets || 0}</p>
-            <span className="stat-label">En uso pero obsoletos o sin garantía</span>
-          </div>
-        </Link>
-
-        <div className="floating-card bento-card activity-card">
-          <div className="bento-header">
-            <div className="stat-icon" style={{ background: '#f1f5f9', color: 'var(--text-muted)' }}>
-              <Clock size={24} />
-            </div>
-            <h3 style={{ marginLeft: '12px' }}>Últimos Movimientos</h3>
-          </div>
+        {/* Activity feed */}
+        <div className="dash-card dash-activity" style={{ flex: '1 1 240px' }}>
+          <h3 className="dash-card-title">Actividad Reciente</h3>
           <div className="activity-list">
-            {metrics?.recentActivity?.length === 0 ? (
-              <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                No hay movimientos recientes registrados
-              </div>
+            {!metrics?.recentActivity?.length ? (
+              <p style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Sin movimientos recientes</p>
             ) : (
-              metrics?.recentActivity?.map(act => (
+              metrics.recentActivity.slice(0, 6).map(act => (
                 <div className="activity-item" key={act.id}>
-                  <div className="activity-dot" style={{borderColor: act.type.includes('RETURN') ? 'var(--accent-red)' : 'var(--ikusi-green)'}}></div>
-                  <div className="activity-details">
-                    <p>
-                      <Link to={`/collaborators/${act.collaboratorId}`} style={{ color: 'var(--text-main)', textDecoration: 'underline', fontWeight: 500 }}>
-                        {act.description.split(' ')[0] /* Obtiene el primer nombre temporalmente */}
-                      </Link> 
-                      {' ' + act.description.split(' ').slice(1).join(' ')}
+                  <div className="activity-dot" style={{ background: act.type?.includes('RETURN') ? '#ef4444' : '#00A650' }} />
+                  <div>
+                    <p style={{ fontSize: '13px', margin: 0, lineHeight: 1.4 }}>
+                      <Link to={`/collaborators/${act.collaboratorId}`} style={{ color: 'var(--text-main)', fontWeight: 600 }}>
+                        {act.description.split(' ')[0]}
+                      </Link>{' '}{act.description.split(' ').slice(1).join(' ')}
                     </p>
-                    <span className="activity-time">{new Date(act.date).toLocaleDateString()} {new Date(act.date).toLocaleTimeString()}</span>
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                      {new Date(act.date).toLocaleDateString('es-CO')} {new Date(act.date).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}
+                    </span>
                   </div>
                 </div>
               ))
             )}
           </div>
-          <div className="activity-footer">
-            <Link to="/assets" style={{color: 'var(--accent-blue)', textDecoration: 'none', fontSize: '14px', fontWeight: 500}}>
-              Ver el catálogo
-            </Link>
-          </div>
+          <Link to="/assets" style={{ color: 'var(--accent-blue)', textDecoration: 'none', fontSize: '13px', fontWeight: 500, marginTop: 'auto', paddingTop: '12px', display: 'block' }}>
+            Ver catálogo →
+          </Link>
         </div>
 
       </section>
 
-      {/* DASHBOARD CHARTS */}
-      <section className="bento-grid" style={{ marginTop: '20px' }}>
-        {/* Gráfico 1: Estado del Inventario */}
-        <div className="floating-card bento-card" style={{ padding: '20px', minHeight: '350px' }}>
-          <h3 style={{ marginBottom: '20px', color: 'var(--text-main)' }}>Estado del Inventario</h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <PieChart>
-              <Pie
-                data={metrics?.assetsByStatus || []}
-                cx="50%"
-                cy="50%"
-                innerRadius={60}
-                outerRadius={80}
-                paddingAngle={5}
-                dataKey="count"
-                nameKey="status"
-                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-              >
-                {metrics?.assetsByStatus?.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip formatter={(value: number, name: string) => [value, name]} />
-            </PieChart>
-          </ResponsiveContainer>
+      {/* ── Info Panels Row ─────────────────────────────────────────────────── */}
+      <section className="dash-row">
+
+        {/* Warranty table */}
+        <div className="dash-card" style={{ flex: '2 1 400px' }}>
+          <h3 className="dash-card-title">Próximos Vencimientos de Garantía</h3>
+          {warrantyAssets.length === 0 ? (
+            <p style={{ color: 'var(--text-muted)', fontSize: '13px' }}>No hay activos con garantía registrada.</p>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+              <thead>
+                <tr>
+                  {['Placa', 'Categoría', 'Fecha Venc.', 'Días restantes', 'Estado'].map(h => (
+                    <th key={h} style={{ textAlign: 'left', padding: '8px 10px', color: 'var(--text-muted)', fontWeight: 600, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.4px', borderBottom: '1px solid var(--border-subtle)' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {warrantyAssets.map(a => {
+                  const expired = a.daysLeft < 0;
+                  const soon = a.daysLeft < 30 && a.daysLeft >= 0;
+                  const color = expired ? '#ef4444' : soon ? '#f59e0b' : '#10b981';
+                  const label = expired ? 'VENCIDA' : soon ? 'POR VENCER' : 'VIGENTE';
+                  return (
+                    <tr key={a.id} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+                      <td style={{ padding: '10px', fontWeight: 600 }}>{a.id}</td>
+                      <td style={{ padding: '10px', color: 'var(--text-muted)' }}>{a.categoryId}</td>
+                      <td style={{ padding: '10px' }}>{a.expiryDate.toLocaleDateString('es-CO')}</td>
+                      <td style={{ padding: '10px', fontWeight: 600, color }}>
+                        {expired ? `Venció hace ${Math.abs(a.daysLeft)} días` : `${a.daysLeft} días`}
+                      </td>
+                      <td style={{ padding: '10px' }}>
+                        <span style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '4px', background: `${color}18`, color, fontWeight: 700 }}>{label}</span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
         </div>
 
-        {/* Gráfico 2: Activos por Categoría */}
-        <div className="floating-card bento-card" style={{ padding: '20px', minHeight: '350px' }}>
-          <h3 style={{ marginBottom: '20px', color: 'var(--text-main)' }}>Activos por Categoría</h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={metrics?.assetsByCategory || []}>
-              <XAxis dataKey="categoryName" stroke="var(--text-muted)" />
-              <YAxis allowDecimals={false} stroke="var(--text-muted)" />
-              <Tooltip cursor={{ fill: 'rgba(255, 255, 255, 0.1)' }} />
-              <Bar dataKey="count" fill="var(--ikusi-green-light)" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+        {/* Top collaborators */}
+        <div className="dash-card" style={{ flex: '1 1 260px' }}>
+          <h3 className="dash-card-title">
+            <Users size={16} style={{ display: 'inline', marginRight: '8px', verticalAlign: 'middle' }} />
+            Top Colaboradores por Equipos
+          </h3>
+          {collabStats.length === 0 ? (
+            <p style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Sin asignaciones activas.</p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginTop: '8px' }}>
+              {collabStats.map((c, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span style={{ width: '22px', height: '22px', borderRadius: '50%', background: i === 0 ? '#f59e0b' : i === 1 ? '#94a3b8' : '#cd7f32', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 700, flexShrink: 0 }}>
+                    {i + 1}
+                  </span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
+                      <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-main)' }}>{c.name}</span>
+                      <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{c.count} equipo{c.count !== 1 ? 's' : ''}</span>
+                    </div>
+                    <div style={{ height: '6px', borderRadius: '3px', background: 'var(--border-subtle, #e2e8f0)' }}>
+                      <div style={{ height: '6px', borderRadius: '3px', background: '#00A650', width: `${(c.count / maxCollabCount) * 100}%`, transition: 'width 0.6s ease' }} />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
+
       </section>
 
     </div>

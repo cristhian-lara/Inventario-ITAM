@@ -58,9 +58,9 @@
 }
 
 .glass-table td {
-  padding: 20px 24px;
+  padding: 16px 24px;
   border-bottom: 1px solid var(--border-subtle);
-  vertical-align: middle;
+  vertical-align: top;
   color: var(--text-main);
 }
 
@@ -111,9 +111,14 @@
 
 /* Specs Cells */
 .specs-cell {
+  vertical-align: middle;
+}
+
+.specs-cell-inner {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
+  align-items: center;
 }
 
 .spec-tag {
@@ -223,3 +228,46 @@
 .alert-success { background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); color: #10b981; }
 .alert-error { background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); color: #ef4444; }
 .glass-input:disabled { background: var(--ikusi-green-light); color: var(--ikusi-green-hover); border: 1px dashed var(--ikusi-green); cursor: not-allowed; font-weight: 600; opacity: 0.8; }
+
+/* ── Responsive ──────────────────────────────────── */
+@media (max-width: 900px) {
+  .catalog-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+
+  .table-controls {
+    flex-direction: column;
+  }
+
+  .search-box { max-width: 100%; }
+}
+
+@media (max-width: 640px) {
+  .table-controls {
+    padding: 16px;
+    gap: 8px;
+  }
+
+  /* Assignment form stacks on mobile */
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .assignment-form {
+    padding: 20px;
+  }
+
+  /* Specs tags wrap on mobile */
+  .specs-cell-inner {
+    flex-wrap: wrap;
+  }
+
+  /* Table paddings tighter on mobile */
+  .glass-table th,
+  .glass-table td {
+    padding: 12px 14px;
+  }
+}

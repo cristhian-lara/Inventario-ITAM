@@ -116,7 +116,7 @@ export default function Catalog() {
   });
 
   const getActiveAssignmentForAsset = (assetId: string) => {
-    return assignments?.find((a: any) => a.assetId === assetId && a.status === 'ACCEPTED');
+    return assignments?.find((a: any) => a.assetId === assetId && ['ACCEPTED', 'PENDING_ACCEPTANCE', 'PENDING_RETURN'].includes(a.status));
   };
 
   const { data: collaborators } = useQuery<any[]>({
@@ -372,8 +372,18 @@ export default function Catalog() {
     if (filterCategory !== 'all') {
       if (Number(asset.categoryId) !== Number(filterCategory)) return false;
     }
-    
-    if (filterStatus !== 'all') {
+
+    // Determine if this asset has a pending acceptance assignment
+    const pendingAssignment = assignments?.find((a: any) => a.assetId === asset.id && a.status === 'PENDING_ACCEPTANCE');
+    const isPendingFirma = !!pendingAssignment;
+
+    if (filterStatus === 'PENDING_ACCEPTANCE') {
+      // Show ONLY assets pending signature
+      if (!isPendingFirma) return false;
+    } else if (filterStatus === 'AVAILABLE') {
+      // Show only truly available (not pending signature)
+      if (asset.status !== 'AVAILABLE' || isPendingFirma) return false;
+    } else if (filterStatus !== 'all') {
       if (asset.status !== filterStatus) return false;
     }
 
@@ -495,6 +505,7 @@ export default function Catalog() {
             <option value="all">Todos los Estados</option>
             <option value="AVAILABLE">Disponible</option>
             <option value="IN_USE">En Uso</option>
+            <option value="PENDING_ACCEPTANCE">⏳ Pendiente de Firma</option>
             <option value="MAINTENANCE">En Mantenimiento</option>
             <option value="RETIRED">Retirado / Baja</option>
           </select>
@@ -520,7 +531,7 @@ export default function Catalog() {
               <tr>
                 <th>Placa Ikusi</th>
                 <th>Categoría</th>
-                <th>Serial</th>
+                <th>Asignado a (Correo)</th>
                 <th>Especificaciones Principales</th>
                 <th>Estado</th>
                 <th>Acciones</th>
@@ -550,6 +561,7 @@ export default function Catalog() {
                     })()}
                   </td>
                   <td className="specs-cell">
+                    <div className="specs-cell-inner">
                     <span className="spec-tag" title="Serial">
                       <HardDrive size={12} /> {asset.serial || 'N/A'}
                     </span>
@@ -599,6 +611,7 @@ export default function Catalog() {
                         </span>
                       );
                     })() : null}
+                    </div>
                   </td>
                   <td>
                     {(() => {

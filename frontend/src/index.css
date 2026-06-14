@@ -176,18 +176,139 @@ body {
   color: var(--text-muted);
 }
 
-/* RESPONSIVE DESIGN UTILITIES */
+/* ══════════════════════════════════════════════
+   RESPONSIVE DESIGN — GLOBAL
+   ══════════════════════════════════════════════ */
+
+/* Tablet ≤ 900px */
 @media (max-width: 900px) {
   .top-navbar {
-    padding: 0 20px;
-  }
-  
-  .main-content {
-    padding: 20px;
+    padding: 0 16px;
   }
 
-  .form-row, .form-container {
+  .main-content {
+    padding: 20px 16px;
+  }
+
+  .form-row,
+  .form-container {
     flex-direction: column;
+  }
+
+  /* Bento grid adapts */
+  .bento-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  .hero-card {
+    padding: 24px;
   }
 }
 
+/* Mobile ≤ 640px */
+@media (max-width: 640px) {
+  .main-content {
+    padding: 12px;
+  }
+
+  /* Single column grids */
+  .bento-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Tables: allow horizontal scroll on small screens */
+  .table-responsive {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .glass-table {
+    min-width: 600px;
+  }
+
+  /* Stack catalog/page headers */
+  .catalog-header,
+  .page-header,
+  .dash-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 12px !important;
+  }
+
+  /* Table controls wrap */
+  .table-controls {
+    flex-direction: column !important;
+    gap: 10px !important;
+  }
+
+  .search-box {
+    max-width: 100% !important;
+  }
+
+  /* Buttons full width in stacked headers */
+  .catalog-header .btn-primary,
+  .page-header .btn-primary {
+    width: 100%;
+    justify-content: center;
+  }
+
+  /* KPI row → 2 cols on mobile */
+  .kpi-row {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  /* Charts stack */
+  .dash-row,
+  .charts-row,
+  .info-row {
+    flex-direction: column !important;
+  }
+
+  /* Modals full screen */
+  .modal-overlay > div,
+  [style*="maxWidth: '500px'"] {
+    width: calc(100vw - 24px) !important;
+    max-width: 100% !important;
+    margin: 12px !important;
+  }
+
+  /* Profile grid */
+  .profile-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Filter controls wrap */
+  .filter-controls,
+  .filter-row {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  /* glass-input full width in filter bars */
+  .glass-input[style*="width"] {
+    width: 100% !important;
+  }
+
+  /* Maint KPI → 2 cols */
+  .maint-kpi-row {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  /* Hero card compact */
+  .hero-card {
+    padding: 20px;
+  }
+
+  .hero-card h1 {
+    font-size: 24px !important;
+  }
+
+  .hero-card p {
+    font-size: 15px !important;
+  }
+
+  /* Activity card */
+  .activity-card {
+    min-height: unset !important;
+  }
+}

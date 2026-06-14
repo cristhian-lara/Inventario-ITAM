@@ -22,6 +22,7 @@
   font-weight: 800;
   font-size: 18px;
   box-shadow: 0 4px 10px var(--ikusi-green-glow);
+  flex-shrink: 0;
 }
 
 .logo-text {
@@ -31,22 +32,24 @@
   letter-spacing: -0.02em;
 }
 
+/* ── Desktop nav ─────────────────────────────────── */
 .navbar-center {
   display: flex;
-  gap: 8px;
+  gap: 4px;
 }
 
 .nav-link {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 16px;
+  padding: 8px 14px;
   border-radius: 8px;
   text-decoration: none;
   color: var(--text-secondary);
   font-weight: 500;
   font-size: 14px;
   transition: all 0.2s ease;
+  white-space: nowrap;
 }
 
 .nav-link:hover {
@@ -60,16 +63,17 @@
   font-weight: 600;
 }
 
+/* ── Right side ──────────────────────────────────── */
 .navbar-right {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
 }
 
 .user-profile {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 
 .avatar {
@@ -82,7 +86,8 @@
   align-items: center;
   justify-content: center;
   font-weight: 600;
-  font-size: 14px;
+  font-size: 13px;
+  flex-shrink: 0;
 }
 
 .user-name {
@@ -107,4 +112,107 @@
 .btn-icon:hover {
   background: #fee2e2;
   color: var(--accent-red);
+}
+
+/* ── Hamburger (hidden on desktop) ──────────────── */
+.btn-hamburger {
+  display: none;
+  background: none;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 8px;
+  cursor: pointer;
+  color: var(--text-main);
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.btn-hamburger:hover {
+  background: #f1f5f9;
+}
+
+/* ── Mobile drawer ───────────────────────────────── */
+.mobile-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 200;
+  backdrop-filter: blur(2px);
+}
+
+.mobile-drawer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 280px;
+  height: 100%;
+  background: white;
+  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.12);
+  display: flex;
+  flex-direction: column;
+  animation: slideIn 0.22s ease;
+}
+
+@keyframes slideIn {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(0); }
+}
+
+.mobile-drawer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.mobile-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px 12px;
+  flex: 1;
+}
+
+.mobile-nav-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 10px;
+  text-decoration: none;
+  color: var(--text-secondary);
+  font-weight: 500;
+  font-size: 15px;
+  transition: all 0.15s;
+}
+
+.mobile-nav-link:hover {
+  background: #f1f5f9;
+  color: var(--text-main);
+}
+
+.mobile-nav-link.active {
+  background: var(--ikusi-green-light);
+  color: var(--ikusi-green);
+  font-weight: 600;
+}
+
+.mobile-drawer-footer {
+  padding: 16px 20px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+/* ── Responsive breakpoints ──────────────────────── */
+@media (max-width: 768px) {
+  .navbar-center,
+  .user-profile,
+  .btn-icon:not(.btn-hamburger) {
+    display: none;
+  }
+
+  .btn-hamburger {
+    display: flex;
+  }
 }
