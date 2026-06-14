@@ -43,6 +43,14 @@ export default function CollaboratorProfile() {
     }
   });
 
+  const { data: categories } = useQuery<any[]>({
+    queryKey: ['categories'],
+    queryFn: async () => {
+      const response = await axios.get(`${API_URL}/api/catalog/categories`);
+      return response.data;
+    }
+  });
+
   const { data: departments } = useQuery<any[]>({
     queryKey: ['departments'],
     queryFn: async () => {
@@ -66,8 +74,8 @@ export default function CollaboratorProfile() {
   return (
     <div className="profile-container">
       <header className="profile-header">
-        <button className="btn-back" onClick={() => navigate('/collaborators')}>
-          <ArrowLeft size={20} /> Volver a Colaboradores
+        <button className="btn-back" onClick={() => navigate(-1)}>
+          <ArrowLeft size={20} /> Volver
         </button>
       </header>
 
@@ -214,7 +222,9 @@ export default function CollaboratorProfile() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
               <div>
                 <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: 'var(--text-muted)' }}>Categoría</p>
-                <span className="badge badge-category" style={{ padding: '4px 12px' }}>{selectedAsset.categoryId}</span>
+                <span className="badge badge-category" style={{ padding: '4px 12px' }}>
+                  {categories?.find((c: any) => c.id === Number(selectedAsset.categoryId))?.name || selectedAsset.categoryId}
+                </span>
               </div>
               <div>
                 <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: 'var(--text-muted)' }}>Estado</p>

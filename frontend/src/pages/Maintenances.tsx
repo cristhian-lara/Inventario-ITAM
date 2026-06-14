@@ -116,13 +116,15 @@ const Maintenances: React.FC = () => {
   const correctiveCount = maintenances?.filter(m => m.type === 'CORRECTIVE').length || 0;
   const correctiveRatio = maintenances && maintenances.length > 0
     ? Math.round((correctiveCount / maintenances.length) * 100) : 0;
+  const preventiveRatio = maintenances && maintenances.length > 0
+    ? Math.round((preventiveCount / maintenances.length) * 100) : 0;
 
   // ── Charts data ────────────────────────────────────────────────────────────
   const typeData = [
     { name: 'Preventivo', value: preventiveCount },
     { name: 'Correctivo', value: correctiveCount }
   ];
-  const COLORS_TYPE = ['#22c55e', '#a855f7'];
+  const COLORS_TYPE = ['#14b8a6', '#a855f7'];
 
   const statusData = [
     { status: 'Programado', count: totalScheduled },
@@ -160,6 +162,8 @@ const Maintenances: React.FC = () => {
       if (!(m.status === 'SCHEDULED' && new Date(m.scheduledDate) < now)) return false;
     } else if (viewMode === 'balance') {
       if (m.type !== 'CORRECTIVE') return false;
+    } else if (viewMode === 'preventive') {
+      if (m.type !== 'PREVENTIVE') return false;
     }
     if (filterType !== 'all' && m.type !== filterType) return false;
     if (filterStatus !== 'all' && m.status !== filterStatus) return false;
@@ -262,6 +266,15 @@ const Maintenances: React.FC = () => {
           </div>
         </div>
 
+        <div className="maint-kpi-card kpi-teal" style={{ cursor: 'pointer', outline: viewMode === 'preventive' ? '2px solid #14b8a6' : 'none' }} onClick={() => setViewMode(viewMode === 'preventive' ? 'general' : 'preventive')}>
+          <div className="kpi-icon" style={{ background: 'rgba(20,184,166,0.12)', color: '#14b8a6' }}><Wrench size={22} /></div>
+          <div className="kpi-body">
+            <span className="kpi-label">Preventivos %</span>
+            <span className="kpi-value" style={{ color: '#14b8a6' }}>{preventiveRatio}%</span>
+            <span className="kpi-sub">del total</span>
+          </div>
+        </div>
+
         <div className="maint-kpi-card kpi-purple" style={{ cursor: 'pointer', outline: viewMode === 'balance' ? '2px solid #a855f7' : 'none' }} onClick={() => setViewMode(viewMode === 'balance' ? 'general' : 'balance')}>
           <div className="kpi-icon" style={{ background: 'rgba(168,85,247,0.12)', color: '#a855f7' }}><Wrench size={22} /></div>
           <div className="kpi-body">
@@ -310,7 +323,7 @@ const Maintenances: React.FC = () => {
               <YAxis allowDecimals={false} stroke="var(--text-muted)" fontSize={12} />
               <Tooltip />
               <Legend iconType="circle" iconSize={10} />
-              <Line type="monotone" dataKey="Preventivo" stroke="#22c55e" strokeWidth={2} dot={{ r: 4 }} />
+              <Line type="monotone" dataKey="Preventivo" stroke="#14b8a6" strokeWidth={2} dot={{ fill: '#14b8a6', r: 4 }} activeDot={{ r: 6 }} />
               <Line type="monotone" dataKey="Correctivo" stroke="#a855f7" strokeWidth={2} dot={{ r: 4 }} />
             </LineChart>
           </ResponsiveContainer>
@@ -358,7 +371,11 @@ const Maintenances: React.FC = () => {
               )}
               {viewMode !== 'general' && (
                 <span className="filter-pill filter-pill-blue">
-                  {viewMode === 'auditoria' ? '🚨 Auditoría Vencidos' : '⚙️ Análisis Correctivos'}
+                  {viewMode === 'auditoria'
+                    ? '🚨 Auditoría Vencidos'
+                    : viewMode === 'preventive'
+                    ? '🔧 Análisis Preventivos'
+                    : '⚙️ Análisis Correctivos'}
                   <button onClick={() => setViewMode('general')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 0 0 4px', color: 'inherit' }}><X size={12} /></button>
                 </span>
               )}

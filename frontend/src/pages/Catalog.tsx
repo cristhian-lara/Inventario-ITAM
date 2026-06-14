@@ -353,16 +353,24 @@ export default function Catalog() {
       if (asset.status !== 'IN_USE') return false;
       let atRisk = false;
       const today = new Date();
+      // Normalize today to midnight (date only, no time)
+      today.setHours(0, 0, 0, 0);
       if (asset.purchaseDate) {
-        const pd = new Date(asset.purchaseDate);
+        // purchaseDate arrives as "2025-06-14T00:00:00.000Z" — parse as local date
+        const pdStr = typeof asset.purchaseDate === 'string'
+          ? asset.purchaseDate.split('T')[0]
+          : new Date(asset.purchaseDate).toISOString().split('T')[0];
+        const [pdYear, pdMonth, pdDay] = pdStr.split('-').map(Number);
+        const pd = new Date(pdYear, pdMonth - 1, pdDay); // local midnight
+
         if (asset.warrantyMonths) {
           const wDate = new Date(pd);
-          wDate.setMonth(wDate.getMonth() + asset.warrantyMonths);
+          wDate.setMonth(wDate.getMonth() + Number(asset.warrantyMonths));
           if (wDate < today) atRisk = true;
         }
         if (asset.depreciationYears) {
           const dDate = new Date(pd);
-          dDate.setFullYear(dDate.getFullYear() + asset.depreciationYears);
+          dDate.setFullYear(dDate.getFullYear() + Number(asset.depreciationYears));
           if (dDate < today) atRisk = true;
         }
       }
@@ -667,6 +675,17 @@ export default function Catalog() {
                   </td>
                   <td>
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      {asset.status !== 'RETIRED' && (
+                        <button
+                          className="btn-action"
+                          style={{ borderColor: 'var(--text-muted)', color: 'var(--text-muted)' }}
+                          title="Editar Activo"
+                          onClick={() => handleEditClick(asset)}
+                        >
+                          ✏️
+                        </button>
+                      )}
+
                     {(() => {
                       const activeAssignment = getActiveAssignmentForAsset(asset.id);
                       const isPendingAcceptance = activeAssignment?.status === 'PENDING_ACCEPTANCE';
@@ -674,7 +693,7 @@ export default function Catalog() {
                       
                       if (isPendingAcceptance) {
                         return (
-                          <div style={{ display: 'flex', gap: '8px' }}>
+                          <>
                             <button
                               className="btn-action"
                               style={{ borderColor: '#22c55e', color: '#22c55e' }}
@@ -707,35 +726,25 @@ export default function Catalog() {
                             >
                               <RefreshCw size={16} />
                             </button>
-                          </div>
+                          </>
                         );
                       }
 
                       if (asset.status === 'AVAILABLE' && !isPendingAcceptance && !isPendingReturn) {
                         return (
-                          <div style={{ display: 'flex', gap: '8px' }}>
-                            <button
-                              className="btn-action"
-                              style={{ borderColor: 'var(--text-muted)', color: 'var(--text-muted)' }}
-                              title="Editar Activo"
-                              onClick={() => handleEditClick(asset)}
-                            >
-                              ✏️
-                            </button>
-                            <button
-                              className="btn-action btn-assign"
-                              title="Asignar Activo"
-                              onClick={() => handleAssignClick(asset.id)}
-                            >
-                              <PlusCircle size={16} />
-                            </button>
-                          </div>
+                          <button
+                            className="btn-action btn-assign"
+                            title="Asignar Activo"
+                            onClick={() => handleAssignClick(asset.id)}
+                          >
+                            <PlusCircle size={16} />
+                          </button>
                         );
                       }
 
                       if (asset.status === 'IN_USE' || isPendingReturn) {
                         return (
-                          <div style={{ display: 'flex', gap: '8px' }}>
+                          <>
                             {!isPendingReturn && (
                               <button
                                 className="btn-action btn-return"
@@ -780,7 +789,7 @@ export default function Catalog() {
                                 <RefreshCw size={16} />
                               </button>
                             )}
-                          </div>
+                          </>
                         );
                       }
                       
@@ -789,7 +798,7 @@ export default function Catalog() {
                     {asset.status !== 'RETIRED' && (
                       <button
                         className="btn-action"
-                        style={{ borderColor: '#ef4444', color: '#ef4444', marginLeft: '8px' }}
+                        style={{ borderColor: '#ef4444', color: '#ef4444' }}
                         title="Dar de Baja"
                         onClick={() => {
                           const reason = window.prompt('Por favor, indica el motivo por el cual se da de baja este activo:');
