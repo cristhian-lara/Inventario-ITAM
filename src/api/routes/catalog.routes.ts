@@ -240,14 +240,13 @@ router.post('/assets/:assetId/upgrades', async (req, res) => {
                     }
                 }
 
-                // Actualizar la clave encontrada con el nuevo valor
-                if (matchedKey) {
-                    const updatedData = { ...currentData, [matchedKey]: new_value };
-                    await AppDataSource.query(
-                        `UPDATE assets SET dynamic_data = $1 WHERE id = $2`,
-                        [JSON.stringify(updatedData), req.params.assetId]
-                    );
-                }
+                // Actualizar la clave encontrada o agregarla si no existe
+                const finalKey = matchedKey || candidateKeys[0] || component;
+                const updatedData = { ...currentData, [finalKey]: new_value };
+                await AppDataSource.query(
+                    `UPDATE assets SET dynamic_data = $1 WHERE id = $2`,
+                    [JSON.stringify(updatedData), req.params.assetId]
+                );
             }
         } catch (updateErr: any) {
             // No bloqueamos la respuesta si falla la actualización del activo
