@@ -28,6 +28,10 @@ export default function Catalog() {
   // Estados de los modales
   const [returnId, setReturnId] = useState<string | null>(null);
   const [assignModalAssetId, setAssignModalAssetId] = useState<string | null>(null);
+  
+  // Autocomplete state para asignación
+  const [collabSearchTerm, setCollabSearchTerm] = useState('');
+  const [showCollabDropdown, setShowCollabDropdown] = useState(false);
 
   const [searchParams, setSearchParams] = useSearchParams();
   const filterRisk = searchParams.get('filter') === 'risk';
@@ -907,8 +911,11 @@ export default function Catalog() {
 
           <div className="glass-panel form-container" style={{ position: 'relative', width: '100%', maxWidth: '900px', margin: 0 }}>
             <button
+              className="btn-glass"
+              style={{ position: 'absolute', top: '20px', right: '20px', padding: '8px' }}
               onClick={() => {
                 setAssignModalAssetId(null);
+                setCollabSearchTerm('');
                 setFormData({
                   id: `assig-${Math.floor(Math.random() * 1000)}`,
                   assetId: '',
@@ -917,7 +924,6 @@ export default function Catalog() {
                   startDate: new Date().toISOString().split('T')[0]
                 });
               }}
-              style={{ position: 'absolute', top: '15px', right: '15px', background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '5px' }}
             >
               ✕
             </button>
@@ -941,35 +947,80 @@ export default function Catalog() {
                   <label>Placa Ikusi</label>
                   <input type="text" className="glass-input" name="assetId" value={formData.assetId} disabled />
                 </div>
-                <div className="form-group">
+                <div className="form-group" style={{ position: 'relative' }}>
                   <label>Colaborador</label>
-                  <select
+                  <input
+                    type="text"
                     required
                     className="glass-input"
-                    value={formData.collaboratorEmail}
+                    placeholder="Buscar colaborador..."
+                    value={collabSearchTerm}
                     onChange={(e) => {
-                      const selected = collaborators?.find(c => c.email === e.target.value);
-                      if (selected) {
-                        setFormData({
-                          ...formData,
-                          collaboratorEmail: selected.email,
-                          collaboratorId: selected.id
-                        });
-                      } else {
-                        setFormData({
-                          ...formData,
-                          collaboratorEmail: '',
-                          collaboratorId: ''
-                        });
+                      setCollabSearchTerm(e.target.value);
+                      setShowCollabDropdown(true);
+                      if (!e.target.value) {
+                        setFormData({ ...formData, collaboratorEmail: '', collaboratorId: '' });
                       }
                     }}
-                    style={{ WebkitAppearance: 'none', background: 'rgba(0,0,0,0.2)', color: 'white' }}
-                  >
-                    <option value="" style={{ color: 'black' }}>Seleccione colaborador...</option>
-                    {collaborators?.filter(c => c.status === 'ACTIVE').map(c => (
-                      <option key={c.id} value={c.email} style={{ color: 'black' }}>{c.name}</option>
-                    ))}
-                  </select>
+                    onFocus={() => setShowCollabDropdown(true)}
+                    onBlur={() => setTimeout(() => setShowCollabDropdown(false), 200)}
+                    style={{ background: 'rgba(0,0,0,0.2)', color: 'white' }}
+                  />
+                  {showCollabDropdown && (
+                    <ul style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      width: '100%',
+                      background: 'rgba(20, 20, 25, 0.95)',
+                      backdropFilter: 'blur(10px)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: '8px',
+                      listStyle: 'none',
+                      padding: '5px 0',
+                      margin: '5px 0 0 0',
+                      zIndex: 10,
+                      maxHeight: '200px',
+                      overflowY: 'auto',
+                      boxShadow: '0 4px 15px rgba(0,0,0,0.5)'
+                    }}>
+                      {collaborators
+                        ?.filter(c => c.status === 'ACTIVE' && (collabSearchTerm === '' || c.name.toLowerCase().includes(collabSearchTerm.toLowerCase())))
+                        .slice(0, 5)
+                        .map(c => (
+                          <li
+                            key={c.id}
+                            style={{
+                              padding: '10px 15px',
+                              cursor: 'pointer',
+                              color: 'white',
+                              borderBottom: '1px solid rgba(255,255,255,0.05)',
+                              fontSize: '14px',
+                              transition: 'background 0.2s'
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
+                            onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                            onMouseDown={(e) => {
+                              setCollabSearchTerm(c.name);
+                              setFormData({
+                                ...formData,
+                                collaboratorEmail: c.email,
+                                collaboratorId: c.id
+                              });
+                              setShowCollabDropdown(false);
+                            }}
+                          >
+                            <div style={{ fontWeight: 500 }}>{c.name}</div>
+                            <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.6)' }}>{c.email}</div>
+                          </li>
+                        ))}
+                      {collaborators?.filter(c => c.status === 'ACTIVE' && (collabSearchTerm === '' || c.name.toLowerCase().includes(collabSearchTerm.toLowerCase()))).length === 0 && (
+                        <li style={{ padding: '10px 15px', color: 'rgba(255,255,255,0.5)', fontSize: '13px' }}>
+                          No se encontraron colaboradores
+                        </li>
+                      )}
+                    </ul>
+                  )}
                 </div>
               </div>
 
