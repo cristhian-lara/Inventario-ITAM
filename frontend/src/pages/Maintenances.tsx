@@ -76,6 +76,36 @@ const Maintenances: React.FC = () => {
     }
   });
 
+  const { data: assignments } = useQuery<any[]>({
+    queryKey: ['assignments'],
+    queryFn: async () => {
+      const res = await fetch(`${API_URL}/api/assignments`);
+      if (!res.ok) return [];
+      return res.json();
+    }
+  });
+
+  const { data: collaborators } = useQuery<any[]>({
+    queryKey: ['collaborators'],
+    queryFn: async () => {
+      const res = await fetch(`${API_URL}/api/collaborators`);
+      if (!res.ok) return [];
+      return res.json();
+    }
+  });
+
+  const getCollaboratorForAsset = (assetId: string) => {
+    const assignment = assignments?.find(a => a.assetId === assetId && ['ACCEPTED', 'PENDING_ACCEPTANCE', 'PENDING_RETURN'].includes(a.status));
+    if (assignment) {
+      const coll = collaborators?.find(c => c.id === assignment.collaboratorId);
+      if (coll) return coll.name;
+    }
+    return 'Sin asignar';
+  };
+
+  const [assetSearchTerm, setAssetSearchTerm] = useState('');
+  const [showAssetDropdown, setShowAssetDropdown] = useState(false);
+
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
       const res = await fetch(`${API_URL}/api/maintenances`, {
@@ -225,7 +255,10 @@ const Maintenances: React.FC = () => {
 
   const openModal = (mode: 'create' | 'start' | 'complete', record?: MaintenanceRecord) => {
     setModalMode(mode); setSelectedRecord(record || null);
-    if (mode === 'create') setFormData({ assetId: '', type: 'PREVENTIVE', scheduledDate: new Date().toISOString().split('T')[0], reason: '', notes: '', executionDate: new Date().toISOString().split('T')[0] });
+    if (mode === 'create') {
+      setFormData({ assetId: '', type: 'PREVENTIVE', scheduledDate: new Date().toISOString().split('T')[0], reason: '', notes: '', executionDate: new Date().toISOString().split('T')[0] });
+      setAssetSearchTerm('');
+    }
     else if (record) setFormData({ ...formData, reason: record.reason || '', notes: record.notes || '' });
     setShowModal(true);
   };
@@ -540,12 +573,94 @@ const Maintenances: React.FC = () => {
             <form onSubmit={handleSubmit}>
               {modalMode === 'create' && (
                 <>
-                  <div className="form-group">
-                    <label>ID del Activo (Placa Ikusi)</label>
-                    <input required type="text" list="assets-list" className="glass-input" value={formData.assetId} onChange={e => setFormData({ ...formData, assetId: e.target.value })} placeholder="Escribe para buscar..." />
-                    <datalist id="assets-list">
-                      {assets?.map(a => <option key={a.id} value={a.id}>{a.dynamicAttributes?.Nombre || 'Activo'} - {a.id}</option>)}
-                    </datalist>
+                  <div className="form-group" style={{ position: 'relative' }}>
+                    <label>ID del Activo, Hostname o Colaborador asignado</label>
+                    <input
+                      required
+                      type="text"
+                      className="glass-input"
+                      placeholder="Buscar por placa, hostname o colaborador..."
+                      value={assetSearchTerm}
+                      onChange={(e) => {
+                        setAssetSearchTerm(e.target.value);
+                        setShowAssetDropdown(true);
+                        if (!e.target.value) {
+                          setFormData({ ...formData, assetId: '' });
+                        }
+                      }}
+                      onFocus={() => setShowAssetDropdown(true)}
+                      onBlur={() => setTimeout(() => setShowAssetDropdown(false), 200)}
+                    />
+                    {showAssetDropdown && (
+                      <ul style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        width: '100%',
+                        background: 'rgba(20, 20, 25, 0.95)',
+                        backdropFilter: 'blur(10px)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        borderRadius: '8px',
+                        listStyle: 'none',
+                        padding: '5px 0',
+                        margin: '5px 0 0 0',
+                        zIndex: 10,
+                        maxHeight: '200px',
+                        overflowY: 'auto',
+                        boxShadow: '0 4px 15px rgba(0,0,0,0.5)'
+                      }}>
+                        {assets
+                          ?.filter(a => {
+                            if (!assetSearchTerm) return true;
+                            const term = assetSearchTerm.toLowerCase();
+                            const placa = (a.id || '').toLowerCase();
+                            const hostname = (a.dynamicAttributes?.HOSTNAME || a.dynamicAttributes?.Hostname || a.dynamicAttributes?.hostname || '').toLowerCase();
+                            const collab = getCollaboratorForAsset(a.id).toLowerCase();
+                            return placa.includes(term) || hostname.includes(term) || collab.includes(term);
+                          })
+                          .slice(0, 5)
+                          .map(a => (
+                            <li
+                              key={a.id}
+                              style={{
+                                padding: '10px 15px',
+                                cursor: 'pointer',
+                                color: 'white',
+                                borderBottom: '1px solid rgba(255,255,255,0.05)',
+                                fontSize: '14px',
+                                transition: 'background 0.2s'
+                              }}
+                              onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
+                              onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                              onMouseDown={(e) => {
+                                const displayName = `${a.id} - ${a.dynamicAttributes?.HOSTNAME || a.dynamicAttributes?.Hostname || a.dynamicAttributes?.hostname || 'Sin Hostname'}`;
+                                setAssetSearchTerm(displayName);
+                                setFormData({ ...formData, assetId: a.id });
+                                setShowAssetDropdown(false);
+                              }}
+                            >
+                              <div style={{ fontWeight: 500 }}>
+                                {a.id} <span style={{ opacity: 0.7, fontSize: '12px' }}>{a.dynamicAttributes?.HOSTNAME || a.dynamicAttributes?.Hostname || a.dynamicAttributes?.hostname || ''}</span>
+                              </div>
+                              <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.6)' }}>
+                                Asignado a: {getCollaboratorForAsset(a.id)}
+                              </div>
+                            </li>
+                          ))}
+                        {assets?.filter(a => {
+                          if (!assetSearchTerm) return true;
+                          const term = assetSearchTerm.toLowerCase();
+                          const placa = (a.id || '').toLowerCase();
+                          const hostname = (a.dynamicAttributes?.HOSTNAME || a.dynamicAttributes?.Hostname || a.dynamicAttributes?.hostname || '').toLowerCase();
+                          const collab = getCollaboratorForAsset(a.id).toLowerCase();
+                          return placa.includes(term) || hostname.includes(term) || collab.includes(term);
+                        }).length === 0 && (
+                          <li style={{ padding: '10px 15px', color: 'rgba(255,255,255,0.5)', fontSize: '13px' }}>
+                            No se encontraron activos
+                          </li>
+                        )}
+                      </ul>
+                    )}
                   </div>
                   <div className="form-group">
                     <label>Tipo</label>
