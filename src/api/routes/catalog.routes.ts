@@ -3,6 +3,9 @@ import multer from 'multer';
 import * as xlsx from 'xlsx';
 import { CatalogUseCases } from '../../modules/catalog/application/CatalogUseCases';
 import { PostgresCatalogRepository } from '../../modules/catalog/infrastructure/PostgresCatalogRepository';
+import { AppDataSource } from '../../shared/infrastructure/database/postgres';
+import { HardwareUpgradeOrmEntity } from '../../modules/catalog/infrastructure/orm/HardwareUpgrade.entity';
+import { v4 as uuidv4 } from 'uuid';
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage() });
@@ -142,6 +145,111 @@ router.get('/assets', async (req, res) => {
         warrantyMonths: a.warrantyMonths,
         depreciationYears: a.depreciationYears
     })));
+});
+
+// ══════════════════════════════════════════════
+// HARDWARE UPGRADES — Actualizaciones físicas
+// ══════════════════════════════════════════════
+
+// GET /api/catalog/assets/:assetId/upgrades — Listar upgrades de hardware
+router.get('/assets/:assetId/upgrades', async (req, res) => {
+    try {
+        const upgradeRepo = AppDataSource.getRepository(HardwareUpgradeOrmEntity);
+        const upgrades = await upgradeRepo.find({
+            where: { asset_id: req.params.assetId },
+            order: { upgrade_date: 'DESC' }
+        });
+        res.json(upgrades);
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// POST /api/catalog/assets/:assetId/upgrades — Registrar un nuevo upgrade
+router.post('/assets/:assetId/upgrades', async (req, res) => {
+    try {
+        const { upgrade_date, component, old_value, new_value, performed_by, notes } = req.body;
+        if (!component || !new_value || !upgrade_date) {
+            return res.status(400).json({ error: 'component, new_value y upgrade_date son obligatorios' });
+        }
+
+        // 1. Guardar el registro de upgrade
+        const upgradeRepo = AppDataSource.getRepository(HardwareUpgradeOrmEntity);
+        const entity = upgradeRepo.create({
+            id: uuidv4(),
+            asset_id: req.params.assetId,
+            upgrade_date: new Date(upgrade_date),
+            component,
+            old_value: old_value || undefined,
+            new_value,
+            performed_by: performed_by || undefined,
+            notes: notes || undefined
+        });
+        await upgradeRepo.save(entity);
+
+        // 2. Actualizar la especificación correspondiente en dynamic_data del activo
+        // Mapa componente → posibles claves en dynamic_data (igual que el frontend)
+        const COMPONENT_TO_ATTR_KEYS: Record<string, string[]> = {
+            'RAM':              ['MEMORIA RAM', 'Memoria RAM', 'RAM', 'Memoria', 'memoria', 'ram'],
+            'Disco Duro':       ['Disco Duro', 'DISCO DURO', 'Disco', 'disco', 'Storage', 'Almacenamiento', 'SSD', 'HDD'],
+            'Procesador':       ['Procesador', 'PROCESADOR', 'CPU', 'cpu', 'Processor'],
+            'Pantalla':         ['Pantalla', 'PANTALLA', 'Monitor', 'Display', 'Resolución'],
+            'Batería':          ['Batería', 'BATERIA', 'Battery', 'Bateria'],
+            'Tarjeta de Red':   ['Tarjeta de Red', 'MAC', 'MAC Address', 'Red', 'Network'],
+            'Tarjeta Gráfica':  ['Tarjeta Gráfica', 'GPU', 'gpu', 'Graphics'],
+            'Teclado':          ['Teclado', 'TECLADO', 'Keyboard'],
+            'Fuente de Poder':  ['Fuente de Poder', 'Fuente', 'PSU', 'Power'],
+        };
+
+        try {
+            // Obtener el activo para conocer sus dynamic_data actuales
+            const assetResult = await AppDataSource.query(
+                `SELECT dynamic_data FROM assets WHERE id = $1`,
+                [req.params.assetId]
+            );
+
+            if (assetResult && assetResult.length > 0) {
+                const currentData: Record<string, any> = assetResult[0].dynamic_data || {};
+                const candidateKeys = COMPONENT_TO_ATTR_KEYS[component] || [];
+
+                // Buscar qué clave existe actualmente en el activo
+                let matchedKey: string | null = null;
+                for (const key of candidateKeys) {
+                    if (currentData[key] !== undefined) {
+                        matchedKey = key;
+                        break;
+                    }
+                }
+
+                // Si no encontró ninguna clave exacta, buscar por inclusión case-insensitive
+                if (!matchedKey) {
+                    const lowerComp = component.toLowerCase();
+                    for (const key of Object.keys(currentData)) {
+                        if (key.toLowerCase().includes(lowerComp)) {
+                            matchedKey = key;
+                            break;
+                        }
+                    }
+                }
+
+                // Actualizar la clave encontrada con el nuevo valor
+                if (matchedKey) {
+                    const updatedData = { ...currentData, [matchedKey]: new_value };
+                    await AppDataSource.query(
+                        `UPDATE assets SET dynamic_data = $1 WHERE id = $2`,
+                        [JSON.stringify(updatedData), req.params.assetId]
+                    );
+                }
+            }
+        } catch (updateErr: any) {
+            // No bloqueamos la respuesta si falla la actualización del activo
+            console.warn('[upgrade] No se pudo actualizar dynamic_data del activo:', updateErr.message);
+        }
+
+        res.status(201).json(entity);
+    } catch (error: any) {
+        res.status(400).json({ error: error.message });
+    }
 });
 
 export default router;

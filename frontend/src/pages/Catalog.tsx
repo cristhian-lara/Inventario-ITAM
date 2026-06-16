@@ -548,7 +548,15 @@ export default function Catalog() {
             <tbody>
               {filteredAssets?.map((asset) => (
                 <tr key={asset.id} className="table-row">
-                  <td className="fw-600">{asset.id}</td>
+                  <td className="fw-600">
+                    <Link
+                      to={`/assets/${asset.id}`}
+                      style={{ color: 'var(--accent-blue)', textDecoration: 'none', fontFamily: 'monospace', fontWeight: 700, fontSize: '14px' }}
+                      title="Ver Hoja de Vida del Equipo"
+                    >
+                      {asset.id}
+                    </Link>
+                  </td>
                   <td>
                     <span className="badge badge-category">
                       <Tag size={12} /> {categories?.find((c: any) => c.id === Number(asset.categoryId))?.name || asset.categoryId}
@@ -675,6 +683,14 @@ export default function Catalog() {
                   </td>
                   <td>
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <Link
+                          to={`/assets/${asset.id}`}
+                          className="btn-action"
+                          style={{ borderColor: 'var(--ikusi-green)', color: 'var(--ikusi-green)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}
+                          title="Hoja de Vida del Equipo"
+                        >
+                          📋
+                        </Link>
                       {asset.status !== 'RETIRED' && (
                         <button
                           className="btn-action"

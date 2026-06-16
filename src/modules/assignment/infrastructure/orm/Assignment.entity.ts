@@ -25,4 +25,7 @@ export class AssignmentOrmEntity {
 
     @Column({ type: 'jsonb', nullable: true })
     signature_metadata?: any;
+
+    @Column({ nullable: true })
+    document_path?: string;
 }

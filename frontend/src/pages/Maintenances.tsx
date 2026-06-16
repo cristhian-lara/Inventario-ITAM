@@ -34,6 +34,8 @@ const Maintenances: React.FC = () => {
   const queryClient = useQueryClient();
   const [filterType, setFilterType] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [filterYear, setFilterYear] = useState('all');
+  const [filterMonth, setFilterMonth] = useState('all');
   const [viewMode, setViewMode] = useState<'general' | 'auditoria' | 'balance'>('general');
   const { confirm } = useConfirm();
 
@@ -58,6 +60,12 @@ const Maintenances: React.FC = () => {
       return res.json();
     }
   });
+
+  const availableYears = React.useMemo(() => {
+    if (!maintenances) return [];
+    const years = new Set(maintenances.map(m => new Date(m.scheduledDate).getFullYear()));
+    return Array.from(years).sort((a, b) => b - a);
+  }, [maintenances]);
 
   const { data: assets } = useQuery<any[]>({
     queryKey: ['assets_list'],
@@ -167,6 +175,13 @@ const Maintenances: React.FC = () => {
     }
     if (filterType !== 'all' && m.type !== filterType) return false;
     if (filterStatus !== 'all' && m.status !== filterStatus) return false;
+    
+    if (filterYear !== 'all' || filterMonth !== 'all') {
+      const date = new Date(m.scheduledDate);
+      if (filterYear !== 'all' && date.getFullYear().toString() !== filterYear) return false;
+      if (filterMonth !== 'all' && (date.getMonth() + 1).toString() !== filterMonth) return false;
+    }
+    
     return true;
   });
 
@@ -353,9 +368,28 @@ const Maintenances: React.FC = () => {
             <option value="auditoria">🚨 Auditoría de Vencidos</option>
             <option value="balance">⚙️ Análisis de Correctivos</option>
           </select>
+          <select className="glass-input" value={filterYear} onChange={e => setFilterYear(e.target.value)} style={{ width: '130px' }}>
+            <option value="all">Todos (Años)</option>
+            {availableYears.map(y => <option key={y} value={y.toString()}>{y}</option>)}
+          </select>
+          <select className="glass-input" value={filterMonth} onChange={e => setFilterMonth(e.target.value)} style={{ width: '150px' }}>
+            <option value="all">Todos (Meses)</option>
+            <option value="1">Enero</option>
+            <option value="2">Febrero</option>
+            <option value="3">Marzo</option>
+            <option value="4">Abril</option>
+            <option value="5">Mayo</option>
+            <option value="6">Junio</option>
+            <option value="7">Julio</option>
+            <option value="8">Agosto</option>
+            <option value="9">Septiembre</option>
+            <option value="10">Octubre</option>
+            <option value="11">Noviembre</option>
+            <option value="12">Diciembre</option>
+          </select>
 
           {/* Active filter pills */}
-          {(filterType !== 'all' || filterStatus !== 'all' || viewMode !== 'general') && (
+          {(filterType !== 'all' || filterStatus !== 'all' || viewMode !== 'general' || filterYear !== 'all' || filterMonth !== 'all') && (
             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginLeft: 'auto' }}>
               {filterType !== 'all' && (
                 <span className="filter-pill">
@@ -369,6 +403,18 @@ const Maintenances: React.FC = () => {
                   <button onClick={() => setFilterStatus('all')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 0 0 4px', color: 'inherit' }}><X size={12} /></button>
                 </span>
               )}
+              {filterYear !== 'all' && (
+                <span className="filter-pill">
+                  Año: {filterYear}
+                  <button onClick={() => setFilterYear('all')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 0 0 4px', color: 'inherit' }}><X size={12} /></button>
+                </span>
+              )}
+              {filterMonth !== 'all' && (
+                <span className="filter-pill">
+                  Mes: {new Date(2000, parseInt(filterMonth) - 1).toLocaleString('es-CO', { month: 'long' })}
+                  <button onClick={() => setFilterMonth('all')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 0 0 4px', color: 'inherit' }}><X size={12} /></button>
+                </span>
+              )}
               {viewMode !== 'general' && (
                 <span className="filter-pill filter-pill-blue">
                   {viewMode === 'auditoria'
@@ -379,6 +425,27 @@ const Maintenances: React.FC = () => {
                   <button onClick={() => setViewMode('general')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 0 0 4px', color: 'inherit' }}><X size={12} /></button>
                 </span>
               )}
+              <button 
+                onClick={() => {
+                  setFilterType('all');
+                  setFilterStatus('all');
+                  setFilterYear('all');
+                  setFilterMonth('all');
+                  setViewMode('general');
+                }}
+                style={{ 
+                  background: 'none', 
+                  border: 'none', 
+                  color: 'var(--accent-red)', 
+                  fontSize: '12px', 
+                  cursor: 'pointer', 
+                  textDecoration: 'underline', 
+                  marginLeft: '8px',
+                  fontWeight: 600
+                }}
+              >
+                Limpiar filtros
+              </button>
             </div>
           )}
         </div>

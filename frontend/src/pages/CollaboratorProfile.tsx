@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
@@ -14,10 +13,20 @@ interface HistoryEvent {
   reason: string;
 }
 
+const ACTION_LABELS: Record<string, string> = {
+  CREATED:            'Alta Usuario',
+  ACTIVATED:          'Activación',
+  DEACTIVATED:        'Baja Usuario',
+  ASSET_ASSIGNED:     'Activo Asignado',
+  ASSET_RETURNED:     'Activo Devuelto',
+  DEPARTMENT_CHANGED: 'Cambio Departamento',
+};
+
+const translateAction = (action: string) => ACTION_LABELS[action] ?? action;
+
 export default function CollaboratorProfile() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [selectedAsset, setSelectedAsset] = useState<any>(null);
 
   const { data: collaborator, isLoading: isLoadingCollab } = useQuery({
     queryKey: ['collaborator', id],
@@ -119,19 +128,19 @@ export default function CollaboratorProfile() {
               <div className="assets-grid">
                 {activeAssignments.map((a: any) => {
                   const asset = assets?.find(ast => ast.id === a.assetId);
-                  const isIkusi = asset?.id?.startsWith('IKU-') || asset?.id?.startsWith('PLA-');
-                  const serial = asset?.serial || 'Sin serial';
-                  
-                  // Extraer hostname o modelo de atributos dinámicos
                   const attrs = asset?.dynamicAttributes || {};
-                  const hostname = attrs['Hostname'] || attrs['hostname'] || attrs['Nombre'] || attrs['nombre'];
+                  const hostname = attrs['Hostname'] || attrs['hostname'] || attrs['HOSTNAME'] || attrs['Host'] || attrs['host'];
                   const modelo = attrs['Modelo'] || attrs['modelo'] || attrs['Marca'] || attrs['marca'] || 'Sin modelo';
+                  const serial = asset?.serial || 'Sin serial';
+
+                  // Considera "Ikusi" si el ID tiene formato numérico (ej. 000264) o prefijo IKU/PLA, O si tiene hostname
+                  const isIkusi = !!hostname || /^\d{5,}$/.test(asset?.id || '') || asset?.id?.startsWith('IKU-') || asset?.id?.startsWith('PLA-');
 
                   return (
                     <div 
                       key={a.id} 
                       className="asset-card" 
-                      onClick={() => asset && setSelectedAsset(asset)}
+                      onClick={() => asset && navigate(`/assets/${asset.id}`)}
                       style={{ cursor: 'pointer', transition: 'transform 0.2s, box-shadow 0.2s' }}
                       onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.3)'; }}
                       onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)'; }}
@@ -139,7 +148,7 @@ export default function CollaboratorProfile() {
                       <div className="asset-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <h4 style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                           <Box size={16} /> 
-                          {isIkusi ? `Placa: ${asset?.id}` : `ID: ${asset?.id}`}
+                          {asset?.id?.startsWith('IKU-') || asset?.id?.startsWith('PLA-') ? `Placa: ${asset?.id}` : `ID: ${asset?.id}`}
                         </h4>
                         <span className="badge badge-in_use">En Uso</span>
                       </div>
@@ -190,83 +199,57 @@ export default function CollaboratorProfile() {
           <div className="content-section glass-panel">
             <h3 className="section-title"><Activity size={20} /> Histórico y Auditoría de Estados</h3>
             <div className="timeline">
-              {history?.map((event, index) => (
-                <div key={event.id} className="timeline-item">
-                  <div className="timeline-connector"></div>
-                  <div className={`timeline-dot ${event.action.toLowerCase()}`}></div>
-                  <div className="timeline-content">
-                    <div className="timeline-header">
-                      <span className={`badge-sm badge-${event.action.toLowerCase()}`}>{event.action}</span>
-                      <span className="timeline-date"><Clock size={14}/> {new Date(event.timestamp).toLocaleString()}</span>
+              {history?.map((event, index) => {
+                // Extraer el ID del activo del campo reason (ej. "Activo 000264 asignado...")
+                const isAssetEvent = event.action === 'ASSET_ASSIGNED' || event.action === 'ASSET_RETURNED';
+                let assetCategoryName: string | null = null;
+                if (isAssetEvent) {
+                  const match = event.reason?.match(/Activo\s+([^\s]+)/i);
+                  if (match) {
+                    const assetId = match[1];
+                    const foundAsset = assets?.find((a: any) => a.id === assetId);
+                    if (foundAsset) {
+                      const cat = categories?.find((c: any) => c.id === Number(foundAsset.categoryId));
+                      assetCategoryName = cat?.name ?? null;
+                    }
+                  }
+                }
+
+                return (
+                  <div key={event.id} className="timeline-item">
+                    <div className="timeline-connector"></div>
+                    <div className={`timeline-dot ${event.action.toLowerCase()}`}></div>
+                    <div className="timeline-content">
+                      <div className="timeline-header">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                          <span className={`badge-sm badge-${event.action.toLowerCase()}`}>{translateAction(event.action)}</span>
+                          {assetCategoryName && (
+                            <span style={{
+                              display: 'inline-flex', alignItems: 'center', gap: '4px',
+                              fontSize: '11px', fontWeight: 600,
+                              background: 'rgba(0,166,80,0.1)', color: 'var(--ikusi-green, #00a650)',
+                              border: '1px solid rgba(0,166,80,0.25)',
+                              borderRadius: '5px', padding: '2px 8px',
+                              whiteSpace: 'nowrap'
+                            }}>
+                              <Tag size={10} />
+                              {assetCategoryName}
+                            </span>
+                          )}
+                        </div>
+                        <span className="timeline-date"><Clock size={14}/> {new Date(event.timestamp).toLocaleString()}</span>
+                      </div>
+                      <p className="timeline-reason">{event.reason}</p>
                     </div>
-                    <p className="timeline-reason">{event.reason}</p>
                   </div>
-                </div>
-              ))}
+                );
+              })}
               {history?.length === 0 && <p className="empty-text">No hay eventos registrados.</p>}
             </div>
           </div>
 
         </div>
       </div>
-
-      {/* Modal de Detalle de Activo */}
-      {selectedAsset && (
-        <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(4px)', padding: '20px' }} onClick={() => setSelectedAsset(null)}>
-          <div className="glass-panel" style={{ width: '100%', maxWidth: '600px', margin: 0, padding: '30px', maxHeight: '90vh', overflowY: 'auto', position: 'relative' }} onClick={e => e.stopPropagation()}>
-            <button onClick={() => setSelectedAsset(null)} style={{ position: 'absolute', top: '15px', right: '15px', background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '18px', padding: '5px' }}>✕</button>
-            <h3 style={{ marginBottom: '24px', color: 'var(--text-main)', borderBottom: '1px solid var(--border-glass)', paddingBottom: '16px', marginTop: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Box size={24} color="var(--primary-color)" /> Detalles del Activo: {selectedAsset.id}
-            </h3>
-            
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
-              <div>
-                <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: 'var(--text-muted)' }}>Categoría</p>
-                <span className="badge badge-category" style={{ padding: '4px 12px' }}>
-                  {categories?.find((c: any) => c.id === Number(selectedAsset.categoryId))?.name || selectedAsset.categoryId}
-                </span>
-              </div>
-              <div>
-                <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: 'var(--text-muted)' }}>Estado</p>
-                <span className={`badge badge-status badge-${selectedAsset.status?.toLowerCase()}`} style={{ padding: '4px 12px' }}>
-                  {selectedAsset.status === 'IN_USE' ? 'En Uso' : selectedAsset.status}
-                </span>
-              </div>
-              <div>
-                <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: 'var(--text-muted)' }}>Serial</p>
-                <div style={{ fontFamily: 'monospace', color: 'var(--text-main)' }}>{selectedAsset.serial || 'N/A'}</div>
-              </div>
-              {selectedAsset.purchaseDate && (
-                <div>
-                  <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: 'var(--text-muted)' }}>Fecha de Compra</p>
-                  <div style={{ color: 'var(--text-main)' }}>{new Date(selectedAsset.purchaseDate).toLocaleDateString()}</div>
-                </div>
-              )}
-            </div>
-
-            <div>
-              <h4 style={{ marginBottom: '16px', color: 'var(--text-main)', borderBottom: '1px solid var(--border-glass)', paddingBottom: '8px' }}>
-                <MonitorSmartphone size={18} style={{ verticalAlign: 'middle', marginRight: '6px' }} />
-                Especificaciones y Atributos Dinámicos
-              </h4>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
-                {Object.entries(selectedAsset.dynamicAttributes || {}).map(([k, v]) => {
-                  if (v === null || v === undefined || v === '') return null;
-                  return (
-                    <div key={k} style={{ background: 'rgba(15, 23, 42, 0.4)', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-glass)', flex: '1 1 calc(50% - 10px)', minWidth: '200px' }}>
-                      <p style={{ margin: '0 0 4px 0', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{k}</p>
-                      <div style={{ color: 'var(--text-main)', fontSize: '14px', wordBreak: 'break-word' }}>{String(v)}</div>
-                    </div>
-                  );
-                })}
-                {(!selectedAsset.dynamicAttributes || Object.values(selectedAsset.dynamicAttributes).every(v => v === null || v === undefined || v === '')) && (
-                  <p style={{ color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '14px' }}>Sin especificaciones registradas.</p>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
     </div>
   );

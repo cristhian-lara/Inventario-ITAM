@@ -5,6 +5,7 @@ import Catalog from './pages/Catalog'
 import Collaborators from './pages/Collaborators'
 import CollaboratorProfile from './pages/CollaboratorProfile'
 import Settings from './pages/Settings'
+import AssetProfile from './pages/AssetProfile'
 
 import Maintenances from './pages/Maintenances'
 import MaintenanceSign from './pages/MaintenanceSign'
@@ -17,6 +18,7 @@ function App() {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/assets" element={<Catalog />} />
+          <Route path="/assets/:id" element={<AssetProfile />} />
           <Route path="/collaborators" element={<Collaborators />} />
           <Route path="/collaborators/:id" element={<CollaboratorProfile />} />
           <Route path="/maintenances" element={<Maintenances />} />

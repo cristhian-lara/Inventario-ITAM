@@ -396,4 +396,48 @@ router.get('/:id/accept', async (req, res) => {
     }
 });
 
+// Historial completo de asignaciones de un activo (para Hoja de Vida del Equipo)
+router.get('/asset/:assetId/history', async (req, res) => {
+    try {
+        const { AppDataSource } = require('../../shared/infrastructure/database/postgres');
+        const { AssignmentOrmEntity } = require('../../modules/assignment/infrastructure/orm/Assignment.entity');
+        const { PostgresCollaboratorRepository } = require('../../modules/collaborator/infrastructure/PostgresCollaboratorRepository');
+
+        const repo = AppDataSource.getRepository(AssignmentOrmEntity);
+        const assignments = await repo.find({
+            where: { asset_id: req.params.assetId },
+            order: { start_date: 'DESC' }
+        });
+
+        const collaboratorRepo = new PostgresCollaboratorRepository(AppDataSource);
+
+        const enriched = await Promise.all(assignments.map(async (a: any) => {
+            let collaboratorName = a.collaborator_id;
+            let collaboratorEmail = '';
+            try {
+                const collab = await collaboratorRepo.findById(a.collaborator_id);
+                if (collab) {
+                    collaboratorName = collab.name;
+                    collaboratorEmail = collab.email;
+                }
+            } catch (_) {}
+            return {
+                id: a.id,
+                assetId: a.asset_id,
+                collaboratorId: a.collaborator_id,
+                collaboratorName,
+                collaboratorEmail,
+                status: a.status,
+                startDate: a.start_date,
+                endDate: a.end_date,
+                documentPath: a.document_path || null
+            };
+        }));
+
+        res.json(enriched);
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 export default router;

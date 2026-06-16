@@ -16,7 +16,8 @@ export class PostgresAssignmentRepository implements IAssignmentRepository {
             start_date: assignment.startDate,
             end_date: assignment.endDate,
             signature_token: assignment.signatureToken,
-            signature_metadata: assignment.signatureMetadata
+            signature_metadata: assignment.signatureMetadata,
+            document_path: (assignment as any).props?.documentPath || undefined
         });
         await this.repo.save(ormEntity);
     }
