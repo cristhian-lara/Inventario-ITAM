@@ -209,122 +209,12 @@ export default function Settings() {
   };
 
   // --- CUSTOM LISTS STATE ---
-  const [activeTab2, setActiveTab2] = useState<'categories' | 'departments' | 'cecos' | 'custom-lists'>('categories');
-  const [newCustomListName, setNewCustomListName] = useState('');
-  const [newCustomListTarget, setNewCustomListTarget] = useState<'Collaborator' | 'Asset' | 'None'>('None');
-  const [newCustomListDesc, setNewCustomListDesc] = useState('');
-  const [editingCustomListId, setEditingCustomListId] = useState<string | null>(null);
-  const [showCustomListModal, setShowCustomListModal] = useState(false);
+  const [activeTab2, setActiveTab2] = useState('categories');
+  
 
-  const [selectedListForItems, setSelectedListForItems] = useState<any>(null);
-  const [showListItemsModal, setShowListItemsModal] = useState(false);
-  const [newItemValue, setNewItemValue] = useState('');
-  const [newItemDesc, setNewItemDesc] = useState('');
-  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  
 
-  const { data: customLists, isLoading: loadingCustomLists } = useQuery({
-    queryKey: ['custom-lists'],
-    queryFn: async () => {
-      const response = await axios.get(`${API_URL}/api/master-data/custom-lists`);
-      return response.data;
-    }
-  });
-
-  const customListMutation = useMutation({
-    mutationFn: async () => {
-      const res = await axios.post(`${API_URL}/api/master-data/custom-lists`, {
-        name: newCustomListName,
-        description: newCustomListDesc,
-        targetEntity: newCustomListTarget,
-        targetEntity: newCustomListTarget
-      });
-      return res.data;
-    },
-    onSuccess: () => {
-      setSuccessMsg('Lista guardada con éxito');
-      setNewCustomListName(''); setNewCustomListDesc(''); setNewCustomListTarget('None'); setShowCustomListModal(false);
-      queryClient.invalidateQueries({ queryKey: ['custom-lists'] });
-      setTimeout(() => setSuccessMsg(''), 5000);
-    },
-    onError: (err: any) => {
-      setErrorMsg(err.response?.data?.error || err.message);
-      setTimeout(() => setErrorMsg(''), 5000);
-    }
-  });
-
-  const updateCustomListMutation = useMutation({
-    mutationFn: async () => {
-      const res = await axios.put(`${API_URL}/api/master-data/custom-lists/${editingCustomListId}`, {
-        name: newCustomListName,
-        description: newCustomListDesc
-      });
-      return res.data;
-    },
-    onSuccess: () => {
-      setSuccessMsg('Lista actualizada con éxito');
-      setNewCustomListName(''); setNewCustomListDesc(''); setNewCustomListTarget('None'); setShowCustomListModal(false); setEditingCustomListId(null);
-      queryClient.invalidateQueries({ queryKey: ['custom-lists'] });
-      setTimeout(() => setSuccessMsg(''), 5000);
-    },
-    onError: (err: any) => {
-      setErrorMsg(err.response?.data?.error || err.message);
-      setTimeout(() => setErrorMsg(''), 5000);
-    }
-  });
-
-  const itemMutation = useMutation({
-    mutationFn: async () => {
-      if (editingItemId) {
-        await axios.put(`${API_URL}/api/master-data/custom-lists/${selectedListForItems.id}/items/${editingItemId}`, {
-          value: newItemValue,
-          description: newItemDesc
-        });
-      } else {
-        await axios.post(`${API_URL}/api/master-data/custom-lists/${selectedListForItems.id}/items`, {
-          value: newItemValue,
-          description: newItemDesc
-        });
-      }
-    },
-    onSuccess: () => {
-      setSuccessMsg('Opción guardada con éxito');
-      setNewItemValue(''); setNewItemDesc(''); setEditingItemId(null);
-      queryClient.invalidateQueries({ queryKey: ['custom-lists'] });
-      queryClient.fetchQuery({ queryKey: ['custom-lists'] }).then((data: any) => {
-         const updatedList = data.find((l: any) => l.id === selectedListForItems.id);
-         if (updatedList) setSelectedListForItems(updatedList);
-      });
-      setTimeout(() => setSuccessMsg(''), 5000);
-    },
-    onError: (err: any) => {
-      setErrorMsg(err.response?.data?.error || err.message);
-      setTimeout(() => setErrorMsg(''), 5000);
-    }
-  });
-
-  const handleEditCustomList = (c: any) => {
-    setEditingCustomListId(c.id);
-    setNewCustomListName(c.name);
-    setNewCustomListDesc(c.description || '');
-    setNewCustomListTarget(c.targetEntity || 'None');
-    setShowCustomListModal(true);
-  };
-
-  const handleManageItems = (c: any) => {
-    setSelectedListForItems(c);
-    setShowListItemsModal(true);
-  };
-
-  const handleEditItem = (item: any, list: any) => {
-    setSelectedListForItems(list);
-    setEditingItemId(item.id);
-    setNewItemValue(item.value);
-    setNewItemDesc(item.description || '');
-    setShowListItemsModal(true);
-  };
-
-
-  const handleCreateCategory = (e: React.FormEvent) => {
+    const handleCreateCategory = (e: React.FormEvent) => {
     e.preventDefault();
     confirm({
       title: editingCatId ? 'Guardar Cambios' : 'Crear Categoría',
@@ -415,19 +305,7 @@ export default function Settings() {
             <Briefcase size={18} /> CECOS
           </button>
           
-          {/* Dynamic Modules injected here */}
-          <div style={{ padding: '10px 20px', fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '1px', marginTop: '10px', borderTop: '1px solid var(--border-glass)' }}>
-            Módulos Dinámicos
-          </div>
-          {customLists?.map((list: any) => (
-            <button key={list.id} className={`settings-tab ${activeTab2 === 'custom-list-' + list.id ? 'active' : ''}`} onClick={() => setActiveTab2('custom-list-' + list.id)}>
-              <Database size={18} /> {list.name}
-            </button>
-          ))}
-          <button className="settings-tab" style={{ color: 'var(--primary)', justifyContent: 'center', marginTop: '10px', border: '1px dashed var(--primary)' }} onClick={() => { setEditingCustomListId(null); setNewCustomListName(''); setNewCustomListDesc(''); setNewCustomListTarget('None'); setShowCustomListModal(true); }}>
-            <Plus size={16} /> Crear Catálogo
-          </button>
-        </div>
+                  </div>
 
         <div className="settings-content glass-panel">
           {activeTab2 === 'categories' && (
@@ -560,130 +438,8 @@ export default function Settings() {
           </div>
         )}
 
-          {/* RENDER INDIVIDUAL CUSTOM LIST TABS - INSIDE settings-content */}
-          {customLists?.filter((list: any) => activeTab2 === 'custom-list-' + list.id).map((list: any) => (
-            <div key={list.id} className="slide-in">
-              {/* Header */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '28px', paddingBottom: '20px', borderBottom: '1px solid var(--border-glass)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                  <div style={{ width: '48px', height: '48px', borderRadius: '14px', background: 'linear-gradient(135deg, var(--ikusi-green), #059669)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 16px rgba(16,185,129,0.35)', flexShrink: 0 }}>
-                    <Database size={22} color="white" />
                   </div>
-                  <div>
-                    <h2 style={{ margin: 0, fontSize: '22px', fontWeight: 700, color: 'var(--text-main)' }}>{list.name}</h2>
-                    <p style={{ margin: '4px 0 0', fontSize: '13px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      {list.targetEntity === 'Collaborator' && <><span style={{ color: 'var(--ikusi-green)' }}>●</span> Vinculado a Colaboradores</>}
-                      {list.targetEntity === 'Asset' && <><span style={{ color: 'var(--ikusi-green)' }}>●</span> Vinculado a Activos / Equipos</>}
-                      {list.targetEntity === 'None' && <><span style={{ color: 'var(--text-muted)' }}>●</span> Catálogo de uso general</>}
-                    </p>
-                  </div>
-                </div>
-                <div style={{ display: 'flex', gap: '10px', flexShrink: 0 }}>
-                  <button className="btn-secondary" onClick={() => handleEditCustomList(list)} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '9px 18px', fontSize: '14px' }}>
-                    <Edit size={15} /> Editar módulo
-                  </button>
-                  {!list.isSystem && (
-                    <button
-                      className="btn-secondary"
-                      style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '9px 18px', fontSize: '14px', color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }}
-                      onClick={() => {
-                        confirm({
-                          title: 'Eliminar Módulo',
-                          message: `¿Estás seguro de eliminar el módulo "${list.name}" permanentemente? Esta acción no se puede deshacer.`,
-                          type: 'danger',
-                          onConfirm: async () => {
-                            try {
-                              await axios.delete(`${API_URL}/api/master-data/custom-lists/${list.id}`);
-                              queryClient.invalidateQueries({ queryKey: ['custom-lists'] });
-                              setActiveTab2('categories');
-                              setSuccessMsg('Módulo eliminado correctamente.');
-                              setTimeout(() => setSuccessMsg(''), 5000);
-                            } catch (e) { alert('Error al eliminar el módulo'); }
-                          }
-                        });
-                      }}
-                    >
-                      <Trash2 size={15} /> Eliminar
-                    </button>
-                  )}
-                </div>
-              </div>
 
-              {/* Add/Edit form */}
-              <div style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid var(--border-glass)', borderRadius: '16px', padding: '24px', marginBottom: '24px' }}>
-                <h3 style={{ margin: '0 0 18px', fontSize: '15px', fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Plus size={16} color="var(--ikusi-green)" />
-                  {editingItemId ? 'Editar opción seleccionada' : 'Agregar nueva opción al catálogo'}
-                </h3>
-                <form
-                  onSubmit={(e) => { e.preventDefault(); setSelectedListForItems(list); setTimeout(() => itemMutation.mutate(), 100); }}
-                  style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto auto', gap: '14px', alignItems: 'flex-end' }}
-                >
-                  <div className="form-group" style={{ margin: 0 }}>
-                    <label>Valor / Nombre <span className="text-danger">*</span></label>
-                    <input type="text" className="glass-input" required value={newItemValue} onChange={(e) => setNewItemValue(e.target.value)} placeholder="Ej: Medellín, Lenovo, Piso 3..." />
-                  </div>
-                  <div className="form-group" style={{ margin: 0 }}>
-                    <label>Descripción <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: '12px' }}>(Opcional)</span></label>
-                    <input type="text" className="glass-input" value={newItemDesc} onChange={(e) => setNewItemDesc(e.target.value)} placeholder="Descripción breve..." />
-                  </div>
-                  <button type="submit" className="btn-primary" disabled={itemMutation.isPending} style={{ alignSelf: 'flex-end', whiteSpace: 'nowrap', height: '42px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    {itemMutation.isPending ? '...' : editingItemId ? '✓ Actualizar' : <><Plus size={15} /> Agregar</>}
-                  </button>
-                  {editingItemId && (
-                    <button type="button" className="btn-secondary" style={{ alignSelf: 'flex-end', height: '42px' }} onClick={() => { setEditingItemId(null); setNewItemValue(''); setNewItemDesc(''); }}>
-                      Cancelar
-                    </button>
-                  )}
-                </form>
-              </div>
-
-              {/* Items table */}
-              {list.items?.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '60px 20px', background: 'rgba(255,255,255,0.02)', border: '1px dashed var(--border-glass)', borderRadius: '16px', color: 'var(--text-muted)' }}>
-                  <Database size={48} style={{ opacity: 0.15, marginBottom: '16px' }} />
-                  <p style={{ margin: 0, fontSize: '15px', fontWeight: 500 }}>Este catálogo aún no tiene opciones.</p>
-                  <p style={{ margin: '6px 0 0', fontSize: '13px' }}>Usa el formulario de arriba para agregar la primera opción.</p>
-                </div>
-              ) : (
-                <table className="glass-table">
-                  <thead>
-                    <tr>
-                      <th>Valor</th>
-                      <th>Descripción</th>
-                      <th style={{ width: '100px' }}>Estado</th>
-                      <th style={{ width: '100px', textAlign: 'center' }}>Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {list.items?.map((item: any) => (
-                      <tr key={item.id}>
-                        <td style={{ fontWeight: 600 }}>{item.value}</td>
-                        <td style={{ color: 'var(--text-muted)' }}>{item.description || <span style={{ opacity: 0.35 }}>—</span>}</td>
-                        <td><span className={`status-badge ${item.isActive ? 'status-active' : 'status-inactive'}`}>{item.isActive ? 'Activo' : 'Inactivo'}</span></td>
-                        <td>
-                          <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-                            <button className="icon-btn" title="Editar" onClick={() => handleEditItem(item)} style={{ color: 'var(--ikusi-green)' }}><Edit size={15} /></button>
-                            <button className="icon-btn text-danger" title="Eliminar" onClick={() => {
-                              confirm({ title: 'Eliminar Opción', message: `¿Eliminar la opción "${item.value}"?`, type: 'danger', onConfirm: async () => {
-                                try {
-                                  await axios.delete(`${API_URL}/api/master-data/custom-lists/${list.id}/items/${item.id}`);
-                                  queryClient.invalidateQueries({ queryKey: ['custom-lists'] });
-                                } catch (e) { alert('Error al eliminar'); }
-                              }});
-                            }}><Trash2 size={15} /></button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          ))}
-
-        </div>
-      
       {showCatModal && (
         <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(4px)', padding: '20px' }}>
           <div className="glass-panel" style={{ position: 'relative', width: '100%', maxWidth: '900px', margin: 0, padding: '30px', maxHeight: '90vh', overflowY: 'auto' }}>
@@ -987,77 +743,7 @@ export default function Settings() {
       )}
 
 
-      {/* CUSTOM LIST MODAL - REDESIGNED */}
-      {showCustomListModal && (
-        <div className="modal-overlay slide-in">
-          <div className="modal-content glass-panel" style={{ maxWidth: '540px' }}>
-            {/* Modal Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '28px', paddingBottom: '20px', borderBottom: '1px solid var(--border-glass)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: 'linear-gradient(135deg, var(--ikusi-green), #059669)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 12px rgba(16,185,129,0.3)', flexShrink: 0 }}>
-                  <Database size={20} color="white" />
-                </div>
-                <div>
-                  <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 700, color: 'var(--text-main)' }}>
-                    {editingCustomListId ? 'Editar Módulo' : 'Nuevo Catálogo Dinámico'}
-                  </h2>
-                  <p style={{ margin: '3px 0 0', fontSize: '13px', color: 'var(--text-muted)' }}>Configura un catálogo reutilizable en el sistema</p>
-                </div>
-              </div>
-              <button className="icon-btn" onClick={() => setShowCustomListModal(false)} style={{ flexShrink: 0, marginTop: '2px' }}><X size={20} /></button>
             </div>
-
-            <form onSubmit={(e) => { e.preventDefault(); editingCustomListId ? updateCustomListMutation.mutate() : customListMutation.mutate(); }} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
-              <div className="form-group" style={{ margin: 0 }}>
-                <label style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px', display: 'block', color: 'var(--text-secondary)' }}>Nombre del catálogo <span className="text-danger">*</span></label>
-                <input
-                  type="text"
-                  className="glass-input"
-                  required
-                  value={newCustomListName}
-                  onChange={(e) => setNewCustomListName(e.target.value)}
-                  placeholder="Ej: Sedes, Ubicaciones, Tipos de Contrato..."
-                />
-              </div>
-
-              <div className="form-group" style={{ margin: 0 }}>
-                <label style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px', display: 'block', color: 'var(--text-secondary)' }}>Vincular a formulario</label>
-                <select className="glass-input" value={newCustomListTarget} onChange={(e) => setNewCustomListTarget(e.target.value as any)}>
-                  <option value="None">🔘 Ninguno — Uso general</option>
-                  <option value="Collaborator">👤 Colaboradores / Usuarios</option>
-                  <option value="Asset">🖥️ Activos / Equipos</option>
-                </select>
-                <p style={{ margin: '8px 0 0', fontSize: '12px', color: 'var(--text-muted)', lineHeight: '1.5' }}>
-                  {newCustomListTarget === 'Collaborator' && 'Este campo aparecerá automáticamente en el formulario de Colaboradores.'}
-                  {newCustomListTarget === 'Asset' && 'Este campo aparecerá automáticamente en el formulario de Activos.'}
-                  {newCustomListTarget === 'None' && 'El catálogo estará disponible pero no se inyectará en ningún formulario.'}
-                </p>
-              </div>
-
-              <div className="form-group" style={{ margin: 0 }}>
-                <label style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px', display: 'block', color: 'var(--text-secondary)' }}>Descripción <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(Opcional)</span></label>
-                <textarea
-                  className="glass-input"
-                  value={newCustomListDesc}
-                  onChange={(e) => setNewCustomListDesc(e.target.value)}
-                  rows={3}
-                  placeholder="Describe para qué se usará este catálogo..."
-                  style={{ resize: 'vertical', minHeight: '80px' }}
-                ></textarea>
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '8px', paddingTop: '20px', borderTop: '1px solid var(--border-glass)' }}>
-                <button type="button" className="btn-secondary" onClick={() => setShowCustomListModal(false)}>Cancelar</button>
-                <button type="submit" className="btn-primary" disabled={customListMutation.isPending || updateCustomListMutation.isPending} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  {customListMutation.isPending || updateCustomListMutation.isPending ? 'Guardando...' : <><Database size={15} /> {editingCustomListId ? 'Guardar cambios' : 'Crear catálogo'}</>}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      </div>
     </div>
   );
 }

@@ -80,20 +80,14 @@ export default function Collaborators() {
   });
 
 
-  const { data: dynamicModules } = useQuery({
-    queryKey: ['custom-lists-collaborators'],
-    queryFn: async () => {
-      const response = await axios.get(`${API_URL}/api/master-data/custom-lists`);
-      return response.data.filter((l: any) => l.targetEntity === 'Collaborator' && l.isActive !== false);
-    }
-  });
+  
 
   const mutation = useMutation({
     mutationFn: (newCollab: any) => axios.post(`${API_URL}/api/collaborators`, {
       ...newCollab,
       department: Number(newCollab.department),
       leaderId: newCollab.leaderId || null,
-      dynamicAttributes: { CECOS: newCollab.cecos, ...(newCollab.dynamicAttributes || {}) }
+      dynamicAttributes: { CECOS: newCollab.cecos }
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['collaborators'] });
@@ -211,7 +205,7 @@ export default function Collaborators() {
           </button>
           <button className="btn-primary" onClick={() => {
     setEditingId(null);
-    setFormData({ name: '', email: '', department: '', location: '', isLeader: false, leaderId: '', cecos: '', activationDate: new Date().toISOString().split('T')[0], dynamicAttributes: {} as Record<string, any> });
+    setFormData({ name: '', email: '', department: '', location: '', isLeader: false, leaderId: '', cecos: '', activationDate: new Date().toISOString().split('T')[0], dynamicAttributes: {} });
     setLocationType('Medellín');
     setIsModalOpen(true);
   }}>
@@ -409,27 +403,6 @@ export default function Collaborators() {
                 </select>
               </div>
 
-                            
-
-              {/* Módulos Dinámicos */}
-              {dynamicModules?.map((mod: any) => (
-                <div className="form-group" key={mod.id}>
-                  <label>{mod.name}</label>
-                  <select
-                    className="glass-input"
-                    value={formData.dynamicAttributes[mod.name] || ''}
-                    onChange={(e) => setFormData({ 
-                      ...formData, 
-                      dynamicAttributes: { ...formData.dynamicAttributes, [mod.name]: e.target.value }
-                    })}
-                  >
-                    <option value="">Seleccione {mod.name.toLowerCase()}...</option>
-                    {mod.items?.filter((i: any) => i.isActive).map((item: any) => (
-                      <option key={item.id} value={item.value}>{item.value}</option>
-                    ))}
-                  </select>
-                </div>
-              ))}
 
               <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
                 <input 

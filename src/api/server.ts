@@ -5,7 +5,6 @@ import assignmentRoutes from './routes/assignment.routes';
 import { collaboratorRouter } from './routes/collaborator.routes';
 import dashboardRouter from './routes/dashboard.routes';
 import { maintenanceRouter } from './routes/maintenance.routes';
-import { masterDataRouter } from './routes/master-data.routes';
 import { initializeDatabase } from '../shared/infrastructure/database/postgres';
 import path from 'path';
 
@@ -28,7 +27,6 @@ app.use('/api/assignments', assignmentRoutes);
 app.use('/api/collaborators', collaboratorRouter);
 app.use('/api/dashboard', dashboardRouter);
 app.use('/api/maintenances', maintenanceRouter);
-app.use('/api/master-data', masterDataRouter);
 
 // Iniciar Base de Datos y Servidor
 initializeDatabase().then(() => {
