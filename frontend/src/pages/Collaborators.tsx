@@ -71,11 +71,20 @@ export default function Collaborators() {
 
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  const { data: departments } = useQuery<any[]>({
+    const { data: departments } = useQuery<any[]>({
     queryKey: ['departments'],
     queryFn: async () => {
       const response = await axios.get(`${API_URL}/api/collaborators/departments`);
       return response.data;
+    }
+  });
+
+
+  const { data: dynamicModules } = useQuery({
+    queryKey: ['custom-lists-collaborators'],
+    queryFn: async () => {
+      const response = await axios.get(`${API_URL}/api/master-data/custom-lists`);
+      return response.data.filter((l: any) => l.targetEntity === 'Collaborator' && l.isActive !== false);
     }
   });
 
@@ -84,7 +93,7 @@ export default function Collaborators() {
       ...newCollab,
       department: Number(newCollab.department),
       leaderId: newCollab.leaderId || null,
-      dynamicAttributes: { CECOS: newCollab.cecos }
+      dynamicAttributes: { CECOS: newCollab.cecos, ...(newCollab.dynamicAttributes || {}) }
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['collaborators'] });
@@ -173,10 +182,8 @@ export default function Collaborators() {
   };
   const departmentHasLeader = useMemo(() => {
     if (!formData.department) return false;
-    const deptName = departments?.find((d: any) => d.id === formData.department)?.name;
-    if (!deptName) return false;
-    return collaborators.some((c: any) => c.department === deptName && c.isLeader && c.id !== editingId);
-  }, [formData.department, collaborators, departments, editingId]);
+    return collaborators.some((c: any) => String(c.department) === String(formData.department) && c.isLeader && c.id !== editingId);
+  }, [formData.department, collaborators, editingId]);
 
   const filtered = collaborators.filter(c => 
     c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -202,7 +209,12 @@ export default function Collaborators() {
             <Upload size={20} />
             {importing ? 'Importando...' : 'Importar (.xlsx, .csv)'}
           </button>
-          <button className="btn-primary" onClick={() => setIsModalOpen(true)}>
+          <button className="btn-primary" onClick={() => {
+    setEditingId(null);
+    setFormData({ name: '', email: '', department: '', location: '', isLeader: false, leaderId: '', cecos: '', activationDate: new Date().toISOString().split('T')[0], dynamicAttributes: {} as Record<string, any> });
+    setLocationType('Medellín');
+    setIsModalOpen(true);
+  }}>
             <UserPlus size={20} />
             Nuevo Colaborador
           </button>
@@ -357,6 +369,7 @@ export default function Collaborators() {
                   ))}
                 </select>
               </div>
+              
               <div className="form-group">
                 <label>Localidad / Sede</label>
                 <select 
@@ -396,9 +409,31 @@ export default function Collaborators() {
                 </select>
               </div>
 
+                            
+
+              {/* Módulos Dinámicos */}
+              {dynamicModules?.map((mod: any) => (
+                <div className="form-group" key={mod.id}>
+                  <label>{mod.name}</label>
+                  <select
+                    className="glass-input"
+                    value={formData.dynamicAttributes[mod.name] || ''}
+                    onChange={(e) => setFormData({ 
+                      ...formData, 
+                      dynamicAttributes: { ...formData.dynamicAttributes, [mod.name]: e.target.value }
+                    })}
+                  >
+                    <option value="">Seleccione {mod.name.toLowerCase()}...</option>
+                    {mod.items?.filter((i: any) => i.isActive).map((item: any) => (
+                      <option key={item.id} value={item.value}>{item.value}</option>
+                    ))}
+                  </select>
+                </div>
+              ))}
+
               <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
                 <input 
-                  type="checkbox" 
+                  type="checkbox"  
                   id="isLeader" 
                   checked={departmentHasLeader ? false : formData.isLeader} 
                   disabled={departmentHasLeader}

@@ -124,7 +124,15 @@ collaboratorRouter.post('/import', upload.single('file'), async (req, res) => {
             return res.status(400).json({ error: 'No se subió ningún archivo' });
         }
 
-        const workbook = xlsx.read(req.file.buffer, { type: 'buffer', cellDates: true });
+        const isCsv = req.file.originalname.toLowerCase().endsWith('.csv');
+        let workbook;
+        if (isCsv) {
+            const csvString = req.file.buffer.toString('utf8');
+            workbook = xlsx.read(csvString, { type: 'string', cellDates: true });
+        } else {
+            workbook = xlsx.read(req.file.buffer, { type: 'buffer', cellDates: true });
+        }
+        
         const sheetName = workbook.SheetNames[0];
         const sheet = workbook.Sheets[sheetName];
         const records = xlsx.utils.sheet_to_json(sheet);

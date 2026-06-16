@@ -36,6 +36,14 @@ export class CollaboratorUseCases {
             throw new Error('Department not found');
         }
 
+        if (data.isLeader) {
+            const allCollabs = await this.collaboratorRepo.findAll();
+            const existingLeader = allCollabs.find(c => Number(c.department) === Number(department.id) && c.isLeader && c.status === 'ACTIVE');
+            if (existingLeader) {
+                throw new Error(`El departamento '${department.name}' ya tiene un líder asignado.`);
+            }
+        }
+
         const collaborator = Collaborator.create(
             uuidv4(),
             data.name,
@@ -174,6 +182,14 @@ export class CollaboratorUseCases {
         const department = await this.departmentRepo.findById(departmentId);
         if (!department) {
             throw new Error(`El departamento con ID ${departmentId} no existe.`);
+        }
+
+        if (isLeader) {
+            const allCollabs = await this.collaboratorRepo.findAll();
+            const existingLeader = allCollabs.find(c => Number(c.department) === Number(department.id) && c.isLeader && c.status === 'ACTIVE' && c.id !== collaborator.id);
+            if (existingLeader) {
+                throw new Error(`El departamento '${department.name}' ya tiene un líder asignado.`);
+            }
         }
 
         const finalLeaderId = isLeader ? null : (leaderId || null);

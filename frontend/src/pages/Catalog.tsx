@@ -91,6 +91,19 @@ export default function Catalog() {
     }
   };
 
+  const handleDownloadTemplate = () => {
+    const headers = ['Placa Ikusi', 'Categoría', 'Serial', 'Fecha de Compra', 'Meses Garantía', 'Años Depreciación', 'PRECIO COMPRA'];
+    const sampleRow = ['EQ-1001', '1', 'SN-A1B2C3', '2024-01-15', '12', '3', '3500000'];
+    const csvContent = "data:text/csv;charset=utf-8," + headers.join(',') + "\n" + sampleRow.join(',');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "plantilla_equipos.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const { data: assets, isLoading, error } = useQuery<Asset[]>({
     queryKey: ['assets'],
     queryFn: async () => {
@@ -415,6 +428,13 @@ export default function Catalog() {
             ref={fileInputRef}
             onChange={handleImport}
           />
+          <button 
+            className="btn-secondary" 
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', borderRadius: '12px', background: 'var(--glass-bg)', color: 'var(--text-main)', border: '1px solid var(--border-glass)', cursor: 'pointer', fontWeight: '500', transition: 'all 0.3s ease' }} 
+            onClick={handleDownloadTemplate} 
+          >
+            Descargar Plantilla
+          </button>
           <button 
             className="btn-secondary" 
             style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', borderRadius: '12px', background: 'var(--glass-bg)', color: 'var(--text-main)', border: '1px solid var(--border-glass)', cursor: 'pointer', fontWeight: '500', transition: 'all 0.3s ease' }} 
