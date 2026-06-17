@@ -47,6 +47,7 @@ const Maintenances: React.FC = () => {
   const [modalMode, setModalMode] = useState<'create' | 'start' | 'complete' | 'view' | 'forceSign'>('create');
   const [selectedRecord, setSelectedRecord] = useState<MaintenanceRecord | null>(null);
   const [successMsg, setSuccessMsg] = useState('');
+  const [errorToast, setErrorToast] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
   const [formData, setFormData] = useState({
@@ -173,7 +174,10 @@ const Maintenances: React.FC = () => {
       setSuccessMsg('Firma solicitada correctamente. Se ha enviado un correo al colaborador con el enlace mágico.');
       setTimeout(() => setSuccessMsg(''), 4000);
     },
-    onError: (error: Error) => { alert(error.message); }
+    onError: (error: Error) => { 
+      setErrorToast(error.message); 
+      setTimeout(() => setErrorToast(''), 4000);
+    }
   });
 
   const forceSignMutation = useMutation({
@@ -201,6 +205,12 @@ const Maintenances: React.FC = () => {
   if (isLoading) return <div style={{ padding: '40px', color: 'var(--text-main)' }}>Cargando módulo de mantenimientos...</div>;
 
   const now = new Date();
+  const getTargetMidnight = (d: string | Date) => {
+    const dateStr = d instanceof Date ? d.toISOString() : String(d);
+    const [year, month, day] = dateStr.split('T')[0].split('-');
+    return new Date(Number(year), Number(month) - 1, Number(day)).getTime();
+  };
+  const nowNorm = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
 
   const timeFilteredMaintenances = maintenances?.filter(m => {
     if (filterYear !== 'all' || filterMonth !== 'all') {
@@ -216,7 +226,7 @@ const Maintenances: React.FC = () => {
   const totalScheduled = timeFilteredMaintenances?.filter(m => m.status === 'SCHEDULED').length || 0;
   const totalInProgress = timeFilteredMaintenances?.filter(m => m.status === 'IN_PROGRESS').length || 0;
   const totalCompleted = timeFilteredMaintenances?.filter(m => m.status === 'COMPLETED').length || 0;
-  const overdue = timeFilteredMaintenances?.filter(m => m.status === 'SCHEDULED' && new Date(m.scheduledDate) < now).length || 0;
+  const overdue = timeFilteredMaintenances?.filter(m => m.status === 'SCHEDULED' && getTargetMidnight(m.scheduledDate) < nowNorm).length || 0;
   const preventiveCount = timeFilteredMaintenances?.filter(m => m.type === 'PREVENTIVE').length || 0;
   const correctiveCount = timeFilteredMaintenances?.filter(m => m.type === 'CORRECTIVE').length || 0;
   const correctiveRatio = timeFilteredMaintenances && timeFilteredMaintenances.length > 0
@@ -390,6 +400,16 @@ const Maintenances: React.FC = () => {
             <CheckCircle size={60} color="#10b981" style={{ marginBottom: '20px' }} />
             <h2 style={{ color: '#f8fafc', marginBottom: '15px', fontSize: '24px', fontWeight: 'bold' }}>¡Éxito!</h2>
             <p style={{ color: '#e2e8f0', fontSize: '16px', lineHeight: '1.6', margin: 0 }}>{successMsg}</p>
+          </div>
+        </div>
+      )}
+
+      {errorToast && (
+        <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, backdropFilter: 'blur(6px)' }}>
+          <div className="glass-panel slide-up" style={{ padding: '40px', maxWidth: '420px', width: '100%', textAlign: 'center', background: '#0f172a', border: '1px solid #ef4444', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.3)' }}>
+            <AlertTriangle size={60} color="#ef4444" style={{ marginBottom: '20px' }} />
+            <h2 style={{ color: '#f8fafc', marginBottom: '15px', fontSize: '24px', fontWeight: 'bold' }}>Aviso</h2>
+            <p style={{ color: '#e2e8f0', fontSize: '16px', lineHeight: '1.6', margin: 0 }}>{errorToast}</p>
           </div>
         </div>
       )}
@@ -668,12 +688,12 @@ const Maintenances: React.FC = () => {
             </thead>
             <tbody>
               {filteredData?.map(m => {
-                const isLate = m.status === 'SCHEDULED' && new Date(m.scheduledDate) < now;
+                const isLate = m.status === 'SCHEDULED' && getTargetMidnight(m.scheduledDate) < nowNorm;
                 const delayDays = (() => {
                   if (m.status === 'COMPLETED' && m.executionDate) {
-                    return Math.max(0, Math.floor((new Date(m.executionDate).getTime() - new Date(m.scheduledDate).getTime()) / (1000 * 3600 * 24)));
-                  } else if (m.status === 'SCHEDULED' && new Date(m.scheduledDate) < now) {
-                    return Math.floor((now.getTime() - new Date(m.scheduledDate).getTime()) / (1000 * 3600 * 24));
+                    return Math.max(0, Math.floor((getTargetMidnight(m.executionDate) - getTargetMidnight(m.scheduledDate)) / (1000 * 3600 * 24)));
+                  } else if (m.status === 'SCHEDULED' && getTargetMidnight(m.scheduledDate) < nowNorm) {
+                    return Math.floor((nowNorm - getTargetMidnight(m.scheduledDate)) / (1000 * 3600 * 24));
                   }
                   return null;
                 })();
