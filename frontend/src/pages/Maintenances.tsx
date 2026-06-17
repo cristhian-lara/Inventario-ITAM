@@ -457,7 +457,7 @@ const Maintenances: React.FC = () => {
       </div>
 
       {/* ── Date-Filtered KPI Cards ─────────────────────────────────────────── */}
-      <div className="maint-kpi-row">
+      <div className="maint-kpi-row" style={{ marginBottom: '20px' }}>
         <div className="maint-kpi-card" style={{ cursor: 'default' }}>
           <div className="kpi-icon" style={{ background: 'rgba(71,85,105,0.12)', color: '#475569' }}><Calendar size={22} /></div>
           <div className="kpi-body">
@@ -504,297 +504,239 @@ const Maintenances: React.FC = () => {
         <div className="maint-kpi-card kpi-teal" style={{ cursor: 'pointer', outline: viewMode === 'preventive' ? '2px solid #14b8a6' : 'none' }} onClick={() => setViewMode(viewMode === 'preventive' ? 'general' : 'preventive')}>
           <div className="kpi-icon" style={{ background: 'rgba(20,184,166,0.12)', color: '#14b8a6' }}><Wrench size={22} /></div>
           <div className="kpi-body">
-            <span className="kpi-label">Preventivos %</span>
-            <span className="kpi-value" style={{ color: '#14b8a6' }}>{preventiveRatio}%</span>
-            <span className="kpi-sub">del total</span>
+            <span className="kpi-label">Preventivos</span>
+            <span className="kpi-value" style={{ color: '#14b8a6' }}>{preventiveCount}</span>
+            <span className="kpi-sub">({preventiveRatio}% del total)</span>
           </div>
         </div>
 
         <div className="maint-kpi-card kpi-purple" style={{ cursor: 'pointer', outline: viewMode === 'balance' ? '2px solid #a855f7' : 'none' }} onClick={() => setViewMode(viewMode === 'balance' ? 'general' : 'balance')}>
           <div className="kpi-icon" style={{ background: 'rgba(168,85,247,0.12)', color: '#a855f7' }}><Wrench size={22} /></div>
           <div className="kpi-body">
-            <span className="kpi-label">Correctivos %</span>
-            <span className="kpi-value" style={{ color: '#a855f7' }}>{correctiveRatio}%</span>
-            <span className="kpi-sub">del total</span>
+            <span className="kpi-label">Correctivos</span>
+            <span className="kpi-value" style={{ color: '#a855f7' }}>{correctiveCount}</span>
+            <span className="kpi-sub">({correctiveRatio}% del total)</span>
           </div>
         </div>
       </div>
 
-      {/* ── Charts Row ──────────────────────────────────────────────────────── */}
-      <div className="dash-row" style={{ marginBottom: '20px' }}>
+      {/* ── Split Layout Container ────────────────────────────────────────────── */}
+      <div className="maint-split-layout">
+        
+        {/* Left Column: Table & Filters */}
+        <div className="table-main-area">
+          <div className="dash-card" style={{ height: '100%' }}>
+            {/* Filter bar */}
+            <div style={{ display: 'flex', gap: '16px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '15px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+              <div style={{ position: 'relative', flex: '1 1 300px' }}>
+                <Search size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                <input 
+                  type="text" 
+                  className="glass-input" 
+                  placeholder="Buscar por placa, hostname o colaborador..." 
+                  value={searchTerm} 
+                  onChange={e => setSearchTerm(e.target.value)}
+                  style={{ width: '100%', paddingLeft: '40px' }}
+                />
+              </div>
 
-        {/* Donut */}
-        <div className="dash-card" style={{ flex: '1 1 220px' }}>
-          <h3 className="dash-card-title">Preventivo vs Correctivo</h3>
-          <ResponsiveContainer width="100%" height={220}>
-            <PieChart>
-              <Pie data={typeData} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={4} dataKey="value" nameKey="name" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
-                {typeData.map((_, i) => <Cell key={i} fill={COLORS_TYPE[i]} />)}
-              </Pie>
-              <Tooltip formatter={(v: any, n: string) => [v, n]} />
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* Bar */}
-        <div className="dash-card" style={{ flex: '1 1 260px' }}>
-          <h3 className="dash-card-title">Mantenimientos por Estado</h3>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={statusData} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
-              <XAxis dataKey="status" stroke="var(--text-muted)" fontSize={12} />
-              <YAxis allowDecimals={false} stroke="var(--text-muted)" fontSize={12} />
-              <Tooltip cursor={{ fill: 'rgba(59,130,246,0.05)' }} />
-              <Bar dataKey="count" fill="#3b82f6" radius={[6, 6, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* Line — Tendencia Mensual */}
-        <div className="dash-card" style={{ flex: '1 1 300px' }}>
-          <h3 className="dash-card-title">Tendencia Mensual (últimos 6 meses)</h3>
-          <ResponsiveContainer width="100%" height={220}>
-            <LineChart data={monthlyData} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
-              <XAxis dataKey="month" stroke="var(--text-muted)" fontSize={12} />
-              <YAxis allowDecimals={false} stroke="var(--text-muted)" fontSize={12} />
-              <Tooltip />
-              <Legend iconType="circle" iconSize={10} />
-              <Line type="monotone" dataKey="Preventivo" stroke="#14b8a6" strokeWidth={2} dot={{ fill: '#14b8a6', r: 4 }} activeDot={{ r: 6 }} />
-              <Line type="monotone" dataKey="Correctivo" stroke="#a855f7" strokeWidth={2} dot={{ r: 4 }} />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-
-      </div>
-
-      {/* ── Filters + Table ──────────────────────────────────────────────────── */}
-      <div className="dash-card">
-
-        {/* Filter bar */}
-        <div style={{ display: 'flex', gap: '16px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '15px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-          <div style={{ position: 'relative', flex: '1 1 300px' }}>
-            <Search size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-            <input 
-              type="text" 
-              className="glass-input" 
-              placeholder="Buscar por placa, hostname o colaborador..." 
-              value={searchTerm} 
-              onChange={e => setSearchTerm(e.target.value)}
-              style={{ width: '100%', paddingLeft: '40px' }}
-            />
-          </div>
-
-          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-            <span style={{ color: 'var(--text-muted)', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Calendar size={16} /> Período:
-            </span>
-            <select className="glass-input" value={filterMonth} onChange={e => setFilterMonth(e.target.value)} style={{ width: '150px' }}>
-              <option value="all">Cualquier Mes</option>
-              <option value="1">Enero</option>
-              <option value="2">Febrero</option>
-              <option value="3">Marzo</option>
-              <option value="4">Abril</option>
-              <option value="5">Mayo</option>
-              <option value="6">Junio</option>
-              <option value="7">Julio</option>
-              <option value="8">Agosto</option>
-              <option value="9">Septiembre</option>
-              <option value="10">Octubre</option>
-              <option value="11">Noviembre</option>
-              <option value="12">Diciembre</option>
-            </select>
-            <select className="glass-input" value={filterYear} onChange={e => setFilterYear(e.target.value)} style={{ width: '130px' }}>
-              <option value="all">Cualquier Año</option>
-              {availableYears.map(y => <option key={y} value={y.toString()}>{y}</option>)}
-            </select>
-          </div>
-
-          {/* Active filter pills */}
-          {(filterType !== 'all' || filterStatus !== 'all' || viewMode !== 'general' || filterYear !== 'all' || filterMonth !== 'all') && (
-            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginLeft: 'auto' }}>
-              {filterType !== 'all' && (
-                <span className="filter-pill">
-                  {TYPE_LABELS[filterType]}
-                  <button onClick={() => setFilterType('all')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 0 0 4px', color: 'inherit' }}><X size={12} /></button>
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                <span style={{ color: 'var(--text-muted)', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Calendar size={16} /> Período:
                 </span>
-              )}
-              {filterStatus !== 'all' && (
-                <span className="filter-pill">
-                  {STATUS_LABELS[filterStatus]}
-                  <button onClick={() => setFilterStatus('all')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 0 0 4px', color: 'inherit' }}><X size={12} /></button>
-                </span>
-              )}
-              {filterYear !== 'all' && (
-                <span className="filter-pill">
-                  Año: {filterYear}
-                  <button onClick={() => setFilterYear('all')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 0 0 4px', color: 'inherit' }}><X size={12} /></button>
-                </span>
-              )}
-              {filterMonth !== 'all' && (
-                <span className="filter-pill">
-                  Mes: {new Date(2000, parseInt(filterMonth) - 1).toLocaleString('es-CO', { month: 'long' })}
-                  <button onClick={() => setFilterMonth('all')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 0 0 4px', color: 'inherit' }}><X size={12} /></button>
-                </span>
-              )}
-              {viewMode !== 'general' && (
-                <span className="filter-pill filter-pill-blue">
-                  {viewMode === 'auditoria'
-                    ? '🚨 Auditoría Vencidos'
-                    : viewMode === 'preventive'
-                    ? '🔧 Análisis Preventivos'
-                    : '⚙️ Análisis Correctivos'}
-                  <button onClick={() => setViewMode('general')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 0 0 4px', color: 'inherit' }}><X size={12} /></button>
-                </span>
-              )}
-              <button 
-                onClick={() => {
-                  setFilterType('all');
-                  setFilterStatus('all');
-                  setFilterYear('all');
-                  setFilterMonth('all');
-                  setViewMode('general');
-                  setSearchTerm('');
-                }}
-                style={{ 
-                  background: 'none', 
-                  border: 'none', 
-                  color: 'var(--accent-red)', 
-                  fontSize: '12px', 
-                  cursor: 'pointer', 
-                  textDecoration: 'underline', 
-                  marginLeft: '8px',
-                  fontWeight: 600
-                }}
-              >
-                Limpiar filtros
-              </button>
+                <select className="glass-input" value={filterMonth} onChange={e => setFilterMonth(e.target.value)} style={{ width: '150px' }}>
+                  <option value="all">Cualquier Mes</option>
+                  <option value="1">Enero</option>
+                  <option value="2">Febrero</option>
+                  <option value="3">Marzo</option>
+                  <option value="4">Abril</option>
+                  <option value="5">Mayo</option>
+                  <option value="6">Junio</option>
+                  <option value="7">Julio</option>
+                  <option value="8">Agosto</option>
+                  <option value="9">Septiembre</option>
+                  <option value="10">Octubre</option>
+                  <option value="11">Noviembre</option>
+                  <option value="12">Diciembre</option>
+                </select>
+                <select className="glass-input" value={filterYear} onChange={e => setFilterYear(e.target.value)} style={{ width: '130px' }}>
+                  <option value="all">Cualquier Año</option>
+                  {availableYears.map(y => <option key={y} value={y.toString()}>{y}</option>)}
+                </select>
+              </div>
             </div>
-          )}
-        </div>
 
-        {/* Table */}
-        <div className="table-responsive">
-          <table className="glass-table">
-            <thead>
-              <tr>
-                <th>Equipo (Hostname)</th>
-                <th>Tipo</th>
-                <th>Estado</th>
-                <th>Fecha Prog.</th>
-                <th>Días de Retraso</th>
-                <th>Usuario en Turno</th>
-                <th>Firma</th>
-                <th>Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredData?.map(m => {
-                const isLate = m.status === 'SCHEDULED' && getTargetMidnight(m.scheduledDate) < nowNorm;
-                const delayDays = (() => {
-                  if (m.status === 'COMPLETED' && m.executionDate) {
-                    return Math.max(0, Math.floor((getTargetMidnight(m.executionDate) - getTargetMidnight(m.scheduledDate)) / (1000 * 3600 * 24)));
-                  } else if (m.status === 'SCHEDULED' && getTargetMidnight(m.scheduledDate) < nowNorm) {
-                    return Math.floor((nowNorm - getTargetMidnight(m.scheduledDate)) / (1000 * 3600 * 24));
-                  }
-                  return null;
-                })();
-
-                return (
-                  <tr key={m.id}>
-                    <td style={{ fontWeight: 600 }}>
-                      {assets?.find(a => a.id === m.assetId)?.dynamicAttributes?.Hostname || m.assetId}
-                    </td>
-                    <td>
-                      <span className="spec-tag" style={{ background: m.type === 'PREVENTIVE' ? 'rgba(59,130,246,0.12)' : 'rgba(239,68,68,0.12)', color: m.type === 'PREVENTIVE' ? '#3b82f6' : '#ef4444' }}>
-                        {m.type === 'PREVENTIVE' ? 'Preventivo' : 'Correctivo'}
-                      </span>
-                    </td>
-                    <td>
-                      <span className={`badge badge-status badge-${m.status.toLowerCase()}`}>
-                        {STATUS_LABELS[m.status] || m.status}
-                      </span>
-                      {isLate && <span style={{ color: '#ef4444', fontSize: '12px', marginLeft: '6px' }}>⚠ Vencido</span>}
-                    </td>
-                    <td>{new Date(m.scheduledDate).toLocaleDateString('es-CO', { timeZone: 'UTC' })}</td>
-                    <td>
-                      {delayDays === null ? (
-                        <span style={{ color: 'var(--text-muted)' }}>—</span>
-                      ) : delayDays === 0 ? (
-                        <span style={{ color: '#10b981', fontWeight: 600 }}>A tiempo</span>
-                      ) : (
-                        <span style={{ color: m.status === 'COMPLETED' ? '#f59e0b' : '#ef4444', fontWeight: 600 }}>{delayDays} días</span>
-                      )}
-                    </td>
-                    <td>{m.collaboratorInTurnName || <span style={{ color: 'var(--text-muted)' }}>N/A</span>}</td>
-                    <td>
-                      {m.status !== 'COMPLETED' ? (
-                        <span style={{ color: 'var(--text-muted)' }}>N/A</span>
-                      ) : (m.signedAt || m.pdfUrl) ? (
-                        <span style={{ color: '#10b981', fontWeight: 600 }}>Firmada</span>
-                      ) : m.signatureToken ? (
-                        <span style={{ color: '#f59e0b', fontWeight: 600 }}>Pendiente</span>
-                      ) : (
-                        <span style={{ color: '#ef4444', fontWeight: 600 }}>Sin enviar</span>
-                      )}
-                    </td>
-                    <td>
-                      <div style={{ display: 'flex', gap: '6px' }}>
-                        <button className="btn-action" style={{ borderColor: '#8b5cf6', color: '#8b5cf6' }} title="Ver Historial" onClick={() => openModal('view', m)}>
-                          <Clock size={16} />
-                        </button>
-                        {m.status === 'SCHEDULED' && (
-                          <button className="btn-action" style={{ borderColor: '#eab308', color: '#eab308' }} title="Iniciar Mantenimiento" onClick={() => openModal('start', m)}>
-                            <Wrench size={16} />
-                          </button>
-                        )}
-                        {m.status === 'IN_PROGRESS' && (
-                          <button className="btn-action" style={{ borderColor: '#22c55e', color: '#22c55e' }} title="Completar Mantenimiento" onClick={() => openModal('complete', m)}>
-                            <CheckCircle size={16} />
-                          </button>
-                        )}
-                        {m.status === 'COMPLETED' && !m.signedAt && !m.pdfUrl && (
-                          <button 
-                            className="btn-action" 
-                            style={{ borderColor: '#ec4899', color: '#ec4899', opacity: forceSignMutation.isPending ? 0.5 : 1 }} 
-                            title="Firmar forzadamente" 
-                            onClick={() => openModal('forceSign', m)}
-                            disabled={forceSignMutation.isPending}
-                          >
-                            <Edit3 size={16} />
-                          </button>
-                        )}
-                        {m.status === 'COMPLETED' && (
-                          <button 
-                            className="btn-action" 
-                            style={{ borderColor: '#3b82f6', color: '#3b82f6', opacity: requestSignatureMutation.isPending ? 0.5 : 1 }} 
-                            title="Solicitar firma de mantenimiento" 
-                            onClick={() => {
-                              confirm({
-                                title: 'Solicitar Firma',
-                                message: '¿Estás seguro de enviar el correo solicitando la firma de este mantenimiento?',
-                                type: 'info',
-                                onConfirm: () => requestSignatureMutation.mutate(m.id)
-                              });
-                            }}
-                            disabled={requestSignatureMutation.isPending}
-                          >
-                            <Mail size={16} />
-                          </button>
-                        )}
-                      </div>
-                    </td>
+            {/* Table */}
+            <div className="table-responsive">
+              <table className="glass-table">
+                <thead>
+                  <tr>
+                    <th>Equipo (Hostname)</th>
+                    <th>Tipo</th>
+                    <th>Estado</th>
+                    <th>Fecha Prog.</th>
+                    <th>Días de Retraso</th>
+                    <th>Usuario en Turno</th>
+                    <th>Firma</th>
+                    <th>Acciones</th>
                   </tr>
-                );
-              })}
-              {(!filteredData || filteredData.length === 0) && (
-                <tr>
-                  <td colSpan={8} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
-                    No hay registros que coincidan con los filtros aplicados.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                </thead>
+                <tbody>
+                  {filteredData?.map(m => {
+                    const isLate = m.status === 'SCHEDULED' && getTargetMidnight(m.scheduledDate) < nowNorm;
+                    const delayDays = (() => {
+                      if (m.status === 'COMPLETED' && m.executionDate) {
+                        return Math.max(0, Math.floor((getTargetMidnight(m.executionDate) - getTargetMidnight(m.scheduledDate)) / (1000 * 3600 * 24)));
+                      } else if (m.status === 'SCHEDULED' && getTargetMidnight(m.scheduledDate) < nowNorm) {
+                        return Math.floor((nowNorm - getTargetMidnight(m.scheduledDate)) / (1000 * 3600 * 24));
+                      }
+                      return null;
+                    })();
+
+                    return (
+                      <tr key={m.id}>
+                        <td style={{ fontWeight: 600 }}>
+                          {assets?.find(a => a.id === m.assetId)?.dynamicAttributes?.Hostname || m.assetId}
+                        </td>
+                        <td>
+                          <span className="spec-tag" style={{ background: m.type === 'PREVENTIVE' ? 'rgba(59,130,246,0.12)' : 'rgba(239,68,68,0.12)', color: m.type === 'PREVENTIVE' ? '#3b82f6' : '#ef4444' }}>
+                            {m.type === 'PREVENTIVE' ? 'Preventivo' : 'Correctivo'}
+                          </span>
+                        </td>
+                        <td>
+                          <span className={`badge badge-status badge-${m.status.toLowerCase()}`}>
+                            {STATUS_LABELS[m.status] || m.status}
+                          </span>
+                          {isLate && <span style={{ color: '#ef4444', fontSize: '12px', marginLeft: '6px' }}>⚠ Vencido</span>}
+                        </td>
+                        <td>{new Date(m.scheduledDate).toLocaleDateString('es-CO', { timeZone: 'UTC' })}</td>
+                        <td>
+                          {delayDays === null ? (
+                            <span style={{ color: 'var(--text-muted)' }}>—</span>
+                          ) : delayDays === 0 ? (
+                            <span style={{ color: '#10b981', fontWeight: 600 }}>A tiempo</span>
+                          ) : (
+                            <span style={{ color: m.status === 'COMPLETED' ? '#f59e0b' : '#ef4444', fontWeight: 600 }}>{delayDays} días</span>
+                          )}
+                        </td>
+                        <td>{m.collaboratorInTurnName || <span style={{ color: 'var(--text-muted)' }}>N/A</span>}</td>
+                        <td>
+                          {m.status !== 'COMPLETED' ? (
+                            <span style={{ color: 'var(--text-muted)' }}>N/A</span>
+                          ) : (m.signedAt || m.pdfUrl) ? (
+                            <span style={{ color: '#10b981', fontWeight: 600 }}>Firmada</span>
+                          ) : m.signatureToken ? (
+                            <span style={{ color: '#f59e0b', fontWeight: 600 }}>Pendiente</span>
+                          ) : (
+                            <span style={{ color: '#ef4444', fontWeight: 600 }}>Sin enviar</span>
+                          )}
+                        </td>
+                        <td>
+                          <div style={{ display: 'flex', gap: '6px' }}>
+                            <button className="btn-action" style={{ borderColor: '#8b5cf6', color: '#8b5cf6' }} title="Ver Historial" onClick={() => openModal('view', m)}>
+                              <Clock size={16} />
+                            </button>
+                            {m.status === 'SCHEDULED' && (
+                              <button className="btn-action" style={{ borderColor: '#eab308', color: '#eab308' }} title="Iniciar Mantenimiento" onClick={() => openModal('start', m)}>
+                                <Wrench size={16} />
+                              </button>
+                            )}
+                            {m.status === 'IN_PROGRESS' && (
+                              <button className="btn-action" style={{ borderColor: '#22c55e', color: '#22c55e' }} title="Completar Mantenimiento" onClick={() => openModal('complete', m)}>
+                                <CheckCircle size={16} />
+                              </button>
+                            )}
+                            {m.status === 'COMPLETED' && !m.signedAt && !m.pdfUrl && (
+                              <button 
+                                className="btn-action" 
+                                style={{ borderColor: '#ec4899', color: '#ec4899', opacity: forceSignMutation.isPending ? 0.5 : 1 }} 
+                                title="Firmar forzadamente" 
+                                onClick={() => openModal('forceSign', m)}
+                                disabled={forceSignMutation.isPending}
+                              >
+                                <Edit3 size={16} />
+                              </button>
+                            )}
+                            {m.status === 'COMPLETED' && (
+                              <button 
+                                className="btn-action" 
+                                style={{ borderColor: '#3b82f6', color: '#3b82f6', opacity: requestSignatureMutation.isPending ? 0.5 : 1 }} 
+                                title="Solicitar firma de mantenimiento" 
+                                onClick={() => {
+                                  confirm({
+                                    title: 'Solicitar Firma',
+                                    message: '¿Estás seguro de enviar el correo solicitando la firma de este mantenimiento?',
+                                    type: 'info',
+                                    onConfirm: () => requestSignatureMutation.mutate(m.id)
+                                  });
+                                }}
+                                disabled={requestSignatureMutation.isPending}
+                              >
+                                <Mail size={16} />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {(!filteredData || filteredData.length === 0) && (
+                    <tr>
+                      <td colSpan={8} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+                        No hay registros que coincidan con los filtros aplicados.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
+
+        {/* Right Column: Charts Sidebar */}
+        <div className="charts-sidebar">
+          {/* Donut */}
+          <div className="dash-card">
+            <h3 className="dash-card-title">Preventivo vs Correctivo</h3>
+            <ResponsiveContainer width="100%" height={220}>
+              <PieChart>
+                <Pie data={typeData} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={4} dataKey="value" nameKey="name" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
+                  {typeData.map((_, i) => <Cell key={i} fill={COLORS_TYPE[i]} />)}
+                </Pie>
+                <Tooltip formatter={(v: any, n: string) => [v, n]} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Bar */}
+          <div className="dash-card">
+            <h3 className="dash-card-title">Por Estado</h3>
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={statusData} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
+                <XAxis dataKey="status" stroke="var(--text-muted)" fontSize={12} />
+                <YAxis allowDecimals={false} stroke="var(--text-muted)" fontSize={12} />
+                <Tooltip cursor={{ fill: 'rgba(59,130,246,0.05)' }} />
+                <Bar dataKey="count" fill="#3b82f6" radius={[6, 6, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Line — Tendencia Mensual */}
+          <div className="dash-card">
+            <h3 className="dash-card-title">Tendencia (últimos 6 m)</h3>
+            <ResponsiveContainer width="100%" height={180}>
+              <LineChart data={monthlyData} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
+                <XAxis dataKey="month" stroke="var(--text-muted)" fontSize={12} />
+                <YAxis allowDecimals={false} stroke="var(--text-muted)" fontSize={12} />
+                <Tooltip />
+                <Legend iconType="circle" iconSize={10} />
+                <Line type="monotone" dataKey="Preventivo" stroke="#14b8a6" strokeWidth={2} dot={{ fill: '#14b8a6', r: 4 }} activeDot={{ r: 6 }} />
+                <Line type="monotone" dataKey="Correctivo" stroke="#a855f7" strokeWidth={2} dot={{ r: 4 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
       </div>
 
       {/* ── Modal ───────────────────────────────────────────────────────────── */}
