@@ -55,7 +55,8 @@ const serializeRecord = (record: any) => {
 router.post('/', async (req, res) => {
     try {
         const { assetId, type, scheduledDate, reason } = req.body;
-        const result = await useCases.createManualMaintenance({ assetId, type, scheduledDate: new Date(scheduledDate), reason });
+        const parsedDate = new Date(scheduledDate.includes('T') ? scheduledDate : `${scheduledDate}T12:00:00Z`);
+        const result = await useCases.createManualMaintenance({ assetId, type, scheduledDate: parsedDate, reason });
         res.status(201).json(serializeRecord(result));
     } catch (error: any) {
         res.status(400).json({ error: error.message });

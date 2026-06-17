@@ -1,0 +1,31 @@
+Nombre,Correo,Departamento,Ubicación,Centro de Costos,Fecha de Alta,Es Líder
+Juan Perez,juan.perez@ikusi.com,IT,Medellín,100,2023-01-10,true
+Maria Torres,maria.torres@ikusi.com,Recursos Humanos,Bogotá,101,2023-02-10,false
+Carlos Gomez,carlos.gomez@ikusi.com,Ventas,Cali,102,2023-03-10,false
+Ana Ruiz,ana.ruiz@ikusi.com,Operaciones,Medellín,103,2023-04-10,false
+Luis Fernandez,luis.fernandez@ikusi.com,IT,Bogotá,104,2023-05-10,false
+Laura Sanchez,laura.sanchez@ikusi.com,Recursos Humanos,Cali,100,2023-06-10,false
+Jorge Ramirez,jorge.ramirez@ikusi.com,Ventas,Medellín,101,2023-07-10,false
+Elena Castro,elena.castro@ikusi.com,Operaciones,Bogotá,102,2023-08-10,false
+Pedro Diaz,pedro.diaz@ikusi.com,IT,Cali,103,2023-09-10,false
+Marta Vargas,marta.vargas@ikusi.com,Recursos Humanos,Medellín,104,2023-10-10,false
+Diego Morales,diego.morales@ikusi.com,Ventas,Bogotá,100,2023-11-10,true
+Sofia Ortiz,sofia.ortiz@ikusi.com,Operaciones,Cali,101,2023-12-10,false
+Andres Silva,andres.silva@ikusi.com,IT,Medellín,102,2023-01-10,false
+Camila Rios,camila.rios@ikusi.com,Recursos Humanos,Bogotá,103,2023-02-10,false
+Javier Peña,javier.peña@ikusi.com,Ventas,Cali,104,2023-03-10,false
+Natalia Cruz,natalia.cruz@ikusi.com,Operaciones,Medellín,100,2023-04-10,false
+Gabriel Herrera,gabriel.herrera@ikusi.com,IT,Bogotá,101,2023-05-10,false
+Valeria Medina,valeria.medina@ikusi.com,Recursos Humanos,Cali,102,2023-06-10,false
+Ricardo Rojas,ricardo.rojas@ikusi.com,Ventas,Medellín,103,2023-07-10,false
+Paula Mendez,paula.mendez@ikusi.com,Operaciones,Bogotá,104,2023-08-10,false
+Fernando Vega,fernando.vega@ikusi.com,IT,Cali,100,2023-09-10,true
+Daniela Blanco,daniela.blanco@ikusi.com,Recursos Humanos,Medellín,101,2023-10-10,false
+Victor Suarez,victor.suarez@ikusi.com,Ventas,Bogotá,102,2023-11-10,false
+Isabella Navarro,isabella.navarro@ikusi.com,Operaciones,Cali,103,2023-12-10,false
+Oscar Molina,oscar.molina@ikusi.com,IT,Medellín,104,2023-01-10,false
+Juliana Gil,juliana.gil@ikusi.com,Recursos Humanos,Bogotá,100,2023-02-10,false
+Hugo Santos,hugo.santos@ikusi.com,Ventas,Cali,101,2023-03-10,false
+Andrea Delgado,andrea.delgado@ikusi.com,Operaciones,Medellín,102,2023-04-10,false
+Felipe Romero,felipe.romero@ikusi.com,IT,Bogotá,103,2023-05-10,false
+Diana Acosta,diana.acosta@ikusi.com,Recursos Humanos,Cali,104,2023-06-10,false

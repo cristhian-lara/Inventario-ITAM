@@ -19,7 +19,8 @@ export class MaintenanceUseCases {
         const activeMaintenance = existingMaintenances.find(m => (m.status === 'SCHEDULED' || m.status === 'IN_PROGRESS') && m.type === dto.type);
         
         if (activeMaintenance) {
-            const dateStr = activeMaintenance.scheduledDate.toISOString().split('T')[0];
+            const d = new Date(activeMaintenance.scheduledDate);
+            const dateStr = d.toISOString().split('T')[0];
             const typeStr = activeMaintenance.type === 'PREVENTIVE' ? 'Preventivo' : 'Correctivo';
             throw new Error(`El equipo ya cuenta con un mantenimiento programado (${typeStr}) para la fecha ${dateStr}.`);
         }

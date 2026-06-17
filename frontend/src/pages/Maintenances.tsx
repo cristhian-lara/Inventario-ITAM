@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Settings, Wrench, CheckCircle, AlertTriangle, Calendar, Plus, Clock, X, Mail, Edit3 } from 'lucide-react';
+import { Settings, Wrench, CheckCircle, AlertTriangle, Calendar, Plus, Clock, X, Mail, Edit3, Search, Server } from 'lucide-react';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, Legend } from 'recharts';
 import { useConfirm } from '../context/ConfirmContext';
 import './Maintenances.css';
@@ -39,6 +39,7 @@ const Maintenances: React.FC = () => {
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterYear, setFilterYear] = useState('all');
   const [filterMonth, setFilterMonth] = useState('all');
+  const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<'general' | 'auditoria' | 'balance'>('general');
   const { confirm } = useConfirm();
 
@@ -169,8 +170,8 @@ const Maintenances: React.FC = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['maintenances'] });
-      setSuccessMsg('Firma solicitada correctamente');
-      setTimeout(() => setSuccessMsg(''), 3000);
+      setSuccessMsg('Firma solicitada correctamente. Se ha enviado un correo al colaborador con el enlace mágico.');
+      setTimeout(() => setSuccessMsg(''), 4000);
     },
     onError: (error: Error) => { alert(error.message); }
   });
@@ -261,6 +262,17 @@ const Maintenances: React.FC = () => {
   };
 
   const filteredData = maintenances?.filter(m => {
+    // 1. Term search
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      const asset = assets?.find(a => a.id === m.assetId);
+      const matchesAsset = m.assetId.toLowerCase().includes(term);
+      const matchesCollab = m.collaboratorInTurnName?.toLowerCase().includes(term);
+      const matchesHostname = (asset?.dynamicAttributes?.Hostname || '').toLowerCase().includes(term);
+      if (!matchesAsset && !matchesCollab && !matchesHostname) return false;
+    }
+
+    // 2. View modes
     if (viewMode === 'auditoria') {
       if (!(m.status === 'SCHEDULED' && new Date(m.scheduledDate) < now)) return false;
     } else if (viewMode === 'balance') {
@@ -268,6 +280,8 @@ const Maintenances: React.FC = () => {
     } else if (viewMode === 'preventive') {
       if (m.type !== 'PREVENTIVE') return false;
     }
+
+    // 3. Types and Statuses
     if (filterType !== 'all' && m.type !== filterType) return false;
     if (filterStatus !== 'all' && m.status !== filterStatus) return false;
     
@@ -321,11 +335,32 @@ const Maintenances: React.FC = () => {
     confirm({ title, message, type: 'info', onConfirm: submitAction });
   };
 
+  // Global coverage metrics
+  const totalAssetsCount = assets?.length || 0;
+  let assetsWithCompletedCount = 0;
+  let scheduledWithoutCompletedCount = 0;
+  let pendingSchedulingCount = 0;
+
+  assets?.forEach(asset => {
+    const assetMaintenances = maintenances?.filter(m => m.assetId === asset.id) || [];
+    const hasCompleted = assetMaintenances.some(m => m.status === 'COMPLETED');
+    const hasScheduled = assetMaintenances.some(m => m.status === 'SCHEDULED' || m.status === 'IN_PROGRESS');
+    
+    if (hasCompleted) {
+      assetsWithCompletedCount++;
+    } else if (hasScheduled) {
+      scheduledWithoutCompletedCount++;
+    } else {
+      pendingSchedulingCount++;
+    }
+  });
+
   const openModal = (mode: 'create' | 'start' | 'complete' | 'view' | 'forceSign', record?: MaintenanceRecord) => {
     setModalMode(mode); setSelectedRecord(record || null);
     setErrorMsg('');
     if (mode === 'create') {
       setFormData({ assetId: '', type: 'PREVENTIVE', scheduledDate: new Date().toISOString().split('T')[0], reason: '', notes: '', executionDate: new Date().toISOString().split('T')[0] });
+      setAssetSearchTerm('');
     } else if (mode === 'forceSign') {
       setFormData({ ...formData, reason: '' });
     } else if (record) {
@@ -350,13 +385,58 @@ const Maintenances: React.FC = () => {
       </header>
 
       {successMsg && (
-        <div style={{ background: 'rgba(16, 185, 129, 0.15)', border: '1px solid rgba(16, 185, 129, 0.3)', padding: '15px 20px', borderRadius: '8px', color: '#10b981', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <CheckCircle size={20} />
-          {successMsg}
+        <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, backdropFilter: 'blur(6px)' }}>
+          <div className="glass-panel slide-up" style={{ padding: '40px', maxWidth: '420px', width: '100%', textAlign: 'center', background: '#0f172a', border: '1px solid #10b981', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.3)' }}>
+            <CheckCircle size={60} color="#10b981" style={{ marginBottom: '20px' }} />
+            <h2 style={{ color: '#f8fafc', marginBottom: '15px', fontSize: '24px', fontWeight: 'bold' }}>¡Éxito!</h2>
+            <p style={{ color: '#e2e8f0', fontSize: '16px', lineHeight: '1.6', margin: 0 }}>{successMsg}</p>
+          </div>
         </div>
       )}
 
-      {/* ── KPI Cards ───────────────────────────────────────────────────────── */}
+      {/* ── Global Coverage KPIs ────────────────────────────────────────────── */}
+      <div style={{ marginBottom: '20px' }}>
+        <h3 style={{ color: 'var(--text-main)', marginBottom: '15px', fontSize: '18px', fontWeight: 600 }}>Cobertura Global del Inventario</h3>
+        <div className="maint-kpi-row">
+          <div className="maint-kpi-card" style={{ flex: '1 1 200px', cursor: 'default' }}>
+            <div className="kpi-icon" style={{ background: 'rgba(71,85,105,0.12)', color: '#475569' }}><Server size={22} /></div>
+            <div className="kpi-body">
+              <span className="kpi-label">Equipos en Inventario</span>
+              <span className="kpi-value" style={{ color: '#475569' }}>{totalAssetsCount}</span>
+              <span className="kpi-sub">Total de activos</span>
+            </div>
+          </div>
+
+          <div className="maint-kpi-card kpi-green" style={{ flex: '1 1 200px', cursor: 'default' }}>
+            <div className="kpi-icon" style={{ background: 'rgba(34,197,94,0.12)', color: '#22c55e' }}><CheckCircle size={22} /></div>
+            <div className="kpi-body">
+              <span className="kpi-label">Con Mantenimiento</span>
+              <span className="kpi-value" style={{ color: '#22c55e' }}>{assetsWithCompletedCount}</span>
+              <span className="kpi-sub">Realizado ({(assetsWithCompletedCount / (totalAssetsCount || 1) * 100).toFixed(1)}%)</span>
+            </div>
+          </div>
+
+          <div className="maint-kpi-card kpi-blue" style={{ flex: '1 1 200px', cursor: 'default' }}>
+            <div className="kpi-icon" style={{ background: 'rgba(59,130,246,0.12)', color: '#3b82f6' }}><Calendar size={22} /></div>
+            <div className="kpi-body">
+              <span className="kpi-label">Ya Programados</span>
+              <span className="kpi-value" style={{ color: '#3b82f6' }}>{scheduledWithoutCompletedCount}</span>
+              <span className="kpi-sub">Les falta, pero en agenda</span>
+            </div>
+          </div>
+
+          <div className="maint-kpi-card kpi-red" style={{ flex: '1 1 200px', cursor: 'default' }}>
+            <div className="kpi-icon" style={{ background: 'rgba(239,68,68,0.12)', color: '#ef4444' }}><AlertTriangle size={22} /></div>
+            <div className="kpi-body">
+              <span className="kpi-label">Pendientes de Programar</span>
+              <span className="kpi-value" style={{ color: '#ef4444' }}>{pendingSchedulingCount}</span>
+              <span className="kpi-sub" style={{ fontWeight: 600 }}>Requieren atención</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Date-Filtered KPI Cards ─────────────────────────────────────────── */}
       <div className="maint-kpi-row">
         <div className="maint-kpi-card" style={{ cursor: 'default' }}>
           <div className="kpi-icon" style={{ background: 'rgba(71,85,105,0.12)', color: '#475569' }}><Calendar size={22} /></div>
@@ -470,43 +550,43 @@ const Maintenances: React.FC = () => {
       <div className="dash-card">
 
         {/* Filter bar */}
-        <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
-          <select className="glass-input" value={filterType} onChange={e => setFilterType(e.target.value)} style={{ width: '170px' }}>
-            <option value="all">Todos los Tipos</option>
-            <option value="PREVENTIVE">Preventivo</option>
-            <option value="CORRECTIVE">Correctivo</option>
-          </select>
-          <select className="glass-input" value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={{ width: '170px' }}>
-            <option value="all">Todos los Estados</option>
-            <option value="SCHEDULED">Programado</option>
-            <option value="IN_PROGRESS">En Progreso</option>
-            <option value="COMPLETED">Completado</option>
-            <option value="CANCELLED">Cancelado</option>
-          </select>
-          <select className="glass-input" value={viewMode} onChange={e => setViewMode(e.target.value as any)} style={{ width: '230px', borderColor: '#3b82f6' }}>
-            <option value="general">📄 Vista General</option>
-            <option value="auditoria">🚨 Auditoría de Vencidos</option>
-            <option value="balance">⚙️ Análisis de Correctivos</option>
-          </select>
-          <select className="glass-input" value={filterYear} onChange={e => setFilterYear(e.target.value)} style={{ width: '130px' }}>
-            <option value="all">Todos (Años)</option>
-            {availableYears.map(y => <option key={y} value={y.toString()}>{y}</option>)}
-          </select>
-          <select className="glass-input" value={filterMonth} onChange={e => setFilterMonth(e.target.value)} style={{ width: '150px' }}>
-            <option value="all">Todos (Meses)</option>
-            <option value="1">Enero</option>
-            <option value="2">Febrero</option>
-            <option value="3">Marzo</option>
-            <option value="4">Abril</option>
-            <option value="5">Mayo</option>
-            <option value="6">Junio</option>
-            <option value="7">Julio</option>
-            <option value="8">Agosto</option>
-            <option value="9">Septiembre</option>
-            <option value="10">Octubre</option>
-            <option value="11">Noviembre</option>
-            <option value="12">Diciembre</option>
-          </select>
+        <div style={{ display: 'flex', gap: '16px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '15px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+          <div style={{ position: 'relative', flex: '1 1 300px' }}>
+            <Search size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+            <input 
+              type="text" 
+              className="glass-input" 
+              placeholder="Buscar por placa, hostname o colaborador..." 
+              value={searchTerm} 
+              onChange={e => setSearchTerm(e.target.value)}
+              style={{ width: '100%', paddingLeft: '40px' }}
+            />
+          </div>
+
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+            <span style={{ color: 'var(--text-muted)', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Calendar size={16} /> Período:
+            </span>
+            <select className="glass-input" value={filterMonth} onChange={e => setFilterMonth(e.target.value)} style={{ width: '150px' }}>
+              <option value="all">Cualquier Mes</option>
+              <option value="1">Enero</option>
+              <option value="2">Febrero</option>
+              <option value="3">Marzo</option>
+              <option value="4">Abril</option>
+              <option value="5">Mayo</option>
+              <option value="6">Junio</option>
+              <option value="7">Julio</option>
+              <option value="8">Agosto</option>
+              <option value="9">Septiembre</option>
+              <option value="10">Octubre</option>
+              <option value="11">Noviembre</option>
+              <option value="12">Diciembre</option>
+            </select>
+            <select className="glass-input" value={filterYear} onChange={e => setFilterYear(e.target.value)} style={{ width: '130px' }}>
+              <option value="all">Cualquier Año</option>
+              {availableYears.map(y => <option key={y} value={y.toString()}>{y}</option>)}
+            </select>
+          </div>
 
           {/* Active filter pills */}
           {(filterType !== 'all' || filterStatus !== 'all' || viewMode !== 'general' || filterYear !== 'all' || filterMonth !== 'all') && (
@@ -552,6 +632,7 @@ const Maintenances: React.FC = () => {
                   setFilterYear('all');
                   setFilterMonth('all');
                   setViewMode('general');
+                  setSearchTerm('');
                 }}
                 style={{ 
                   background: 'none', 
@@ -575,7 +656,7 @@ const Maintenances: React.FC = () => {
           <table className="glass-table">
             <thead>
               <tr>
-                <th>Activo (Placa)</th>
+                <th>Equipo (Hostname)</th>
                 <th>Tipo</th>
                 <th>Estado</th>
                 <th>Fecha Prog.</th>
@@ -599,7 +680,9 @@ const Maintenances: React.FC = () => {
 
                 return (
                   <tr key={m.id}>
-                    <td className="fw-600">{m.assetId}</td>
+                    <td style={{ fontWeight: 600 }}>
+                      {assets?.find(a => a.id === m.assetId)?.dynamicAttributes?.Hostname || m.assetId}
+                    </td>
                     <td>
                       <span className="spec-tag" style={{ background: m.type === 'PREVENTIVE' ? 'rgba(59,130,246,0.12)' : 'rgba(239,68,68,0.12)', color: m.type === 'PREVENTIVE' ? '#3b82f6' : '#ef4444' }}>
                         {m.type === 'PREVENTIVE' ? 'Preventivo' : 'Correctivo'}
@@ -611,7 +694,7 @@ const Maintenances: React.FC = () => {
                       </span>
                       {isLate && <span style={{ color: '#ef4444', fontSize: '12px', marginLeft: '6px' }}>⚠ Vencido</span>}
                     </td>
-                    <td>{new Date(m.scheduledDate).toLocaleDateString('es-CO')}</td>
+                    <td>{new Date(m.scheduledDate).toLocaleDateString('es-CO', { timeZone: 'UTC' })}</td>
                     <td>
                       {delayDays === null ? (
                         <span style={{ color: 'var(--text-muted)' }}>—</span>
@@ -849,7 +932,7 @@ const Maintenances: React.FC = () => {
                     <div className="history-dot" style={{ background: '#3b82f6' }}></div>
                     <div className="history-content">
                       <h4><Calendar size={16} color="#3b82f6" /> Programación</h4>
-                      <p><strong>Fecha:</strong> {new Date(selectedRecord.scheduledDate).toLocaleDateString('es-CO')}</p>
+                      <p><strong>Fecha:</strong> {new Date(selectedRecord.scheduledDate).toLocaleDateString('es-CO', { timeZone: 'UTC' })}</p>
                       {selectedRecord.reason && <p><strong>Motivo / Problema:</strong> {selectedRecord.reason}</p>}
                     </div>
                   </div>
@@ -869,7 +952,7 @@ const Maintenances: React.FC = () => {
                       <div className="history-dot" style={{ background: '#10b981' }}></div>
                       <div className="history-content">
                         <h4><CheckCircle size={16} color="#10b981" /> Completado</h4>
-                        {selectedRecord.executionDate && <p><strong>Fecha Ejecución:</strong> {new Date(selectedRecord.executionDate).toLocaleDateString('es-CO')}</p>}
+                        {selectedRecord.executionDate && <p><strong>Fecha Ejecución:</strong> {new Date(selectedRecord.executionDate).toLocaleDateString('es-CO', { timeZone: 'UTC' })}</p>}
                         {selectedRecord.notes && <p><strong>Notas de Resolución:</strong> {selectedRecord.notes}</p>}
                       </div>
                     </div>
