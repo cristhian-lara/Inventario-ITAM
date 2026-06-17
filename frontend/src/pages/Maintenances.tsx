@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Settings, Wrench, CheckCircle, AlertTriangle, Calendar, Plus, Clock, X } from 'lucide-react';
+import { Settings, Wrench, CheckCircle, AlertTriangle, Calendar, Plus, Clock, X, Mail, Edit3 } from 'lucide-react';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, Legend } from 'recharts';
 import { useConfirm } from '../context/ConfirmContext';
 import './Maintenances.css';
@@ -17,6 +17,9 @@ interface MaintenanceRecord {
   notes?: string;
   collaboratorInTurnId?: string;
   collaboratorInTurnName?: string;
+  signedAt?: string;
+  signatureToken?: string;
+  pdfUrl?: string;
 }
 
 const TYPE_LABELS: Record<string, string> = {
@@ -40,8 +43,10 @@ const Maintenances: React.FC = () => {
   const { confirm } = useConfirm();
 
   const [showModal, setShowModal] = useState(false);
-  const [modalMode, setModalMode] = useState<'create' | 'start' | 'complete'>('create');
+  const [modalMode, setModalMode] = useState<'create' | 'start' | 'complete' | 'view' | 'forceSign'>('create');
   const [selectedRecord, setSelectedRecord] = useState<MaintenanceRecord | null>(null);
+  const [successMsg, setSuccessMsg] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
 
   const [formData, setFormData] = useState({
     assetId: '',
@@ -111,10 +116,14 @@ const Maintenances: React.FC = () => {
       const res = await fetch(`${API_URL}/api/maintenances`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data)
       });
-      if (!res.ok) throw new Error('Error al programar mantenimiento');
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || errData.message || 'Error al programar mantenimiento');
+      }
       return res.json();
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['maintenances'] }); setShowModal(false); }
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['maintenances'] }); setShowModal(false); },
+    onError: (error: Error) => { setErrorMsg(error.message); }
   });
 
   const startMutation = useMutation({
@@ -122,11 +131,14 @@ const Maintenances: React.FC = () => {
       const res = await fetch(`${API_URL}/api/maintenances/${data.id}/start`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason: data.reason })
       });
-      if (!res.ok) throw new Error('Error al iniciar');
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || errData.message || 'Error al iniciar');
+      }
       return res.json();
     },
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['maintenances'] }); setShowModal(false); },
-    onError: (error: Error) => { alert(error.message); }
+    onError: (error: Error) => { setErrorMsg(error.message); }
   });
 
   const completeMutation = useMutation({
@@ -134,28 +146,82 @@ const Maintenances: React.FC = () => {
       const res = await fetch(`${API_URL}/api/maintenances/${data.id}/complete`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ notes: data.notes })
       });
-      if (!res.ok) throw new Error('Error al completar');
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || errData.message || 'Error al completar');
+      }
       return res.json();
     },
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['maintenances'] }); setShowModal(false); },
+    onError: (error: Error) => { setErrorMsg(error.message); }
+  });
+
+  const requestSignatureMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`${API_URL}/api/maintenances/${id}/request-signature`, {
+        method: 'POST'
+      });
+      if (!res.ok) {
+        const error = await res.json().catch(()=>({}));
+        throw new Error(error.error || 'Error al solicitar firma');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['maintenances'] });
+      setSuccessMsg('Firma solicitada correctamente');
+      setTimeout(() => setSuccessMsg(''), 3000);
+    },
     onError: (error: Error) => { alert(error.message); }
+  });
+
+  const forceSignMutation = useMutation({
+    mutationFn: async (data: { id: string, reason: string }) => {
+      const res = await fetch(`${API_URL}/api/maintenances/${data.id}/force-sign`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: data.reason })
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || errData.message || 'Error al forzar firma');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['maintenances'] });
+      setShowModal(false);
+      setSuccessMsg('Mantenimiento firmado forzadamente con éxito');
+      setTimeout(() => setSuccessMsg(''), 3000);
+    },
+    onError: (error: Error) => { setErrorMsg(error.message); }
   });
 
   if (isLoading) return <div style={{ padding: '40px', color: 'var(--text-main)' }}>Cargando módulo de mantenimientos...</div>;
 
   const now = new Date();
 
+  const timeFilteredMaintenances = maintenances?.filter(m => {
+    if (filterYear !== 'all' || filterMonth !== 'all') {
+      const date = new Date(m.scheduledDate);
+      if (filterYear !== 'all' && date.getFullYear().toString() !== filterYear) return false;
+      if (filterMonth !== 'all' && (date.getMonth() + 1).toString() !== filterMonth) return false;
+    }
+    return true;
+  });
+
   // ── KPIs ──────────────────────────────────────────────────────────────────
-  const totalScheduled = maintenances?.filter(m => m.status === 'SCHEDULED').length || 0;
-  const totalInProgress = maintenances?.filter(m => m.status === 'IN_PROGRESS').length || 0;
-  const totalCompleted = maintenances?.filter(m => m.status === 'COMPLETED').length || 0;
-  const overdue = maintenances?.filter(m => m.status === 'SCHEDULED' && new Date(m.scheduledDate) < now).length || 0;
-  const preventiveCount = maintenances?.filter(m => m.type === 'PREVENTIVE').length || 0;
-  const correctiveCount = maintenances?.filter(m => m.type === 'CORRECTIVE').length || 0;
-  const correctiveRatio = maintenances && maintenances.length > 0
-    ? Math.round((correctiveCount / maintenances.length) * 100) : 0;
-  const preventiveRatio = maintenances && maintenances.length > 0
-    ? Math.round((preventiveCount / maintenances.length) * 100) : 0;
+  const totalCount = timeFilteredMaintenances?.length || 0;
+  const totalScheduled = timeFilteredMaintenances?.filter(m => m.status === 'SCHEDULED').length || 0;
+  const totalInProgress = timeFilteredMaintenances?.filter(m => m.status === 'IN_PROGRESS').length || 0;
+  const totalCompleted = timeFilteredMaintenances?.filter(m => m.status === 'COMPLETED').length || 0;
+  const overdue = timeFilteredMaintenances?.filter(m => m.status === 'SCHEDULED' && new Date(m.scheduledDate) < now).length || 0;
+  const preventiveCount = timeFilteredMaintenances?.filter(m => m.type === 'PREVENTIVE').length || 0;
+  const correctiveCount = timeFilteredMaintenances?.filter(m => m.type === 'CORRECTIVE').length || 0;
+  const correctiveRatio = timeFilteredMaintenances && timeFilteredMaintenances.length > 0
+    ? Math.round((correctiveCount / timeFilteredMaintenances.length) * 100) : 0;
+  const preventiveRatio = timeFilteredMaintenances && timeFilteredMaintenances.length > 0
+    ? Math.round((preventiveCount / timeFilteredMaintenances.length) * 100) : 0;
 
   // ── Charts data ────────────────────────────────────────────────────────────
   const typeData = [
@@ -170,7 +236,6 @@ const Maintenances: React.FC = () => {
     { status: 'Completado', count: totalCompleted }
   ];
 
-  // Monthly trend — last 6 months
   const monthlyData = Array.from({ length: 6 }, (_, i) => {
     const d = new Date();
     d.setDate(1);
@@ -249,17 +314,23 @@ const Maintenances: React.FC = () => {
     } else if (modalMode === 'complete' && selectedRecord) {
       title = 'Completar Mantenimiento'; message = '¿Estás seguro de dar por completado este mantenimiento?';
       submitAction = () => completeMutation.mutate({ id: selectedRecord.id, notes: formData.notes });
+    } else if (modalMode === 'forceSign' && selectedRecord) {
+      title = 'Forzar Firma de Mantenimiento'; message = '¿Estás seguro de forzar la firma de este mantenimiento?';
+      submitAction = () => forceSignMutation.mutate({ id: selectedRecord.id, reason: formData.reason });
     } else return;
     confirm({ title, message, type: 'info', onConfirm: submitAction });
   };
 
-  const openModal = (mode: 'create' | 'start' | 'complete', record?: MaintenanceRecord) => {
+  const openModal = (mode: 'create' | 'start' | 'complete' | 'view' | 'forceSign', record?: MaintenanceRecord) => {
     setModalMode(mode); setSelectedRecord(record || null);
+    setErrorMsg('');
     if (mode === 'create') {
       setFormData({ assetId: '', type: 'PREVENTIVE', scheduledDate: new Date().toISOString().split('T')[0], reason: '', notes: '', executionDate: new Date().toISOString().split('T')[0] });
-      setAssetSearchTerm('');
+    } else if (mode === 'forceSign') {
+      setFormData({ ...formData, reason: '' });
+    } else if (record) {
+      setFormData({ ...formData, reason: record.reason || '', notes: record.notes || '' });
     }
-    else if (record) setFormData({ ...formData, reason: record.reason || '', notes: record.notes || '' });
     setShowModal(true);
   };
 
@@ -272,14 +343,30 @@ const Maintenances: React.FC = () => {
           <h1 className="title-glow">Dashboard de Mantenimientos</h1>
           <p style={{ color: 'var(--text-muted)', margin: 0, fontSize: '14px' }}>Gestión y auditoría del ciclo de vida de los equipos</p>
         </div>
-        <div style={{ display: 'flex', gap: '10px' }}>
+        <div className="header-actions" style={{ display: 'flex', gap: '10px' }}>
           <button className="btn-glass" onClick={exportToCSV}>Exportar CSV</button>
           <button className="btn-primary" onClick={() => openModal('create')}><Plus size={18} /> Programar</button>
         </div>
       </header>
 
+      {successMsg && (
+        <div style={{ background: 'rgba(16, 185, 129, 0.15)', border: '1px solid rgba(16, 185, 129, 0.3)', padding: '15px 20px', borderRadius: '8px', color: '#10b981', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <CheckCircle size={20} />
+          {successMsg}
+        </div>
+      )}
+
       {/* ── KPI Cards ───────────────────────────────────────────────────────── */}
       <div className="maint-kpi-row">
+        <div className="maint-kpi-card" style={{ cursor: 'default' }}>
+          <div className="kpi-icon" style={{ background: 'rgba(71,85,105,0.12)', color: '#475569' }}><Calendar size={22} /></div>
+          <div className="kpi-body">
+            <span className="kpi-label">Total Mantenimientos</span>
+            <span className="kpi-value" style={{ color: '#475569' }}>{totalCount}</span>
+            <span className="kpi-sub">según fecha</span>
+          </div>
+        </div>
+
         <div className="maint-kpi-card kpi-blue" style={{ cursor: 'pointer', outline: filterStatus === 'SCHEDULED' ? '2px solid #3b82f6' : 'none' }} onClick={() => handleCardClick('SCHEDULED')}>
           <div className="kpi-icon" style={{ background: 'rgba(59,130,246,0.12)', color: '#3b82f6' }}><Calendar size={22} /></div>
           <div className="kpi-body">
@@ -494,6 +581,7 @@ const Maintenances: React.FC = () => {
                 <th>Fecha Prog.</th>
                 <th>Días de Retraso</th>
                 <th>Usuario en Turno</th>
+                <th>Firma</th>
                 <th>Acciones</th>
               </tr>
             </thead>
@@ -535,7 +623,21 @@ const Maintenances: React.FC = () => {
                     </td>
                     <td>{m.collaboratorInTurnName || <span style={{ color: 'var(--text-muted)' }}>N/A</span>}</td>
                     <td>
+                      {m.status !== 'COMPLETED' ? (
+                        <span style={{ color: 'var(--text-muted)' }}>N/A</span>
+                      ) : (m.signedAt || m.pdfUrl) ? (
+                        <span style={{ color: '#10b981', fontWeight: 600 }}>Firmada</span>
+                      ) : m.signatureToken ? (
+                        <span style={{ color: '#f59e0b', fontWeight: 600 }}>Pendiente</span>
+                      ) : (
+                        <span style={{ color: '#ef4444', fontWeight: 600 }}>Sin enviar</span>
+                      )}
+                    </td>
+                    <td>
                       <div style={{ display: 'flex', gap: '6px' }}>
+                        <button className="btn-action" style={{ borderColor: '#8b5cf6', color: '#8b5cf6' }} title="Ver Historial" onClick={() => openModal('view', m)}>
+                          <Clock size={16} />
+                        </button>
                         {m.status === 'SCHEDULED' && (
                           <button className="btn-action" style={{ borderColor: '#eab308', color: '#eab308' }} title="Iniciar Mantenimiento" onClick={() => openModal('start', m)}>
                             <Wrench size={16} />
@@ -546,6 +648,35 @@ const Maintenances: React.FC = () => {
                             <CheckCircle size={16} />
                           </button>
                         )}
+                        {m.status === 'COMPLETED' && !m.signedAt && !m.pdfUrl && (
+                          <button 
+                            className="btn-action" 
+                            style={{ borderColor: '#ec4899', color: '#ec4899', opacity: forceSignMutation.isPending ? 0.5 : 1 }} 
+                            title="Firmar forzadamente" 
+                            onClick={() => openModal('forceSign', m)}
+                            disabled={forceSignMutation.isPending}
+                          >
+                            <Edit3 size={16} />
+                          </button>
+                        )}
+                        {m.status === 'COMPLETED' && (
+                          <button 
+                            className="btn-action" 
+                            style={{ borderColor: '#3b82f6', color: '#3b82f6', opacity: requestSignatureMutation.isPending ? 0.5 : 1 }} 
+                            title="Solicitar firma de mantenimiento" 
+                            onClick={() => {
+                              confirm({
+                                title: 'Solicitar Firma',
+                                message: '¿Estás seguro de enviar el correo solicitando la firma de este mantenimiento?',
+                                type: 'info',
+                                onConfirm: () => requestSignatureMutation.mutate(m.id)
+                              });
+                            }}
+                            disabled={requestSignatureMutation.isPending}
+                          >
+                            <Mail size={16} />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -553,7 +684,7 @@ const Maintenances: React.FC = () => {
               })}
               {(!filteredData || filteredData.length === 0) && (
                 <tr>
-                  <td colSpan={7} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+                  <td colSpan={8} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
                     No hay registros que coincidan con los filtros aplicados.
                   </td>
                 </tr>
@@ -568,8 +699,13 @@ const Maintenances: React.FC = () => {
         <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(4px)' }}>
           <div className="glass-panel" style={{ padding: '30px', maxWidth: '500px', width: '100%' }}>
             <h3 style={{ marginBottom: '20px', color: 'white' }}>
-              {modalMode === 'create' ? 'Programar Mantenimiento' : modalMode === 'start' ? 'Iniciar Mantenimiento' : 'Completar Mantenimiento'}
+              {modalMode === 'create' ? 'Programar Mantenimiento' : modalMode === 'start' ? 'Iniciar Mantenimiento' : modalMode === 'view' ? 'Historial de Mantenimiento' : modalMode === 'forceSign' ? 'Firmar Forzadamente' : 'Completar Mantenimiento'}
             </h3>
+            {errorMsg && (
+              <div style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', padding: '15px', borderRadius: '8px', marginBottom: '20px', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
+                {errorMsg}
+              </div>
+            )}
             <form onSubmit={handleSubmit}>
               {modalMode === 'create' && (
                 <>
@@ -699,11 +835,54 @@ const Maintenances: React.FC = () => {
                   </div>
                 </>
               )}
+              {modalMode === 'forceSign' && (
+                <>
+                  <div className="form-group">
+                    <label>Motivo de firma forzada</label>
+                    <textarea required className="glass-input" value={formData.reason} onChange={e => setFormData({ ...formData, reason: e.target.value })} placeholder="Ej. El usuario no tiene acceso al sistema..." style={{ minHeight: '80px', resize: 'vertical' }} />
+                  </div>
+                </>
+              )}
+              {modalMode === 'view' && selectedRecord && (
+                <div className="history-timeline">
+                  <div className="history-item">
+                    <div className="history-dot" style={{ background: '#3b82f6' }}></div>
+                    <div className="history-content">
+                      <h4><Calendar size={16} color="#3b82f6" /> Programación</h4>
+                      <p><strong>Fecha:</strong> {new Date(selectedRecord.scheduledDate).toLocaleDateString('es-CO')}</p>
+                      {selectedRecord.reason && <p><strong>Motivo / Problema:</strong> {selectedRecord.reason}</p>}
+                    </div>
+                  </div>
+                  
+                  {(selectedRecord.status === 'IN_PROGRESS' || selectedRecord.status === 'COMPLETED') && (
+                    <div className="history-item">
+                      <div className="history-dot" style={{ background: '#f59e0b' }}></div>
+                      <div className="history-content">
+                        <h4><Wrench size={16} color="#f59e0b" /> En Progreso</h4>
+                        <p>El mantenimiento ha sido iniciado por el técnico.</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedRecord.status === 'COMPLETED' && (
+                    <div className="history-item">
+                      <div className="history-dot" style={{ background: '#10b981' }}></div>
+                      <div className="history-content">
+                        <h4><CheckCircle size={16} color="#10b981" /> Completado</h4>
+                        {selectedRecord.executionDate && <p><strong>Fecha Ejecución:</strong> {new Date(selectedRecord.executionDate).toLocaleDateString('es-CO')}</p>}
+                        {selectedRecord.notes && <p><strong>Notas de Resolución:</strong> {selectedRecord.notes}</p>}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
               <div style={{ display: 'flex', gap: '10px', marginTop: '20px', justifyContent: 'flex-end' }}>
-                <button type="button" className="btn-glass" onClick={() => setShowModal(false)}>Cancelar</button>
-                <button type="submit" className="btn-primary" disabled={createMutation.isPending || startMutation.isPending || completeMutation.isPending}>
-                  {createMutation.isPending || startMutation.isPending || completeMutation.isPending ? 'Guardando...' : 'Confirmar'}
-                </button>
+                <button type="button" className="btn-glass" onClick={() => setShowModal(false)}>{modalMode === 'view' ? 'Cerrar' : 'Cancelar'}</button>
+                {modalMode !== 'view' && (
+                  <button type="submit" className="btn-primary" disabled={createMutation.isPending || startMutation.isPending || completeMutation.isPending || forceSignMutation.isPending}>
+                    {createMutation.isPending || startMutation.isPending || completeMutation.isPending || forceSignMutation.isPending ? 'Guardando...' : 'Confirmar'}
+                  </button>
+                )}
               </div>
             </form>
           </div>

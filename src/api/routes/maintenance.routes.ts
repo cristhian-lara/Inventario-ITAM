@@ -46,6 +46,7 @@ const serializeRecord = (record: any) => {
         collaboratorInTurnId: record.collaboratorInTurnId,
         collaboratorInTurnName: record.collaboratorInTurnName,
         signatureToken: record.signatureToken,
+        signedAt: record.signedAt,
         pdfUrl: record.pdfUrl
     };
 };
@@ -78,6 +79,16 @@ router.post('/:id/complete', async (req, res) => {
         const { notes } = req.body;
         const result = await useCases.completeMaintenance(req.params.id, notes);
         res.json(serializeRecord(result));
+    } catch (error: any) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// 3.5 Solicitar firma manualmente
+router.post('/:id/request-signature', async (req, res) => {
+    try {
+        const result = await useCases.requestSignature(req.params.id);
+        res.json({ message: 'Solicitud de firma enviada al colaborador.', record: serializeRecord(result) });
     } catch (error: any) {
         res.status(400).json({ error: error.message });
     }
@@ -121,7 +132,60 @@ router.get('/verify-token/:token', async (req, res) => {
     }
 });
 
-// 7. Firmar acta (Público)
+// 7. Aceptar y firmar acta electrónicamente (Público)
+router.get('/accept', async (req, res) => {
+    try {
+        const token = req.query.token as string;
+        if (!token) {
+            return res.status(400).send('Token de firma es requerido.');
+        }
+
+        const jwt = require('jsonwebtoken');
+        const secret = process.env.JWT_SECRET || 'secret';
+        const decoded = jwt.verify(token, secret) as any;
+        
+        const ipAddress = req.ip || req.socket.remoteAddress || 'unknown';
+        const userAgent = req.headers['user-agent'] || 'unknown';
+
+        const record = await useCases.signMaintenanceAct(decoded.maintenanceId, token, ipAddress, userAgent);
+
+        // Generar PDF
+        const { PdfKitService } = require('../../shared/infrastructure/services/PdfKitService');
+        const documentService = new PdfKitService();
+        
+        // Simular que traemos datos del activo para el PDF
+        const catalogRepo = new (require('../../modules/catalog/infrastructure/PostgresCatalogRepository').PostgresCatalogRepository)(AppDataSource);
+        const asset = await catalogRepo.getAssetById(record.assetId);
+        let categoryName = 'EQUIPO';
+        if (asset && asset.categoryId) {
+            const category = await catalogRepo.getCategoryById(asset.categoryId);
+            if (category) categoryName = category.name;
+        }
+
+        // Generate PDF (sin firma gráfica)
+        const pdfPath = await documentService.generateMaintenanceAct(record, asset, "", categoryName);
+        
+        await useCases.updatePdfUrl(record.id, pdfPath);
+
+        res.send(`
+            <div style="text-align:center; padding: 50px; font-family: sans-serif;">
+                <h1 style="color: green;">✅ Acta de Mantenimiento Aceptada</h1>
+                <p>El mantenimiento ha sido aceptado a conformidad. Tu firma electrónica ha sido registrada exitosamente con la IP <b>${ipAddress}</b>.</p>
+                <p>Se ha generado el Acta Física (PDF) inmutable.</p>
+                <a href="http://localhost:3000${pdfPath}" target="_blank" style="display:inline-block; margin-top:20px; padding:10px 20px; background:#00a650; color:white; text-decoration:none; border-radius:5px;">Ver Acta Firmada (PDF)</a>
+            </div>
+        `);
+    } catch (error: any) {
+        res.status(400).send(`
+            <div style="text-align:center; padding: 50px; font-family: sans-serif;">
+                <h1 style="color: red;">❌ Error al aceptar mantenimiento</h1>
+                <p>${error.message}</p>
+            </div>
+        `);
+    }
+});
+
+// 8. Firmar acta (Público - Legacy UI)
 router.post('/sign', async (req, res) => {
     try {
         const { token, signature } = req.body;
@@ -141,13 +205,49 @@ router.post('/sign', async (req, res) => {
         // Simular que traemos datos del activo para el PDF
         const catalogRepo = new (require('../../modules/catalog/infrastructure/PostgresCatalogRepository').PostgresCatalogRepository)(AppDataSource);
         const asset = await catalogRepo.getAssetById(record.assetId);
+        let categoryName = 'EQUIPO';
+        if (asset && asset.categoryId) {
+            const category = await catalogRepo.getCategoryById(asset.categoryId);
+            if (category) categoryName = category.name;
+        }
 
         // Generate PDF
-        const pdfPath = await documentService.generateMaintenanceAct(record, asset, signature);
+        const pdfPath = await documentService.generateMaintenanceAct(record, asset, signature, categoryName);
         
         await useCases.updatePdfUrl(record.id, pdfPath);
         
         res.json({ message: 'Firmado correctamente', pdfUrl: pdfPath });
+    } catch (error: any) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// 9. Firma forzada
+router.post('/:id/force-sign', async (req, res) => {
+    try {
+        const { reason } = req.body;
+        const adminId = 'admin'; // Simulación
+        
+        const record = await useCases.forceSignMaintenance(req.params.id, reason, adminId);
+
+        // Generar PDF
+        const { PdfKitService } = require('../../shared/infrastructure/services/PdfKitService');
+        const documentService = new PdfKitService();
+        
+        const catalogRepo = new (require('../../modules/catalog/infrastructure/PostgresCatalogRepository').PostgresCatalogRepository)(AppDataSource);
+        const asset = await catalogRepo.getAssetById(record.assetId);
+        let categoryName = 'EQUIPO';
+        if (asset && asset.categoryId) {
+            const category = await catalogRepo.getCategoryById(asset.categoryId);
+            if (category) categoryName = category.name;
+        }
+
+        const signatureText = `Firma forzada por administrador.\nMotivo: ${reason}`;
+        const pdfPath = await documentService.generateMaintenanceAct(record, asset, signatureText, categoryName);
+        
+        await useCases.updatePdfUrl(record.id, pdfPath);
+        
+        res.json({ message: 'Mantenimiento firmado forzadamente', record: serializeRecord(record) });
     } catch (error: any) {
         res.status(400).json({ error: error.message });
     }

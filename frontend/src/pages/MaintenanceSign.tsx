@@ -16,7 +16,7 @@ const MaintenanceSign: React.FC = () => {
   const { data: record, isLoading, isError } = useQuery({
     queryKey: ['verifyMaintenanceToken', token],
     queryFn: async () => {
-      const res = await fetch(`/api/maintenances/verify-token/${token}`);
+      const res = await fetch(`${API_URL}/api/maintenances/verify-token/${token}`);
       if (!res.ok) throw new Error('Token inválido o expirado');
       return res.json();
     },
@@ -25,7 +25,7 @@ const MaintenanceSign: React.FC = () => {
 
   const signMutation = useMutation({
     mutationFn: async (signatureBase64: string) => {
-      const res = await fetch('/api/maintenances/sign', {
+      const res = await fetch(`${API_URL}/api/maintenances/sign`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token, signature: signatureBase64 })

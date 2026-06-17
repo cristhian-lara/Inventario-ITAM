@@ -158,6 +158,7 @@ Este documento cancela la responsiva firmada en el momento de la asignación ori
                     doc.text(`Departamento: ${data.department}`, 50, footerY + 24, { lineBreak: false });
                     doc.text(`ID Asignación Criptográfica: ${data.assignmentId}`, 50, footerY + 36, { lineBreak: false });
                     doc.text(`Firma IP Registrada: ${data.ipAddress}`, 50, footerY + 48, { lineBreak: false });
+                    doc.text(`Nombre: ${data.collaboratorName || 'Usuario Asignado'}`, 50, footerY + 60, { lineBreak: false });
 
                     // --- Marca de agua lateral ---
                     doc.save();
@@ -188,7 +189,7 @@ Este documento cancela la responsiva firmada en el momento de la asignación ori
         });
     }
 
-    public async generateMaintenanceAct(record: any, asset: any, signatureBase64: string): Promise<string> {
+    public async generateMaintenanceAct(record: any, asset: any, signatureBase64: string, categoryName?: string): Promise<string> {
         return new Promise((resolve, reject) => {
             try {
                 // Initialize PDFDocument from pdfkit-table with bufferPages and larger bottom margin for footer
@@ -207,11 +208,16 @@ Este documento cancela la responsiva firmada en el momento de la asignación ori
                 doc.fontSize(16).fillColor('#000000').font('Helvetica-Bold').text('ACTA DE MANTENIMIENTO TÉCNICO', { align: 'center' });
                 doc.moveDown(1.5);
 
+                const category = categoryName || asset?.category?.name || 'EQUIPO';
+                const brand = asset?.dynamicAttributes?.marca || asset?.dynamicAttributes?.brand || 'N/A';
+                const model = asset?.dynamicAttributes?.modelo || asset?.dynamicAttributes?.model || 'N/A';
+                const serial = asset?.serial || asset?.serialNumber || 'N/A';
+
                 const tableGeneral = {
                     title: 'Datos del Equipo',
                     headers: ['Placa Ikusi', 'Tipo', 'Producto', 'Serie', 'Modelo'],
                     rows: [
-                        [record.assetId, asset?.category?.name || asset?.type || 'EQUIPO', 'EQUIPO', asset?.serialNumber || 'N/A', asset?.model || 'N/A']
+                        [record.assetId, category, brand, serial, model]
                     ]
                 };
 
@@ -258,18 +264,7 @@ El usuario certifica que al momento de la devolución, el equipo es operativo de
                 doc.text(legalText, { align: 'justify', lineGap: 5 });
                 doc.moveDown(3);
 
-                // Firma gráfica
-                if (signatureBase64 && signatureBase64.startsWith('data:image')) {
-                    const base64Data = signatureBase64.split(';base64,').pop();
-                    const signatureBuffer = Buffer.from(base64Data as string, 'base64');
-                    doc.image(signatureBuffer, 50, doc.y, { width: 200 });
-                    doc.moveDown(4);
-                }
-
-                const signatureY = doc.y;
-                doc.moveTo(50, signatureY).lineTo(250, signatureY).strokeColor('#000000').stroke();
-                doc.moveDown(0.5);
-                doc.fontSize(10).fillColor('#000000').font('Helvetica-Bold').text(record.collaboratorInTurnName || 'Usuario Asignado', 50, doc.y);
+                // Firma electrónica manejada en el footer
 
                 // DIBUJAR MARCA DE AGUA Y FIRMA DIGITAL EN TODAS LAS PÁGINAS AL FINAL
                 // record signature metadata might be appended later, but we use what we have or placeholder
@@ -291,6 +286,7 @@ El usuario certifica que al momento de la devolución, el equipo es operativo de
                     doc.text(`Tipo de Documento: Acta de Mantenimiento`, 50, footerY + 24, { lineBreak: false });
                     doc.text(`ID Mantenimiento Criptográfico: ${record.id}`, 50, footerY + 36, { lineBreak: false });
                     doc.text(`Firma IP Registrada: ${ipAddress}`, 50, footerY + 48, { lineBreak: false });
+                    doc.text(`Nombre: ${record.collaboratorInTurnName || 'Usuario Asignado'}`, 50, footerY + 60, { lineBreak: false });
 
                     // Marca de agua lateral
                     doc.save();

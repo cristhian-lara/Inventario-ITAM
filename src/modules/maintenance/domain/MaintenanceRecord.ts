@@ -96,6 +96,17 @@ export class MaintenanceRecord {
         this.props.signatureMetadata = metadata;
     }
 
+    public forceSignMaintenance(reason: string, adminId: string): void {
+        if (this.props.status !== 'COMPLETED') {
+            throw new Error('El mantenimiento no está en estado completado.');
+        }
+        if (this.props.signedAt) {
+            throw new Error('El acta de mantenimiento ya ha sido firmada.');
+        }
+        this.props.signedAt = new Date();
+        this.props.signatureMetadata = { forced: true, reason, adminId, signedAt: new Date().toISOString() };
+    }
+
     public updatePdfUrl(url: string): void {
         this.props.pdfUrl = url;
     }

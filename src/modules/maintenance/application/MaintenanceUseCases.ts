@@ -15,6 +15,15 @@ export class MaintenanceUseCases {
     ) {}
 
     async createManualMaintenance(dto: { assetId: string, type: MaintenanceType, scheduledDate: Date, reason?: string }): Promise<MaintenanceRecord> {
+        const existingMaintenances = await this.repo.findByAssetId(dto.assetId);
+        const activeMaintenance = existingMaintenances.find(m => (m.status === 'SCHEDULED' || m.status === 'IN_PROGRESS') && m.type === dto.type);
+        
+        if (activeMaintenance) {
+            const dateStr = activeMaintenance.scheduledDate.toISOString().split('T')[0];
+            const typeStr = activeMaintenance.type === 'PREVENTIVE' ? 'Preventivo' : 'Correctivo';
+            throw new Error(`El equipo ya cuenta con un mantenimiento programado (${typeStr}) para la fecha ${dateStr}.`);
+        }
+
         const id = `maint-${Date.now()}-${Math.floor(Math.random()*1000)}`;
         
         // Al crear o agendar, si está asignado, guardamos la foto (snapshot) del usuario actual
@@ -82,11 +91,45 @@ export class MaintenanceUseCases {
         return record;
     }
 
+    async requestSignature(id: string): Promise<MaintenanceRecord> {
+        const record = await this.repo.findById(id);
+        if (!record) throw new Error('Mantenimiento no encontrado');
+        if (record.status !== 'COMPLETED') throw new Error('El mantenimiento no está completado');
+
+        const assignment = await this.assignmentService.getActiveAssignmentForAsset(record.assetId);
+        if (!assignment || !assignment.collaboratorEmail) {
+            throw new Error('No hay un colaborador asignado al activo en este momento para firmar.');
+        }
+
+        const jwt = require('jsonwebtoken');
+        const secret = process.env.JWT_SECRET || 'secret';
+        const token = record.generateSignatureToken((maintId) => {
+            return jwt.sign({ maintenanceId: maintId }, secret, { expiresIn: '24h' });
+        });
+        
+        await this.repo.save(record);
+
+        if (this.mailerService) {
+            await this.mailerService.sendMaintenanceSignatureEmail(assignment.collaboratorEmail, id, token);
+        }
+
+        return record;
+    }
+
     async signMaintenanceAct(id: string, token: string, ipAddress: string, userAgent: string): Promise<MaintenanceRecord> {
         const record = await this.repo.findById(id);
         if (!record) throw new Error('Mantenimiento no encontrado');
 
         record.signMaintenance(token, { ipAddress, userAgent, signedAt: new Date().toISOString() });
+        await this.repo.save(record);
+        return record;
+    }
+
+    async forceSignMaintenance(id: string, reason: string, adminId: string): Promise<MaintenanceRecord> {
+        const record = await this.repo.findById(id);
+        if (!record) throw new Error('Mantenimiento no encontrado');
+
+        record.forceSignMaintenance(reason, adminId);
         await this.repo.save(record);
         return record;
     }

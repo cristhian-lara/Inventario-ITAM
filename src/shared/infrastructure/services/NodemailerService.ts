@@ -60,7 +60,7 @@ export class NodemailerService implements IMailerService {
     }
 
     async sendMaintenanceSignatureEmail(to: string, maintenanceId: string, token: string): Promise<void> {
-        const signUrl = `http://localhost:5173/maintenances/sign/${token}`;
+        const signUrl = `http://localhost:3000/api/maintenances/accept?token=${token}`;
         
         console.log(`\n📧 [SIMULADOR DE EMAIL] Enviando correo a: ${to}`);
         console.log(`📧 Asunto: Requerido: Firma Acta de Mantenimiento Ikusi`);
