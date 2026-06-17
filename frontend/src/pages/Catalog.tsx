@@ -41,6 +41,8 @@ export default function Catalog() {
   const [filterStatus, setFilterStatus] = useState(initialStatus);
 
   const [searchTerm, setSearchTerm] = useState('');
+  const [retireModalAssetId, setRetireModalAssetId] = useState<string | null>(null);
+  const [retireReason, setRetireReason] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [newAsset, setNewAsset] = useState<{ id: string; categoryId: number | ''; serial: string; dynamicAttributes: any; purchaseDate?: string; warrantyMonths?: number; depreciationYears?: number; purchasePrice?: number }>({
@@ -412,8 +414,10 @@ export default function Catalog() {
       if (asset.status !== filterStatus) return false;
     }
 
+    const hostname = String(asset.dynamicAttributes?.HOSTNAME || asset.dynamicAttributes?.Hostname || asset.dynamicAttributes?.hostname || '');
     return asset.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (asset.serial && asset.serial.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (hostname && hostname.toLowerCase().includes(searchTerm.toLowerCase())) ||
       String(asset.categoryId).toLowerCase().includes(searchTerm.toLowerCase());
   });
 
@@ -841,17 +845,8 @@ export default function Catalog() {
                         style={{ borderColor: '#ef4444', color: '#ef4444' }}
                         title="Dar de Baja"
                         onClick={() => {
-                          const reason = window.prompt('Por favor, indica el motivo por el cual se da de baja este activo:');
-                          if (reason !== null && reason.trim() !== '') {
-                            confirm({
-                              title: 'Dar de Baja',
-                              message: '¿Estás seguro de que deseas dar de baja este activo definitivamente? Esta acción es irreversible.',
-                              type: 'danger',
-                              onConfirm: () => retireAssetMutation.mutate({ id: asset.id, reason: reason.trim() })
-                            });
-                          } else if (reason !== null) {
-                            alert('Debes proporcionar un motivo válido para dar de baja el activo.');
-                          }
+                          setRetireReason('');
+                          setRetireModalAssetId(asset.id);
                         }}
                         disabled={retireAssetMutation.isPending}
                       >
@@ -1200,6 +1195,52 @@ export default function Catalog() {
                 </>
               )}
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL CONFIRMAR BAJA DE ACTIVO */}
+      {retireModalAssetId && (
+        <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(4px)', padding: '20px' }}>
+          <div className="glass-panel" style={{ padding: '30px', maxWidth: '450px', width: '100%', textAlign: 'center' }}>
+            <Trash2 size={48} color="#ef4444" style={{ marginBottom: '20px' }} />
+            <h3 style={{ color: 'var(--text-main)', marginBottom: '15px' }}>Dar de baja activo</h3>
+            <p style={{ margin: '0 0 20px 0', color: 'var(--text-muted)' }}>
+              ¿Estás seguro de que deseas dar de baja el activo <b>{retireModalAssetId}</b> definitivamente? Esta acción es irreversible.
+            </p>
+            <div className="form-group" style={{ textAlign: 'left' }}>
+              <label>Por favor, indica el motivo por el cual se da de baja este activo:</label>
+              <textarea 
+                className="glass-input" 
+                value={retireReason} 
+                onChange={(e) => setRetireReason(e.target.value)}
+                style={{ minHeight: '80px', resize: 'vertical' }}
+                autoFocus
+                placeholder="Ej. Equipo dañado sin reparación..."
+              />
+            </div>
+            <div style={{ display: 'flex', gap: '10px', marginTop: '24px', justifyContent: 'center' }}>
+              <button 
+                className="btn-glass" 
+                onClick={() => setRetireModalAssetId(null)}
+                style={{ padding: '10px 20px' }}
+              >
+                Cancelar
+              </button>
+              <button 
+                className="btn-primary" 
+                style={{ background: '#ef4444', borderColor: '#ef4444', opacity: retireReason.trim() ? 1 : 0.5, padding: '10px 20px' }}
+                onClick={() => {
+                  if (retireReason.trim()) {
+                    retireAssetMutation.mutate({ id: retireModalAssetId, reason: retireReason.trim() });
+                    setRetireModalAssetId(null);
+                  }
+                }}
+                disabled={!retireReason.trim() || retireAssetMutation.isPending}
+              >
+                {retireAssetMutation.isPending ? 'Procesando...' : 'Confirmar Baja'}
+              </button>
+            </div>
           </div>
         </div>
       )}
