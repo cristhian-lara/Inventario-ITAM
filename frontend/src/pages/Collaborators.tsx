@@ -47,7 +47,12 @@ export default function Collaborators() {
       setImportResult(response.data);
       queryClient.invalidateQueries({ queryKey: ['collaborators'] });
     } catch (error: any) {
-      alert('Error en la importación: ' + (error.response?.data?.error || error.message));
+      confirm({
+        title: 'Error de Importación',
+        message: 'Error en la importación: ' + (error.response?.data?.error || error.message),
+        type: 'danger',
+        onConfirm: () => {}
+      });
     } finally {
       setImporting(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -188,7 +193,14 @@ export default function Collaborators() {
     <div className="catalog-container">
       <header className="catalog-header">
         <div>
-          <h1 className="page-title">Directorio de Colaboradores</h1>
+          <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            Directorio de Colaboradores
+            {collaborators && (
+              <span style={{ fontSize: '14px', background: 'var(--bg-glass)', padding: '4px 12px', borderRadius: '20px', color: 'var(--text-muted)', border: '1px solid var(--border-glass)', fontWeight: 500, letterSpacing: '0.3px', display: 'inline-block' }}>
+                {filtered.length === collaborators.length ? `Total: ${collaborators.length}` : `Mostrando ${filtered.length} de ${collaborators.length}`}
+              </span>
+            )}
+          </h1>
           <p className="page-subtitle">Gestión de personal para asignación de equipos</p>
         </div>
         <div style={{ display: 'flex', gap: '10px' }}>

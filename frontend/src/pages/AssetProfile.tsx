@@ -261,7 +261,12 @@ export default function AssetProfile() {
 
     const category = categories?.find(c => c.id === asset?.categoryId);
     const specs = asset?.dynamicAttributes || {};
-    const specEntries = Object.entries(specs).filter(([, v]) => v !== null && v !== undefined && v !== '');
+    const redundantKeys = ['PRECIO', 'COMPRA', 'WARRANTY', 'GARANT', 'DEPRECIACI'];
+    const specEntries = Object.entries(specs).filter(([k, v]) => {
+        if (v === null || v === undefined || v === '') return false;
+        const upperK = k.toUpperCase();
+        return !redundantKeys.some(rk => upperK.includes(rk));
+    });
 
     // ── Loading ──────────────────────────────────────────────────────────────
 
@@ -341,7 +346,10 @@ export default function AssetProfile() {
                                 <Calendar size={16} color="var(--ikusi-green)" style={{ flexShrink: 0, marginTop: '2px' }} />
                                 <div className="asset-detail-block">
                                     <span className="detail-label">Fecha de Compra</span>
-                                    <span className="detail-value">{new Date(asset.purchaseDate).toLocaleDateString('es-CO')}</span>
+                                    <span className="detail-value">{(() => {
+                                        const [y, m, d] = asset.purchaseDate!.toString().split('T')[0].split('-');
+                                        return `${parseInt(d, 10)}/${parseInt(m, 10)}/${y}`;
+                                    })()}</span>
                                 </div>
                             </div>
                         )}
@@ -352,6 +360,16 @@ export default function AssetProfile() {
                                 <div className="asset-detail-block">
                                     <span className="detail-label">Garantía</span>
                                     <span className="detail-value">{asset.warrantyMonths} meses</span>
+                                </div>
+                            </div>
+                        )}
+
+                        {asset.purchasePrice && (
+                            <div className="asset-detail-item">
+                                <Tag size={16} color="var(--ikusi-green)" style={{ flexShrink: 0, marginTop: '2px' }} />
+                                <div className="asset-detail-block">
+                                    <span className="detail-label">Valor de Compra</span>
+                                    <span className="detail-value">{new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP' }).format(asset.purchasePrice)}</span>
                                 </div>
                             </div>
                         )}
@@ -793,10 +811,12 @@ export default function AssetProfile() {
 
             {/* ── Depreciation Modal ── */}
             {showDepreciationModal && (() => {
-                let precio = 0;
-                let pKey = Object.keys(specs).find(k => k.toUpperCase().includes('PRECIO'));
-                if (pKey && specs[pKey]) {
-                    precio = parseFloat(String(specs[pKey]).replace(/[^0-9.-]+/g, ''));
+                let precio = asset?.purchasePrice || 0;
+                if (precio === 0) {
+                    let pKey = Object.keys(specs).find(k => k.toUpperCase().includes('PRECIO'));
+                    if (pKey && specs[pKey]) {
+                        precio = parseFloat(String(specs[pKey]).replace(/[^0-9.-]+/g, ''));
+                    }
                 }
                 
                 let anos = asset?.depreciationYears || 0;
@@ -825,7 +845,7 @@ export default function AssetProfile() {
                         </div>
                     );
                 } else {
-                    const dateCompra = new Date(fechaCompra);
+                    const dateCompra = new Date(`${fechaCompra.toString().split('T')[0]}T12:00:00`);
                     const diffTime = new Date().getTime() - dateCompra.getTime();
                     const elapsedYears = diffTime > 0 ? diffTime / (1000 * 60 * 60 * 24 * 365.25) : 0;
                     

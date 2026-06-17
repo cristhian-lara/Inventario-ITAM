@@ -35,7 +35,8 @@ export class DashboardQueryService {
             FROM assets 
             WHERE purchase_date IS NOT NULL 
               AND warranty_months IS NOT NULL
-              AND (purchase_date + (warranty_months || ' months')::interval) <= (CURRENT_DATE + interval '30 days')
+              AND status != 'RETIRED'
+              AND (purchase_date + (warranty_months || ' months')::interval) <= (CURRENT_DATE + interval '60 days')
               AND (purchase_date + (warranty_months || ' months')::interval) >= CURRENT_DATE
         `);
         const expiringWarranties = parseInt(expiringWarrantiesResult[0].count, 10); 
@@ -47,7 +48,7 @@ export class DashboardQueryService {
         const obsoleteAssetsResult = await this.dataSource.query(`
             SELECT COUNT(*) as count 
             FROM assets 
-            WHERE status = 'IN_USE' 
+            WHERE status != 'RETIRED' 
               AND (
                  (purchase_date IS NOT NULL AND warranty_months IS NOT NULL AND (purchase_date + (warranty_months || ' months')::interval) < CURRENT_DATE)
                  OR

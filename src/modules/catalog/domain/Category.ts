@@ -61,7 +61,11 @@ export class Category {
 
                 // Validación de opciones para tipo 'select'
                 if (field.type === 'select' && field.options && Array.isArray(field.options) && field.options.length > 0) {
-                    if (!field.options.includes(value)) {
+                    const validOptions = field.unit 
+                        ? field.options.map(opt => String(opt).includes(field.unit!) ? String(opt) : `${opt} ${field.unit}`)
+                        : field.options.map(opt => String(opt));
+                        
+                    if (!validOptions.includes(String(value)) && !field.options.map(o => String(o)).includes(String(value))) {
                         errors.push(`El valor '${value}' para ${field.name} no es válido. Opciones permitidas: ${field.options.join(', ')}`);
                     }
                 }

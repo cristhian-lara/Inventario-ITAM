@@ -5,6 +5,7 @@ import axios from 'axios';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import './Dashboard.css';
 import { API_URL } from '../config';
+import { useConfirm } from '../context/ConfirmContext';
 
 interface DashboardMetrics {
   totalAssets: number;
@@ -40,6 +41,7 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 export default function Dashboard() {
+  const { confirm } = useConfirm();
   const { data: metrics, isLoading } = useQuery<DashboardMetrics>({
     queryKey: ['dashboard_metrics'],
     queryFn: async () => {
@@ -72,6 +74,14 @@ export default function Dashboard() {
     }
   });
 
+  const { data: categories } = useQuery<any[]>({
+    queryKey: ['categories'],
+    queryFn: async () => {
+      const response = await axios.get(`${API_URL}/api/catalog/categories`);
+      return response.data;
+    }
+  });
+
   if (isLoading) return (
     <div className="dashboard-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
       <p className="title-glow">Cargando métricas...</p>
@@ -89,13 +99,19 @@ export default function Dashboard() {
   // ── Warranty expiry table (next 5) ─────────────────────────────────────────
   const today = new Date();
   const warrantyAssets = (assets || [])
-    .filter(a => a.purchaseDate && a.warrantyMonths)
+    .filter(a => a.purchaseDate && a.warrantyMonths && a.status !== 'RETIRED')
     .map(a => {
-      const expiryDate = new Date(a.purchaseDate);
+      const [y, m, d] = a.purchaseDate.split('T')[0].split('-').map(Number);
+      const expiryDate = new Date(y, m - 1, d);
       expiryDate.setMonth(expiryDate.getMonth() + Number(a.warrantyMonths));
-      const daysLeft = Math.floor((expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      
+      // Calculate start of today for accurate diff
+      const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      const daysLeft = Math.floor((expiryDate.getTime() - startOfToday.getTime()) / (1000 * 60 * 60 * 24));
+      
       return { ...a, expiryDate, daysLeft };
     })
+    .filter(a => a.daysLeft <= 60 && a.daysLeft >= 0)
     .sort((a, b) => a.daysLeft - b.daysLeft)
     .slice(0, 5);
 
@@ -137,7 +153,14 @@ export default function Dashboard() {
       a.href = url;
       a.download = `Inventario_Ikusi_${new Date().toISOString().split('T')[0]}.csv`;
       a.click();
-    } catch { alert('Error exportando reporte'); }
+    } catch {
+      confirm({
+        title: 'Error de Exportación',
+        message: 'Ocurrió un error exportando el reporte.',
+        type: 'danger',
+        onConfirm: () => {}
+      });
+    }
   };
 
   return (
@@ -310,7 +333,7 @@ export default function Dashboard() {
                   return (
                     <tr key={a.id} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
                       <td style={{ padding: '10px', fontWeight: 600 }}>{a.id}</td>
-                      <td style={{ padding: '10px', color: 'var(--text-muted)' }}>{a.categoryId}</td>
+                      <td style={{ padding: '10px', color: 'var(--text-muted)' }}>{categories?.find(c => c.id === Number(a.categoryId))?.name || a.categoryId}</td>
                       <td style={{ padding: '10px' }}>{a.expiryDate.toLocaleDateString('es-CO')}</td>
                       <td style={{ padding: '10px', fontWeight: 600, color }}>
                         {expired ? `Venció hace ${Math.abs(a.daysLeft)} días` : `${a.daysLeft} días`}

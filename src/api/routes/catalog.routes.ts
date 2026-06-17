@@ -82,7 +82,7 @@ router.post('/assets', async (req, res) => {
             Number(categoryId), 
             serial, 
             dynamicAttributes,
-            purchaseDate ? new Date(purchaseDate) : undefined,
+            purchaseDate ? new Date(`${purchaseDate.split('T')[0]}T12:00:00`) : undefined,
             warrantyMonths,
             depreciationYears
         );
@@ -94,7 +94,8 @@ router.post('/assets', async (req, res) => {
             dynamicAttributes: asset.dynamicAttributes,
             purchaseDate: asset.purchaseDate,
             warrantyMonths: asset.warrantyMonths,
-            depreciationYears: asset.depreciationYears
+            depreciationYears: asset.depreciationYears,
+            purchasePrice: asset.purchasePrice
         });
     } catch (error: any) {
         res.status(400).json({ error: error.message });
@@ -108,7 +109,7 @@ router.put('/assets/:id', async (req, res) => {
             req.params.id,
             serial,
             dynamicAttributes,
-            purchaseDate ? new Date(purchaseDate) : undefined,
+            purchaseDate ? new Date(`${purchaseDate.split('T')[0]}T12:00:00`) : undefined,
             warrantyMonths,
             depreciationYears,
             purchasePrice
@@ -120,7 +121,9 @@ router.put('/assets/:id', async (req, res) => {
             status: asset.status,
             dynamicAttributes: asset.dynamicAttributes,
             purchaseDate: asset.purchaseDate,
-            warrantyMonths: asset.warrantyMonths
+            warrantyMonths: asset.warrantyMonths,
+            depreciationYears: asset.depreciationYears,
+            purchasePrice: asset.purchasePrice
         });
     } catch (error: any) {
         res.status(400).json({ error: error.message });
@@ -151,7 +154,8 @@ router.get('/assets', async (req, res) => {
         dynamicAttributes: a.dynamicAttributes,
         purchaseDate: a.purchaseDate,
         warrantyMonths: a.warrantyMonths,
-        depreciationYears: a.depreciationYears
+        depreciationYears: a.depreciationYears,
+        purchasePrice: a.purchasePrice
     })));
 });
 

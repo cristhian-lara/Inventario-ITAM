@@ -1,6 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useParams } from 'react-router-dom';
-import SignatureCanvas from 'react-signature-canvas';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { CheckCircle } from 'lucide-react';
 import { useConfirm } from '../context/ConfirmContext';
@@ -10,7 +9,6 @@ const MaintenanceSign: React.FC = () => {
   const { token } = useParams<{ token: string }>();
   const [signed, setSigned] = useState(false);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
-  const sigCanvas = useRef<any>(null);
   const { confirm } = useConfirm();
 
   const { data: record, isLoading, isError } = useQuery({
@@ -41,25 +39,22 @@ const MaintenanceSign: React.FC = () => {
       setPdfUrl(data.pdfUrl);
     },
     onError: (error: Error) => {
-      alert(error.message);
+      confirm({
+        title: 'Error de Firma',
+        message: error.message,
+        type: 'danger',
+        onConfirm: () => {}
+      });
     }
   });
 
-  const clearSignature = () => {
-    sigCanvas.current?.clear();
-  };
-
   const handleSign = () => {
-    if (sigCanvas.current?.isEmpty()) {
-      alert('Por favor, dibuje su firma antes de confirmar.');
-      return;
-    }
     confirm({
-      title: 'Confirmar Firma',
-      message: 'Al confirmar, acepto que el equipo ha recibido mantenimiento a conformidad.',
+      title: 'Confirmar Firma Electrónica',
+      message: 'Al confirmar, acepto que el equipo ha recibido mantenimiento a conformidad. Esta acción registrará mi firma electrónica.',
       type: 'info',
       onConfirm: () => {
-        const signatureBase64 = sigCanvas.current.getTrimmedCanvas().toDataURL('image/png');
+        const signatureBase64 = "Firma Electrónica (Aceptación por Enlace)";
         signMutation.mutate(signatureBase64);
       }
     });
@@ -143,45 +138,29 @@ const MaintenanceSign: React.FC = () => {
             </div>
           </div>
 
-          <div style={{ marginTop: '40px' }}>
-            <h3 style={{ color: '#004b87' }}>Firma Digital</h3>
-            <p style={{ color: '#666', fontSize: '14px', marginBottom: '15px' }}>
-              Por favor, dibuje su firma en el recuadro inferior para certificar que recibe su equipo en conformidad tras el mantenimiento.
+          <div style={{ marginTop: '40px', textAlign: 'center' }}>
+            <h3 style={{ color: '#004b87' }}>Confirmación Electrónica</h3>
+            <p style={{ color: '#666', fontSize: '14px', marginBottom: '25px' }}>
+              Al hacer clic en el botón inferior, usted firma electrónicamente el acta y certifica que recibe su equipo a entera conformidad tras el mantenimiento.
             </p>
             
-            <div style={{ border: '2px dashed #ccc', borderRadius: '8px', backgroundColor: '#fafafa' }}>
-              <SignatureCanvas 
-                ref={sigCanvas} 
-                penColor="black"
-                canvasProps={{ width: 720, height: 200, className: 'sigCanvas' }} 
-              />
-            </div>
-            
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '15px' }}>
-              <button 
-                onClick={clearSignature}
-                style={{ padding: '10px 20px', backgroundColor: '#f1f3f5', border: '1px solid #dee2e6', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', color: '#495057' }}
-              >
-                Limpiar Firma
-              </button>
-              
-              <button 
-                onClick={handleSign}
-                disabled={signMutation.isPending}
-                style={{ 
-                  padding: '10px 30px', 
-                  backgroundColor: signMutation.isPending ? '#6c757d' : '#00a650', 
-                  color: 'white', 
-                  border: 'none', 
-                  borderRadius: '4px', 
-                  cursor: signMutation.isPending ? 'not-allowed' : 'pointer', 
-                  fontWeight: 'bold',
-                  fontSize: '16px'
-                }}
-              >
-                {signMutation.isPending ? 'Procesando...' : 'Firmar y Confirmar'}
-              </button>
-            </div>
+            <button 
+              onClick={handleSign}
+              disabled={signMutation.isPending}
+              style={{ 
+                padding: '12px 40px', 
+                backgroundColor: signMutation.isPending ? '#6c757d' : '#00a650', 
+                color: 'white', 
+                border: 'none', 
+                borderRadius: '6px', 
+                cursor: signMutation.isPending ? 'not-allowed' : 'pointer', 
+                fontWeight: 'bold',
+                fontSize: '18px',
+                boxShadow: '0 4px 6px rgba(0, 166, 80, 0.2)'
+              }}
+            >
+              {signMutation.isPending ? 'Procesando...' : 'Confirmar de Conformidad'}
+            </button>
           </div>
 
         </div>

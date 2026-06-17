@@ -17,6 +17,7 @@ export default function Settings() {
   const [newCatName, setNewCatName] = useState('');
   const [newCatRequiresPlaca, setNewCatRequiresPlaca] = useState(true);
   const [fields, setFields] = useState<FieldConfig[]>([{ name: '', isRequired: true, type: 'text', options: [], unit: '', newOptionValue: '' }]);
+  const [deleteFieldIdx, setDeleteFieldIdx] = useState<number | null>(null);
 
   // Estados form Departamento
   const [newDepName, setNewDepName] = useState('');
@@ -500,10 +501,7 @@ export default function Settings() {
                             onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
                             title="Eliminar este campo por completo"
                             onClick={() => {
-                              if (window.confirm('¿Seguro que deseas eliminar este campo?')) {
-                                const newF = fields.filter((_, i) => i !== idx);
-                                setFields(newF);
-                              }
+                              setDeleteFieldIdx(idx);
                             }}
                           >
                             <Trash2 size={16} /> Eliminar
@@ -744,6 +742,40 @@ export default function Settings() {
 
 
             </div>
+
+      {/* MODAL ELIMINAR CAMPO */}
+      {deleteFieldIdx !== null && (
+        <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(4px)', padding: '20px' }}>
+          <div className="glass-panel" style={{ padding: '30px', maxWidth: '400px', width: '100%', textAlign: 'center' }}>
+            <Trash2 size={48} color="#ef4444" style={{ marginBottom: '20px' }} />
+            <h3 style={{ color: 'var(--text-main)', marginBottom: '15px' }}>Eliminar campo</h3>
+            <p style={{ margin: '0 0 24px 0', color: 'var(--text-muted)' }}>
+              ¿Estás seguro de que deseas eliminar el campo <b>"{fields[deleteFieldIdx]?.name || `Campo ${deleteFieldIdx + 1}`}"</b>? Esta acción removerá el campo de la configuración de la categoría.
+            </p>
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+              <button 
+                className="btn-glass" 
+                onClick={() => setDeleteFieldIdx(null)}
+                style={{ padding: '10px 20px' }}
+              >
+                Cancelar
+              </button>
+              <button 
+                className="btn-primary" 
+                style={{ background: '#ef4444', borderColor: '#ef4444', padding: '10px 20px' }}
+                onClick={() => {
+                  const newF = fields.filter((_, i) => i !== deleteFieldIdx);
+                  setFields(newF);
+                  setDeleteFieldIdx(null);
+                }}
+              >
+                Confirmar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

@@ -20,6 +20,7 @@ export default function Catalog() {
   const { confirm } = useConfirm();
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  const [modalErrorMsg, setModalErrorMsg] = useState('');
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importing, setImporting] = useState(false);
@@ -199,7 +200,11 @@ export default function Catalog() {
         id: assetData.id,
         categoryId: assetData.categoryId,
         serial: assetData.serial,
-        dynamicAttributes: assetData.dynamicAttributes
+        dynamicAttributes: assetData.dynamicAttributes,
+        purchaseDate: assetData.purchaseDate,
+        warrantyMonths: assetData.warrantyMonths,
+        purchasePrice: assetData.purchasePrice,
+        depreciationYears: assetData.depreciationYears
       });
       return response.data;
     },
@@ -212,8 +217,8 @@ export default function Catalog() {
       setTimeout(() => setSuccessMsg(''), 3000);
     },
     onError: (err: any) => {
-      setErrorMsg(err.response?.data?.error || err.message);
-      setTimeout(() => setErrorMsg(''), 3000);
+      setModalErrorMsg(err.response?.data?.error || err.message);
+      setTimeout(() => setModalErrorMsg(''), 5000);
     }
   });
 
@@ -231,8 +236,8 @@ export default function Catalog() {
       setTimeout(() => setSuccessMsg(''), 3000);
     },
     onError: (err: any) => {
-      setErrorMsg(err.response?.data?.error || err.message);
-      setTimeout(() => setErrorMsg(''), 8000);
+      setModalErrorMsg(err.response?.data?.error || err.message);
+      setTimeout(() => setModalErrorMsg(''), 8000);
     }
   });
 
@@ -368,33 +373,33 @@ export default function Catalog() {
   if (error) return <div className="error-glass">Error al cargar el inventario: {(error as Error).message}</div>;
 
     const filteredAssets = assets?.filter((asset: any) => {
-    if (filterRisk) {
-      if (asset.status !== 'IN_USE') return false;
-      let atRisk = false;
-      const today = new Date();
-      // Normalize today to midnight (date only, no time)
-      today.setHours(0, 0, 0, 0);
-      if (asset.purchaseDate) {
-        // purchaseDate arrives as "2025-06-14T00:00:00.000Z" — parse as local date
-        const pdStr = typeof asset.purchaseDate === 'string'
-          ? asset.purchaseDate.split('T')[0]
-          : new Date(asset.purchaseDate).toISOString().split('T')[0];
-        const [pdYear, pdMonth, pdDay] = pdStr.split('-').map(Number);
-        const pd = new Date(pdYear, pdMonth - 1, pdDay); // local midnight
-
-        if (asset.warrantyMonths) {
-          const wDate = new Date(pd);
-          wDate.setMonth(wDate.getMonth() + Number(asset.warrantyMonths));
-          if (wDate < today) atRisk = true;
+      if (filterRisk) {
+        if (asset.status === 'RETIRED') return false;
+        let atRisk = false;
+        const today = new Date();
+        // Normalize today to midnight (date only, no time)
+        today.setHours(0, 0, 0, 0);
+        if (asset.purchaseDate) {
+          // purchaseDate arrives as "2025-06-14T00:00:00.000Z" — parse as local date
+          const pdStr = typeof asset.purchaseDate === 'string'
+            ? asset.purchaseDate.split('T')[0]
+            : new Date(asset.purchaseDate).toISOString().split('T')[0];
+          const [pdYear, pdMonth, pdDay] = pdStr.split('-').map(Number);
+          const pd = new Date(pdYear, pdMonth - 1, pdDay); // local midnight
+  
+          if (asset.warrantyMonths) {
+            const wDate = new Date(pd);
+            wDate.setMonth(wDate.getMonth() + Number(asset.warrantyMonths));
+            if (wDate < today) atRisk = true;
+          }
+          if (asset.depreciationYears) {
+            const dDate = new Date(pd);
+            dDate.setFullYear(dDate.getFullYear() + Number(asset.depreciationYears));
+            if (dDate < today) atRisk = true;
+          }
         }
-        if (asset.depreciationYears) {
-          const dDate = new Date(pd);
-          dDate.setFullYear(dDate.getFullYear() + Number(asset.depreciationYears));
-          if (dDate < today) atRisk = true;
-        }
+        if (!atRisk) return false;
       }
-      return atRisk;
-    }
     
     if (filterCategory !== 'all') {
       if (Number(asset.categoryId) !== Number(filterCategory)) return false;
@@ -425,7 +430,14 @@ export default function Catalog() {
     <div className="catalog-page">
       <header className="catalog-header">
         <div>
-          <h1 className="title-glow" style={{ fontSize: '32px', marginBottom: '8px' }}>Catálogo de Activos</h1>
+          <h1 className="title-glow" style={{ fontSize: '32px', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+            Catálogo de Activos
+            {assets && (
+              <span style={{ fontSize: '14px', background: 'var(--bg-glass)', padding: '4px 12px', borderRadius: '20px', color: 'var(--text-muted)', border: '1px solid var(--border-glass)', fontWeight: 500, letterSpacing: '0.3px', display: 'inline-block' }}>
+                {filteredAssets?.length === assets.length ? `Total: ${assets.length}` : `Mostrando ${filteredAssets?.length} de ${assets.length}`}
+              </span>
+            )}
+          </h1>
           <p style={{ color: 'var(--text-muted)' }}>Visualiza y administra todos los equipos registrados en el inventario.</p>
         </div>
         <div style={{ display: 'flex', gap: '10px' }}>
@@ -612,6 +624,16 @@ export default function Catalog() {
                     {Object.entries(asset.dynamicAttributes || {}).map(([key, value]) => {
                       if (!value || String(value).trim() === '') return null;
                       const lowerKey = key.toLowerCase();
+                      
+                      // Ocultar etiquetas duplicadas/confusas migradas del excel
+                      if (
+                        lowerKey.includes('fecha de compra') ||
+                        lowerKey.includes('precio') ||
+                        lowerKey.includes('depreciaci') ||
+                        lowerKey.includes('garant') ||
+                        lowerKey.includes('warranty')
+                      ) return null;
+
                       let Icon = Tag;
                       if (lowerKey.includes('proces') || lowerKey.includes('cpu')) Icon = Cpu;
                       else if (lowerKey.includes('ram') || lowerKey.includes('mem') || lowerKey.includes('disco') || lowerKey.includes('disk')) Icon = HardDrive;
@@ -627,34 +649,6 @@ export default function Catalog() {
                       <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Sin specs</span>
                     }
                     
-                    {asset.purchaseDate && (
-                      <span className="spec-tag" style={{ background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', marginTop: '4px' }}>
-                        📅 Compra: {new Date(asset.purchaseDate).toLocaleDateString('es-CO')}
-                      </span>
-                    )}
-                    
-                    {asset.purchaseDate && asset.depreciationYears ? (() => {
-                      const purchaseDate = new Date(asset.purchaseDate);
-                      const now = new Date();
-                      const elapsedMs = now.getTime() - purchaseDate.getTime();
-                      const elapsedDays = Math.max(0, Math.floor(elapsedMs / (1000 * 60 * 60 * 24)));
-                      const totalDays = asset.depreciationYears * 365;
-                      const depreciationPct = Math.min(100, Math.max(0, (elapsedDays / totalDays) * 100));
-                      
-                      let depreciationValueText = '';
-                      if (asset.purchasePrice) {
-                        const dailyDepreciation = asset.purchasePrice / totalDays;
-                        const depreciatedValue = dailyDepreciation * elapsedDays;
-                        const currentValue = Math.max(0, asset.purchasePrice - depreciatedValue);
-                        depreciationValueText = ` | Valor Actual: COP $${currentValue.toLocaleString('es-CO', { maximumFractionDigits: 0 })}`;
-                      }
-
-                      return (
-                        <span className="spec-tag" style={{ background: 'rgba(234, 179, 8, 0.15)', color: '#ca8a04', marginTop: '4px' }}>
-                          📉 Depreciación: {depreciationPct.toFixed(1)}%{depreciationValueText}
-                        </span>
-                      );
-                    })() : null}
                     </div>
                   </td>
                   <td>
@@ -1050,6 +1044,12 @@ export default function Catalog() {
             <h3 style={{ textAlign: 'center', marginBottom: '24px', color: 'var(--text-main)', borderBottom: '1px solid var(--border-glass)', paddingBottom: '16px', fontSize: '22px', marginTop: 0 }}>
               {isEditing ? 'Editar Activo' : 'Registrar Nuevo Activo'}
             </h3>
+            {modalErrorMsg && (
+              <div className="alert alert-error" style={{ marginBottom: '20px', fontSize: '14px' }}>
+                <AlertCircle size={18} />
+                {modalErrorMsg}
+              </div>
+            )}
             <form onSubmit={(e) => { 
               e.preventDefault(); 
               const submitAction = () => {
