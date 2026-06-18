@@ -4,8 +4,13 @@ export interface AssignmentDocumentData {
     collaboratorName: string;
     collaboratorEmail: string;
     department: string;
+    ceco?: string;
+    sede?: string;
     assetId: string;
-    assetType: string;
+    assetType: string; // Category Name
+    assetBrand?: string;
+    assetHostname?: string;
+    assetVersionOs?: string;
     assetSerial: string;
     assetModel: string;
     assetMac: string;
@@ -15,6 +20,9 @@ export interface AssignmentDocumentData {
     requiresPlacaIkusi?: boolean; // Added for peripherals logic
     ipAddress: string;
     timestamp: Date;
+    legalTextOverride?: string;
+    isForcedSignature?: boolean;
+    signatureEmail?: string;
 }
 
 export interface IDocumentService {

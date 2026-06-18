@@ -111,33 +111,60 @@
 .maint-kpi-card.kpi-teal   { border-top-color: #14b8a6; }
 .maint-kpi-card.kpi-purple { border-top-color: #a855f7; }
 
-/* ── Split Layout ─────────────────────────────────────── */
+/* ── Layout ─────────────────────────────────────── */
 .maint-split-layout {
-  display: flex;
-  gap: 20px;
-  align-items: flex-start;
-}
-
-.table-main-area {
-  flex: 7;
-  min-width: 0;
-}
-
-.charts-sidebar {
-  flex: 3;
-  min-width: 320px;
   display: flex;
   flex-direction: column;
   gap: 20px;
 }
 
+.table-main-area {
+  width: 100%;
+}
+
+.charts-sidebar {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+}
+
+.maint-table-scroll {
+  max-height: calc(100vh - 420px);
+  overflow-y: auto;
+  min-height: 300px;
+}
+
+.maint-table-scroll table th {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--ikusi-green, #00a650);
+  color: white;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+/* ── Frozen First Column ────────────────────────────────────────────── */
+.maint-table-scroll table th:first-child,
+.maint-table-scroll table td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 5;
+  background: white;
+  border-right: 1px solid var(--border-subtle, #e2e8f0);
+}
+
+.maint-table-scroll table th:first-child {
+  z-index: 11;
+  background: var(--ikusi-green, #00a650); /* Solid color to prevent overlap visibility */
+  border-right: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+
 /* ── Responsive ───────────────────────────────────────── */
 @media (max-width: 1100px) {
-  .maint-split-layout {
-    flex-direction: column;
-  }
   .charts-sidebar {
-    width: 100%;
+    grid-template-columns: 1fr;
   }
 }
 

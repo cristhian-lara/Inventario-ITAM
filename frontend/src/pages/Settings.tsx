@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
-import { Plus, Settings as SettingsIcon, Building, Briefcase, Tag, CheckCircle2, AlertCircle, Trash2, Database, Edit, X } from 'lucide-react';
+import { Plus, Settings as SettingsIcon, Building, Briefcase, Tag, CheckCircle2, AlertCircle, Trash2, Database, Edit, X, FileText, Save } from 'lucide-react';
 import { useConfirm } from '../context/ConfirmContext';
 import './Settings.css';
 import { API_URL } from '../config';
@@ -211,9 +211,61 @@ export default function Settings() {
 
   // --- CUSTOM LISTS STATE ---
   const [activeTab2, setActiveTab2] = useState('categories');
-  
 
-  
+  const { data: settingsData, isLoading: loadingSettings } = useQuery({
+    queryKey: ['settings'],
+    queryFn: async () => {
+      const response = await axios.get(`${API_URL}/api/settings`);
+      return response.data;
+    }
+  });
+
+  const updateSettingsMutation = useMutation({
+    mutationFn: async (payload: any) => {
+      const res = await axios.put(`${API_URL}/api/settings`, payload);
+      return res.data;
+    },
+    onSuccess: () => {
+      setSuccessMsg('Plantillas guardadas con éxito');
+      queryClient.invalidateQueries({ queryKey: ['settings'] });
+      setTimeout(() => setSuccessMsg(''), 5000);
+    },
+    onError: (err: any) => {
+      setErrorMsg(err.response?.data?.error || err.message);
+      setTimeout(() => setErrorMsg(''), 5000);
+    }
+  });
+
+  const defaultAssignment = `Mediante la presente hago constar que recibí del área de Tecnología de información el equipo de cómputo en la siguiente página. Me han asignado para facilitar el desempeño de mis funciones, comprometiéndome a destinarlo solo para fines de trabajo y cuidados para su buen funcionamiento y conservación. Cabe señalar que, de existir algún daño físico del equipo imputable a negligencia, acepto la responsabilidad en la reparación de estos.\n\nDe la misma forma que estoy enterado del compromiso de no instalar software adicional al que tiene el equipo sin previa NOTIFICACION Y AUTORIZACION DEL DEPARTAMENTO DE TI. Haciéndome responsable de las sanciones que pudiera dar lugar por dicha instalación.\n\nLos gastos derivados de la reparación y/o remplazo de los equipos de cómputo por daños sufridos como consecuencias de negligencia o descuido por mi parte será de mi entera responsabilidad y son susceptibles de serme repercutidos.\n\nEn caso de robo del equipo, es obligatoria del empleado entregar al departamento de TI copia del acta levantada para poder proceder al trámite de seguro.\n\nCabe señalar que al dar terminada mi relación laboral dentro de IKUSI Redes Colombia, S.A.S. de C. V. me obligo a entregar el equipo en buenas condiciones, (incluyendo toda la información generada por mis actividades) al departamento de TI para que sea dada de baja esta RESPONSIVA.\n\nLa empresa se reserva el derecho de solicitar al empleado en cualquier momento el equipo para su auditoria y/o revisión.`;
+  const defaultReturn = `Mediante la presente, el colaborador hace entrega formal al área de Tecnología de la Información del equipo de cómputo listado en este documento, el cual le fue asignado previamente para el desempeño de sus funciones.\n\nSe deja constancia de que el equipo ha sido revisado por el departamento de TI, validando su estado físico y de funcionamiento actual. Al firmar este documento de Paz y Salvo, el colaborador queda exento de cualquier responsabilidad futura relacionada con el cuidado, conservación o daños del hardware aquí mencionado.\n\nAsimismo, el colaborador certifica que ha entregado los accesorios asociados (cargador, maletín, etc.) y que no retiene información confidencial de IKUSI Redes Colombia, S.A.S. de C. V. en medios de almacenamiento personales derivada del uso de este equipo.\n\nEste documento cancela la responsiva firmada en el momento de la asignación original, dando de baja la responsabilidad del empleado sobre los activos relacionados.`;
+  const defaultMaintenance = `Por medio de la presente, confirmo que he recibido de vuelta mi equipo y certifico que el servicio de mantenimiento detallado en la página anterior se ha realizado satisfactoriamente. Entiendo que debo notificar inmediatamente al área de Tecnología de la Información en caso de presentarse anomalías recurrentes relacionadas con este servicio.\n\nEl usuario certifica que al momento de la devolución, el equipo es operativo de acuerdo a lo expresado en los detalles técnicos de este acta, dándose por concluido el servicio programado.`;
+
+  const [actaAsignacion, setActaAsignacion] = useState(defaultAssignment);
+  const [actaDevolucion, setActaDevolucion] = useState(defaultReturn);
+  const [actaMantenimiento, setActaMantenimiento] = useState(defaultMaintenance);
+
+  React.useEffect(() => {
+    if (settingsData) {
+      if (settingsData.ACTA_ASIGNACION_TEXT) setActaAsignacion(settingsData.ACTA_ASIGNACION_TEXT);
+      if (settingsData.ACTA_DEVOLUCION_TEXT) setActaDevolucion(settingsData.ACTA_DEVOLUCION_TEXT);
+      if (settingsData.ACTA_MANTENIMIENTO_TEXT) setActaMantenimiento(settingsData.ACTA_MANTENIMIENTO_TEXT);
+    }
+  }, [settingsData]);
+
+  const handleSaveTemplates = () => {
+    confirm({
+      title: 'Guardar Plantillas',
+      message: '¿Estás seguro de guardar los cambios en las plantillas de actas?',
+      type: 'info',
+      onConfirm: () => {
+        updateSettingsMutation.mutate({
+          ACTA_ASIGNACION_TEXT: actaAsignacion,
+          ACTA_DEVOLUCION_TEXT: actaDevolucion,
+          ACTA_MANTENIMIENTO_TEXT: actaMantenimiento
+        });
+      }
+    });
+  };
 
     const handleCreateCategory = (e: React.FormEvent) => {
     e.preventDefault();
@@ -304,6 +356,12 @@ export default function Settings() {
             onClick={() => setActiveTab2('cecos')}
           >
             <Briefcase size={18} /> CECOS
+          </button>
+          <button 
+            className={`settings-tab ${activeTab2 === 'templates' ? 'active' : ''}`}
+            onClick={() => setActiveTab2('templates')}
+          >
+            <FileText size={18} /> Plantillas de Actas
           </button>
           
                   </div>
@@ -434,6 +492,68 @@ export default function Settings() {
                     <p className="list-desc">{c.description || 'Sin descripción'}</p>
                   </div>
                 ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab2 === 'templates' && (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+              <h3 style={{ margin: 0 }}>Plantillas de Actas</h3>
+              <button className="btn-primary" onClick={handleSaveTemplates} disabled={updateSettingsMutation.isPending}>
+                <Save size={18} /> Guardar Cambios
+              </button>
+            </div>
+            
+            {loadingSettings ? (
+              <div className="loading-spinner">Cargando...</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                <div style={{ background: 'rgba(255,255,255,0.02)', padding: '20px', borderRadius: '12px', border: '1px dashed var(--border-glass)' }}>
+                  <h4 style={{ margin: '0 0 16px 0', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <FileText size={18} color="var(--ikusi-green)" />
+                    Acta de Asignación
+                  </h4>
+                  <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '12px' }}>Este texto legal aparecerá en la página final del PDF de asignación.</p>
+                  <textarea 
+                    className="glass-input" 
+                    rows={8} 
+                    style={{ width: '100%', resize: 'vertical' }}
+                    value={actaAsignacion}
+                    onChange={(e) => setActaAsignacion(e.target.value)}
+                  />
+                </div>
+
+                <div style={{ background: 'rgba(255,255,255,0.02)', padding: '20px', borderRadius: '12px', border: '1px dashed var(--border-glass)' }}>
+                  <h4 style={{ margin: '0 0 16px 0', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <FileText size={18} color="var(--ikusi-green)" />
+                    Acta de Paz y Salvo (Devolución)
+                  </h4>
+                  <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '12px' }}>Este texto legal aparecerá en la página final del PDF de devolución.</p>
+                  <textarea 
+                    className="glass-input" 
+                    rows={8} 
+                    style={{ width: '100%', resize: 'vertical' }}
+                    value={actaDevolucion}
+                    onChange={(e) => setActaDevolucion(e.target.value)}
+                  />
+                </div>
+
+                <div style={{ background: 'rgba(255,255,255,0.02)', padding: '20px', borderRadius: '12px', border: '1px dashed var(--border-glass)' }}>
+                  <h4 style={{ margin: '0 0 16px 0', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <FileText size={18} color="var(--ikusi-green)" />
+                    Acta de Mantenimiento Técnico
+                  </h4>
+                  <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '12px' }}>Este texto legal aparecerá en la página final del PDF de mantenimiento.</p>
+                  <textarea 
+                    className="glass-input" 
+                    rows={8} 
+                    style={{ width: '100%', resize: 'vertical' }}
+                    value={actaMantenimiento}
+                    onChange={(e) => setActaMantenimiento(e.target.value)}
+                  />
+                </div>
               </div>
             )}
           </div>
