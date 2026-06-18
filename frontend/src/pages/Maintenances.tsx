@@ -41,6 +41,7 @@ const Maintenances: React.FC = () => {
   const [filterMonth, setFilterMonth] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<'general' | 'auditoria' | 'balance'>('general');
+  const [coverageFilter, setCoverageFilter] = useState<'all' | 'completed' | 'scheduled' | 'pending'>('all');
   const { confirm } = useConfirm();
 
   const [showModal, setShowModal] = useState(false);
@@ -82,6 +83,8 @@ const Maintenances: React.FC = () => {
       return res.json();
     }
   });
+
+  const { data: categories } = useQuery<any[]>({ queryKey: ['categories'], queryFn: async () => { const res = await fetch(`${API_URL}/api/catalog/categories`); if (!res.ok) return []; return res.json(); } });
 
   const { data: assignments } = useQuery<any[]>({
     queryKey: ['assignments'],
@@ -214,6 +217,7 @@ const Maintenances: React.FC = () => {
 
   const timeFilteredMaintenances = maintenances?.filter(m => {
     if (filterYear !== 'all' || filterMonth !== 'all') {
+      if (!m?.scheduledDate) return false;
       const date = new Date(m.scheduledDate);
       if (filterYear !== 'all' && date.getFullYear().toString() !== filterYear) return false;
       if (filterMonth !== 'all' && (date.getMonth() + 1).toString() !== filterMonth) return false;
@@ -225,9 +229,9 @@ const Maintenances: React.FC = () => {
   const totalCount = timeFilteredMaintenances?.length || 0;
   const totalScheduled = timeFilteredMaintenances?.filter(m => m.status === 'SCHEDULED').length || 0;
   const totalInProgress = timeFilteredMaintenances?.filter(m => m.status === 'IN_PROGRESS').length || 0;
-  const totalCompleted = timeFilteredMaintenances?.filter(m => m.status === 'COMPLETED').length || 0;
+  const totalCompleted = timeFilteredMaintenances?.filter(m => m?.status === 'COMPLETED').length || 0;
   const overdue = timeFilteredMaintenances?.filter(m => m.status === 'SCHEDULED' && getTargetMidnight(m.scheduledDate) < nowNorm).length || 0;
-  const preventiveCount = timeFilteredMaintenances?.filter(m => m.type === 'PREVENTIVE').length || 0;
+  const preventiveCount = timeFilteredMaintenances?.filter(m => m?.type === 'PREVENTIVE').length || 0;
   const correctiveCount = timeFilteredMaintenances?.filter(m => m.type === 'CORRECTIVE').length || 0;
   const correctiveRatio = timeFilteredMaintenances && timeFilteredMaintenances.length > 0
     ? Math.round((correctiveCount / timeFilteredMaintenances.length) * 100) : 0;
@@ -257,7 +261,7 @@ const Maintenances: React.FC = () => {
       month: d.toLocaleString('es-CO', { month: 'short' }),
       Preventivo: maintenances?.filter(m => {
         const md = new Date(m.scheduledDate);
-        return m.type === 'PREVENTIVE' && md.getFullYear() === yr && md.getMonth() === mo;
+        return m?.type === 'PREVENTIVE' && md.getFullYear() === yr && md.getMonth() === mo;
       }).length || 0,
       Correctivo: maintenances?.filter(m => {
         const md = new Date(m.scheduledDate);
@@ -266,42 +270,113 @@ const Maintenances: React.FC = () => {
     };
   });
 
+  // Global coverage metrics
+  const validCategoryNames = ['computadores', 'laptops', 'computador', 'laptop', 'laptos'];
+  const validCategoryIds = new Set(categories?.filter(c => validCategoryNames.includes((c.name || '').toLowerCase())).map(c => c.id.toString()));
+  
+  const isCategoriesLoaded = categories && categories.length > 0;
+  const filteredAssets = assets?.filter(a => {
+    if (a.status === 'RETIRED') return false;
+    if (!isCategoriesLoaded) return false;
+    return validCategoryIds.has(a.categoryId?.toString());
+  }) || [];
+
+  const totalAssetsCount = filteredAssets.length;
+  const assetsCompleted = new Set<string>();
+  const assetsScheduled = new Set<string>();
+  const assetsPending = new Set<string>();
+
+  filteredAssets.forEach(asset => {
+    const assetMaintenances = maintenances?.filter(m => m.assetId === asset.id) || [];
+    const hasCompleted = assetMaintenances.some(m => m?.status === 'COMPLETED');
+    const hasScheduled = assetMaintenances.some(m => m.status === 'SCHEDULED' || m.status === 'IN_PROGRESS');
+    
+    if (hasCompleted) {
+      assetsCompleted.add(asset.id);
+    } else if (hasScheduled) {
+      assetsScheduled.add(asset.id);
+    } else {
+      assetsPending.add(asset.id);
+    }
+  });
+
+  const assetsWithCompletedCount = assetsCompleted.size;
+  const scheduledWithoutCompletedCount = assetsScheduled.size;
+  const pendingSchedulingCount = assetsPending.size;
+
   // ── Filters ────────────────────────────────────────────────────────────────
   const handleCardClick = (statusFilter: string) => {
     setFilterStatus(filterStatus === statusFilter ? 'all' : statusFilter);
   };
 
-  const filteredData = maintenances?.filter(m => {
+  let displayData: any[] = [];
+  if (coverageFilter === 'pending') {
+    filteredAssets.forEach(a => {
+      if (assetsPending.has(a.id)) {
+        displayData.push({
+          isDummy: true,
+          id: `dummy-${a.id}`,
+          assetId: a.id,
+          type: 'NONE',
+          status: 'PENDING_SCHEDULING',
+          scheduledDate: '',
+          collaboratorInTurnName: getCollaboratorForAsset(a.id)
+        });
+      }
+    });
+  } else {
+    let baseMaintenances = maintenances || [];
+    if (coverageFilter === 'completed') {
+      baseMaintenances = baseMaintenances.filter(m => assetsCompleted.has(m.assetId) && m?.status === 'COMPLETED');
+    } else if (coverageFilter === 'scheduled') {
+      baseMaintenances = baseMaintenances.filter(m => assetsScheduled.has(m.assetId) && (m?.status === 'SCHEDULED' || m?.status === 'IN_PROGRESS'));
+    }
+    displayData = baseMaintenances;
+  }
+
+  const filteredData = displayData.filter(m => {
     // 1. Term search
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
-      const asset = assets?.find(a => a.id === m.assetId);
-      const matchesAsset = m.assetId.toLowerCase().includes(term);
-      const matchesCollab = m.collaboratorInTurnName?.toLowerCase().includes(term);
+      const asset = assets?.find(a => a.id === m?.assetId);
+      const matchesAsset = (m?.assetId || '').toLowerCase().includes(term);
+      const matchesCollab = (m?.collaboratorInTurnName || getCollaboratorForAsset(m?.assetId || '')).toLowerCase().includes(term);
       const matchesHostname = (asset?.dynamicAttributes?.Hostname || '').toLowerCase().includes(term);
       if (!matchesAsset && !matchesCollab && !matchesHostname) return false;
     }
 
+    if (m.isDummy) return true;
+
     // 2. View modes
     if (viewMode === 'auditoria') {
-      if (!(m.status === 'SCHEDULED' && new Date(m.scheduledDate) < now)) return false;
+      if (!(m?.status === 'SCHEDULED' && m?.scheduledDate && new Date(m.scheduledDate) < new Date())) return false;
     } else if (viewMode === 'balance') {
-      if (m.type !== 'CORRECTIVE') return false;
+      if (m?.type !== 'CORRECTIVE') return false;
     } else if (viewMode === 'preventive') {
-      if (m.type !== 'PREVENTIVE') return false;
+      if (m?.type !== 'PREVENTIVE') return false;
     }
 
     // 3. Types and Statuses
-    if (filterType !== 'all' && m.type !== filterType) return false;
-    if (filterStatus !== 'all' && m.status !== filterStatus) return false;
+    if (filterType !== 'all' && m?.type !== filterType) return false;
+    if (filterStatus !== 'all' && m?.status !== filterStatus) return false;
     
     if (filterYear !== 'all' || filterMonth !== 'all') {
+      if (!m?.scheduledDate) return false;
       const date = new Date(m.scheduledDate);
       if (filterYear !== 'all' && date.getFullYear().toString() !== filterYear) return false;
       if (filterMonth !== 'all' && (date.getMonth() + 1).toString() !== filterMonth) return false;
     }
     
     return true;
+  }).sort((a, b) => {
+    // Agrupar por equipo (assetId) para visualizar juntos sus históricos
+    if (a.assetId < b.assetId) return -1;
+    if (a.assetId > b.assetId) return 1;
+    
+    // Luego ordenar por fecha más reciente (descendente)
+    const dateA = a.scheduledDate ? new Date(a.scheduledDate).getTime() : 0;
+    const dateB = b.scheduledDate ? new Date(b.scheduledDate).getTime() : 0;
+    return dateB - dateA;
   });
 
   // ── CSV Export ─────────────────────────────────────────────────────────────
@@ -310,12 +385,12 @@ const Maintenances: React.FC = () => {
     const headers = ['ID Mantenimiento', 'Placa Ikusi', 'Tipo', 'Estado', 'Fecha Programada', 'Fecha Ejecución', 'Dias Retraso', 'Usuario en Turno', 'Motivo', 'Notas Resolución'];
     const rows = filteredData.map(m => {
       let delayDays = 0;
-      if (m.status === 'COMPLETED' && m.executionDate) {
+      if (m?.status === 'COMPLETED' && m?.executionDate && m?.scheduledDate) {
         delayDays = Math.max(0, Math.floor((new Date(m.executionDate).getTime() - new Date(m.scheduledDate).getTime()) / (1000 * 3600 * 24)));
       } else if (m.status === 'SCHEDULED' && new Date(m.scheduledDate) < new Date()) {
         delayDays = Math.max(0, Math.floor((new Date().getTime() - new Date(m.scheduledDate).getTime()) / (1000 * 3600 * 24)));
       }
-      return [m.id, m.assetId, m.type === 'PREVENTIVE' ? 'Preventivo' : 'Correctivo', m.status, m.scheduledDate.split('T')[0], m.executionDate ? m.executionDate.split('T')[0] : 'N/A', delayDays.toString(), m.collaboratorInTurnName || 'N/A', `"${(m.reason || '').replace(/"/g, '""')}"`, `"${(m.notes || '').replace(/"/g, '""')}"`];
+      return [m.id, m.assetId, m?.type === 'PREVENTIVE' ? 'Preventivo' : 'Correctivo', m.status, m.scheduledDate.split('T')[0], m.executionDate ? m.executionDate.split('T')[0] : 'N/A', delayDays.toString(), m?.collaboratorInTurnName || 'N/A', `"${(m.reason || '').replace(/"/g, '""')}"`, `"${(m.notes || '').replace(/"/g, '""')}"`];
     });
     const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
     const link = document.createElement("a");
@@ -345,25 +420,11 @@ const Maintenances: React.FC = () => {
     confirm({ title, message, type: 'info', onConfirm: submitAction });
   };
 
-  // Global coverage metrics
-  const totalAssetsCount = assets?.length || 0;
-  let assetsWithCompletedCount = 0;
-  let scheduledWithoutCompletedCount = 0;
-  let pendingSchedulingCount = 0;
 
-  assets?.forEach(asset => {
-    const assetMaintenances = maintenances?.filter(m => m.assetId === asset.id) || [];
-    const hasCompleted = assetMaintenances.some(m => m.status === 'COMPLETED');
-    const hasScheduled = assetMaintenances.some(m => m.status === 'SCHEDULED' || m.status === 'IN_PROGRESS');
-    
-    if (hasCompleted) {
-      assetsWithCompletedCount++;
-    } else if (hasScheduled) {
-      scheduledWithoutCompletedCount++;
-    } else {
-      pendingSchedulingCount++;
-    }
-  });
+
+  const handleCoverageClick = (type: 'completed' | 'scheduled' | 'pending') => {
+    setCoverageFilter(coverageFilter === type ? 'all' : type);
+  };
 
   const openModal = (mode: 'create' | 'start' | 'complete' | 'view' | 'forceSign', record?: MaintenanceRecord) => {
     setModalMode(mode); setSelectedRecord(record || null);
@@ -427,7 +488,7 @@ const Maintenances: React.FC = () => {
             </div>
           </div>
 
-          <div className="maint-kpi-card kpi-green" style={{ flex: '1 1 200px', cursor: 'default' }}>
+          <div className="maint-kpi-card kpi-green" style={{ flex: '1 1 200px', cursor: 'pointer', outline: coverageFilter === 'completed' ? '2px solid #22c55e' : 'none' }} onClick={() => handleCoverageClick('completed')}>
             <div className="kpi-icon" style={{ background: 'rgba(34,197,94,0.12)', color: '#22c55e' }}><CheckCircle size={22} /></div>
             <div className="kpi-body">
               <span className="kpi-label">Con Mantenimiento</span>
@@ -436,16 +497,15 @@ const Maintenances: React.FC = () => {
             </div>
           </div>
 
-          <div className="maint-kpi-card kpi-blue" style={{ flex: '1 1 200px', cursor: 'default' }}>
+          <div className="maint-kpi-card kpi-blue" style={{ flex: '1 1 200px', cursor: 'pointer', outline: coverageFilter === 'scheduled' ? '2px solid #3b82f6' : 'none' }} onClick={() => handleCoverageClick('scheduled')}>
             <div className="kpi-icon" style={{ background: 'rgba(59,130,246,0.12)', color: '#3b82f6' }}><Calendar size={22} /></div>
             <div className="kpi-body">
               <span className="kpi-label">Ya Programados</span>
               <span className="kpi-value" style={{ color: '#3b82f6' }}>{scheduledWithoutCompletedCount}</span>
-              <span className="kpi-sub">Les falta, pero en agenda</span>
-            </div>
+              </div>
           </div>
 
-          <div className="maint-kpi-card kpi-red" style={{ flex: '1 1 200px', cursor: 'default' }}>
+          <div className="maint-kpi-card kpi-red" style={{ flex: '1 1 200px', cursor: 'pointer', outline: coverageFilter === 'pending' ? '2px solid #ef4444' : 'none' }} onClick={() => handleCoverageClick('pending')}>
             <div className="kpi-icon" style={{ background: 'rgba(239,68,68,0.12)', color: '#ef4444' }}><AlertTriangle size={22} /></div>
             <div className="kpi-body">
               <span className="kpi-label">Pendientes de Programar</span>
@@ -463,8 +523,7 @@ const Maintenances: React.FC = () => {
           <div className="kpi-body">
             <span className="kpi-label">Total Mantenimientos</span>
             <span className="kpi-value" style={{ color: '#475569' }}>{totalCount}</span>
-            <span className="kpi-sub">según fecha</span>
-          </div>
+            </div>
         </div>
 
         <div className="maint-kpi-card kpi-blue" style={{ cursor: 'pointer', outline: filterStatus === 'SCHEDULED' ? '2px solid #3b82f6' : 'none' }} onClick={() => handleCardClick('SCHEDULED')}>
@@ -472,8 +531,7 @@ const Maintenances: React.FC = () => {
           <div className="kpi-body">
             <span className="kpi-label">Programados</span>
             <span className="kpi-value" style={{ color: '#3b82f6' }}>{totalScheduled}</span>
-            <span className="kpi-sub">clic para filtrar</span>
-          </div>
+            </div>
         </div>
 
         <div className="maint-kpi-card kpi-amber" style={{ cursor: 'pointer', outline: filterStatus === 'IN_PROGRESS' ? '2px solid #f59e0b' : 'none' }} onClick={() => handleCardClick('IN_PROGRESS')}>
@@ -489,8 +547,7 @@ const Maintenances: React.FC = () => {
           <div className="kpi-body">
             <span className="kpi-label">Vencidos</span>
             <span className="kpi-value" style={{ color: '#ef4444' }}>{overdue}</span>
-            <span className="kpi-sub">sin atender</span>
-          </div>
+            </div>
         </div>
 
         <div className="maint-kpi-card kpi-green" style={{ cursor: 'pointer', outline: filterStatus === 'COMPLETED' ? '2px solid #22c55e' : 'none' }} onClick={() => handleCardClick('COMPLETED')}>
@@ -545,7 +602,7 @@ const Maintenances: React.FC = () => {
                   <Calendar size={16} /> Período:
                 </span>
                 <select className="glass-input" value={filterMonth} onChange={e => setFilterMonth(e.target.value)} style={{ width: '150px' }}>
-                  <option value="all">Cualquier Mes</option>
+                  <option value="all">Todos (meses)</option>
                   <option value="1">Enero</option>
                   <option value="2">Febrero</option>
                   <option value="3">Marzo</option>
@@ -560,9 +617,27 @@ const Maintenances: React.FC = () => {
                   <option value="12">Diciembre</option>
                 </select>
                 <select className="glass-input" value={filterYear} onChange={e => setFilterYear(e.target.value)} style={{ width: '130px' }}>
-                  <option value="all">Cualquier Año</option>
+                  <option value="all">Todos (años)</option>
                   {availableYears.map(y => <option key={y} value={y.toString()}>{y}</option>)}
-                </select>
+                                </select>
+                {(filterMonth !== 'all' || filterYear !== 'all' || searchTerm !== '' || filterStatus !== 'all' || viewMode !== 'general' || coverageFilter !== 'all') && (
+                  <button 
+                    className="btn-glass" 
+                    style={{ color: '#ef4444', borderColor: 'rgba(239,68,68,0.2)', display: 'flex', alignItems: 'center', gap: '6px', height: '38px', padding: '0 12px' }} 
+                    onClick={() => {
+                      setFilterMonth('all');
+                      setFilterYear('all');
+                      setSearchTerm('');
+                      setFilterStatus('all');
+                      setViewMode('general');
+                      setCoverageFilter('all');
+                      setFilterType('all');
+                    }}
+                    title="Limpiar todos los filtros y búsqueda"
+                  >
+                    <X size={16} /> Limpiar filtros
+                  </button>
+                )}
               </div>
             </div>
 
@@ -583,99 +658,136 @@ const Maintenances: React.FC = () => {
                 </thead>
                 <tbody>
                   {filteredData?.map(m => {
-                    const isLate = m.status === 'SCHEDULED' && getTargetMidnight(m.scheduledDate) < nowNorm;
+                    const isLate = m?.status === 'SCHEDULED' && m?.scheduledDate && getTargetMidnight(m.scheduledDate) < nowNorm;
                     const delayDays = (() => {
-                      if (m.status === 'COMPLETED' && m.executionDate) {
+                      if (m?.status === 'COMPLETED' && m?.executionDate && m?.scheduledDate) {
                         return Math.max(0, Math.floor((getTargetMidnight(m.executionDate) - getTargetMidnight(m.scheduledDate)) / (1000 * 3600 * 24)));
-                      } else if (m.status === 'SCHEDULED' && getTargetMidnight(m.scheduledDate) < nowNorm) {
+                      } else if (m?.status === 'SCHEDULED' && m?.scheduledDate && getTargetMidnight(m.scheduledDate) < nowNorm) {
                         return Math.floor((nowNorm - getTargetMidnight(m.scheduledDate)) / (1000 * 3600 * 24));
                       }
                       return null;
                     })();
 
                     return (
-                      <tr key={m.id}>
+                      <tr key={m?.id || Math.random()}>
                         <td style={{ fontWeight: 600 }}>
-                          {assets?.find(a => a.id === m.assetId)?.dynamicAttributes?.Hostname || m.assetId}
-                        </td>
-                        <td>
-                          <span className="spec-tag" style={{ background: m.type === 'PREVENTIVE' ? 'rgba(59,130,246,0.12)' : 'rgba(239,68,68,0.12)', color: m.type === 'PREVENTIVE' ? '#3b82f6' : '#ef4444' }}>
-                            {m.type === 'PREVENTIVE' ? 'Preventivo' : 'Correctivo'}
+                          <span 
+                            style={{ cursor: 'pointer', textDecoration: 'underline', color: 'var(--text-main)' }} 
+                            onClick={() => {
+                              const hostname = assets?.find(a => a.id === m?.assetId)?.dynamicAttributes?.Hostname || m?.assetId;
+                              setSearchTerm(hostname || '');
+                            }}
+                            title="Filtrar mantenimientos por este equipo"
+                          >
+                            {assets?.find(a => a.id === m?.assetId)?.dynamicAttributes?.Hostname || m?.assetId}
                           </span>
                         </td>
                         <td>
-                          <span className={`badge badge-status badge-${m.status.toLowerCase()}`}>
-                            {STATUS_LABELS[m.status] || m.status}
-                          </span>
-                          {isLate && <span style={{ color: '#ef4444', fontSize: '12px', marginLeft: '6px' }}>⚠ Vencido</span>}
+                          {m?.isDummy ? (
+                            <span className="spec-tag" style={{ background: 'rgba(71,85,105,0.12)', color: '#475569' }}>
+                              Sin asignar
+                            </span>
+                          ) : (
+                            <span className="spec-tag" style={{ background: m?.type === 'PREVENTIVE' ? 'rgba(59,130,246,0.12)' : 'rgba(239,68,68,0.12)', color: m?.type === 'PREVENTIVE' ? '#3b82f6' : '#ef4444' }}>
+                              {m?.type === 'PREVENTIVE' ? 'Preventivo' : 'Correctivo'}
+                            </span>
+                          )}
                         </td>
-                        <td>{new Date(m.scheduledDate).toLocaleDateString('es-CO', { timeZone: 'UTC' })}</td>
                         <td>
-                          {delayDays === null ? (
+                          {m?.isDummy ? (
+                            <span className="badge badge-status" style={{ background: 'rgba(239,68,68,0.12)', color: '#ef4444' }}>
+                              Sin Programar
+                            </span>
+                          ) : (
+                            <span className={`badge badge-status badge-${(m?.status || 'UNKNOWN').toLowerCase()}`}>
+                              {m?.status ? (STATUS_LABELS[m.status] || m.status) : 'Desconocido'}
+                            </span>
+                          )}
+                          {!m?.isDummy && isLate && <span style={{ color: '#ef4444', fontSize: '12px', marginLeft: '6px' }}>⚠ Vencido</span>}
+                        </td>
+                        <td>{m?.isDummy ? <span style={{ color: 'var(--text-muted)' }}>—</span> : (m?.scheduledDate ? new Date(m.scheduledDate).toLocaleDateString('es-CO', { timeZone: 'UTC' }) : 'N/A')}</td>
+                        <td>
+                          {m?.isDummy ? (
+                            <span style={{ color: 'var(--text-muted)' }}>—</span>
+                          ) : delayDays === null ? (
                             <span style={{ color: 'var(--text-muted)' }}>—</span>
                           ) : delayDays === 0 ? (
                             <span style={{ color: '#10b981', fontWeight: 600 }}>A tiempo</span>
                           ) : (
-                            <span style={{ color: m.status === 'COMPLETED' ? '#f59e0b' : '#ef4444', fontWeight: 600 }}>{delayDays} días</span>
+                            <span style={{ color: m?.status === 'COMPLETED' ? '#f59e0b' : '#ef4444', fontWeight: 600 }}>{delayDays} días</span>
                           )}
                         </td>
-                        <td>{m.collaboratorInTurnName || <span style={{ color: 'var(--text-muted)' }}>N/A</span>}</td>
+                        <td>{m?.isDummy ? getCollaboratorForAsset(m?.assetId || '') : (m?.collaboratorInTurnName || <span style={{ color: 'var(--text-muted)' }}>N/A</span>)}</td>
                         <td>
-                          {m.status !== 'COMPLETED' ? (
+                          {m?.isDummy ? (
+                            <span style={{ color: 'var(--text-muted)' }}>—</span>
+                          ) : m?.status !== 'COMPLETED' ? (
                             <span style={{ color: 'var(--text-muted)' }}>N/A</span>
-                          ) : (m.signedAt || m.pdfUrl) ? (
+                          ) : (m?.signedAt || m?.pdfUrl) ? (
                             <span style={{ color: '#10b981', fontWeight: 600 }}>Firmada</span>
-                          ) : m.signatureToken ? (
+                          ) : m?.signatureToken ? (
                             <span style={{ color: '#f59e0b', fontWeight: 600 }}>Pendiente</span>
                           ) : (
                             <span style={{ color: '#ef4444', fontWeight: 600 }}>Sin enviar</span>
                           )}
                         </td>
                         <td>
-                          <div style={{ display: 'flex', gap: '6px' }}>
-                            <button className="btn-action" style={{ borderColor: '#8b5cf6', color: '#8b5cf6' }} title="Ver Historial" onClick={() => openModal('view', m)}>
-                              <Clock size={16} />
+                          {m?.isDummy ? (
+                            <button className="btn-action" style={{ borderColor: '#3b82f6', color: '#3b82f6' }} title="Programar Mantenimiento" onClick={() => {
+                               const asset = assets?.find(a => a.id === m?.assetId);
+                               const displayName = asset ? `${asset.id} - ${asset.dynamicAttributes?.HOSTNAME || asset.dynamicAttributes?.Hostname || asset.dynamicAttributes?.hostname || 'Sin Hostname'}` : m.assetId;
+                               setFormData({ ...formData, assetId: m.assetId });
+                               setAssetSearchTerm(displayName);
+                               openModal('create');
+                            }}>
+                              <Plus size={16} /> Programar
                             </button>
-                            {m.status === 'SCHEDULED' && (
-                              <button className="btn-action" style={{ borderColor: '#eab308', color: '#eab308' }} title="Iniciar Mantenimiento" onClick={() => openModal('start', m)}>
-                                <Wrench size={16} />
+                          ) : (
+                            <div style={{ display: 'flex', gap: '6px' }}>
+                              <button className="btn-action" style={{ borderColor: '#8b5cf6', color: '#8b5cf6' }} title="Ver Historial" onClick={() => openModal('view', m)}>
+                                <Clock size={16} />
                               </button>
-                            )}
-                            {m.status === 'IN_PROGRESS' && (
-                              <button className="btn-action" style={{ borderColor: '#22c55e', color: '#22c55e' }} title="Completar Mantenimiento" onClick={() => openModal('complete', m)}>
-                                <CheckCircle size={16} />
-                              </button>
-                            )}
-                            {m.status === 'COMPLETED' && !m.signedAt && !m.pdfUrl && (
-                              <button 
-                                className="btn-action" 
-                                style={{ borderColor: '#ec4899', color: '#ec4899', opacity: forceSignMutation.isPending ? 0.5 : 1 }} 
-                                title="Firmar forzadamente" 
-                                onClick={() => openModal('forceSign', m)}
-                                disabled={forceSignMutation.isPending}
-                              >
-                                <Edit3 size={16} />
-                              </button>
-                            )}
-                            {m.status === 'COMPLETED' && (
-                              <button 
-                                className="btn-action" 
-                                style={{ borderColor: '#3b82f6', color: '#3b82f6', opacity: requestSignatureMutation.isPending ? 0.5 : 1 }} 
-                                title="Solicitar firma de mantenimiento" 
-                                onClick={() => {
-                                  confirm({
-                                    title: 'Solicitar Firma',
-                                    message: '¿Estás seguro de enviar el correo solicitando la firma de este mantenimiento?',
-                                    type: 'info',
-                                    onConfirm: () => requestSignatureMutation.mutate(m.id)
-                                  });
-                                }}
-                                disabled={requestSignatureMutation.isPending}
-                              >
-                                <Mail size={16} />
-                              </button>
-                            )}
-                          </div>
+                              {m.status === 'SCHEDULED' && (
+                                <button className="btn-action" style={{ borderColor: '#eab308', color: '#eab308' }} title="Iniciar Mantenimiento" onClick={() => openModal('start', m)}>
+                                  <Wrench size={16} />
+                                </button>
+                              )}
+                              {m.status === 'IN_PROGRESS' && (
+                                <button className="btn-action" style={{ borderColor: '#22c55e', color: '#22c55e' }} title="Completar Mantenimiento" onClick={() => openModal('complete', m)}>
+                                  <CheckCircle size={16} />
+                                </button>
+                              )}
+                              {m?.status === 'COMPLETED' && !m?.signedAt && !m?.pdfUrl && (
+                                <button 
+                                  className="btn-action" 
+                                  style={{ borderColor: '#ec4899', color: '#ec4899', opacity: forceSignMutation.isPending ? 0.5 : 1 }} 
+                                  title="Firmar forzadamente" 
+                                  onClick={() => openModal('forceSign', m)}
+                                  disabled={forceSignMutation.isPending}
+                                >
+                                  <Edit3 size={16} />
+                                </button>
+                              )}
+                              {m?.status === 'COMPLETED' && (
+                                <button 
+                                  className="btn-action" 
+                                  style={{ borderColor: '#3b82f6', color: '#3b82f6', opacity: requestSignatureMutation.isPending ? 0.5 : 1 }} 
+                                  title="Solicitar firma de mantenimiento" 
+                                  onClick={() => {
+                                    confirm({
+                                      title: 'Solicitar Firma',
+                                      message: '¿Estás seguro de enviar el correo solicitando la firma de este mantenimiento?',
+                                      type: 'info',
+                                      onConfirm: () => requestSignatureMutation.mutate(m.id)
+                                    });
+                                  }}
+                                  disabled={requestSignatureMutation.isPending}
+                                >
+                                  <Mail size={16} />
+                                </button>
+                              )}
+                            </div>
+                          )}
                         </td>
                       </tr>
                     );
