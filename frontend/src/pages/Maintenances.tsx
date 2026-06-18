@@ -771,9 +771,15 @@ const Maintenances: React.FC = () => {
                               {m?.status === 'COMPLETED' && (
                                 <button 
                                   className="btn-action" 
-                                  style={{ borderColor: '#3b82f6', color: '#3b82f6', opacity: requestSignatureMutation.isPending ? 0.5 : 1 }} 
-                                  title="Solicitar firma de mantenimiento" 
+                                  style={{ 
+                                    borderColor: (m?.signedAt || m?.pdfUrl) ? '#94a3b8' : '#3b82f6', 
+                                    color: (m?.signedAt || m?.pdfUrl) ? '#94a3b8' : '#3b82f6', 
+                                    opacity: (requestSignatureMutation.isPending || m?.signedAt || m?.pdfUrl) ? 0.5 : 1,
+                                    cursor: (m?.signedAt || m?.pdfUrl) ? 'not-allowed' : 'pointer'
+                                  }} 
+                                  title={(m?.signedAt || m?.pdfUrl) ? "Mantenimiento ya firmado" : "Solicitar firma de mantenimiento"} 
                                   onClick={() => {
+                                    if (m?.signedAt || m?.pdfUrl) return;
                                     confirm({
                                       title: 'Solicitar Firma',
                                       message: '¿Estás seguro de enviar el correo solicitando la firma de este mantenimiento?',
@@ -781,7 +787,7 @@ const Maintenances: React.FC = () => {
                                       onConfirm: () => requestSignatureMutation.mutate(m.id)
                                     });
                                   }}
-                                  disabled={requestSignatureMutation.isPending}
+                                  disabled={requestSignatureMutation.isPending || !!(m?.signedAt || m?.pdfUrl)}
                                 >
                                   <Mail size={16} />
                                 </button>
@@ -812,10 +818,11 @@ const Maintenances: React.FC = () => {
             <h3 className="dash-card-title">Preventivo vs Correctivo</h3>
             <ResponsiveContainer width="100%" height={220}>
               <PieChart>
-                <Pie data={typeData} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={4} dataKey="value" nameKey="name" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
+                <Pie data={typeData} cx="50%" cy="45%" innerRadius={50} outerRadius={80} paddingAngle={4} dataKey="value" nameKey="name">
                   {typeData.map((_, i) => <Cell key={i} fill={COLORS_TYPE[i]} />)}
                 </Pie>
                 <Tooltip formatter={(v: any, n: string) => [v, n]} />
+                <Legend verticalAlign="bottom" height={36} />
               </PieChart>
             </ResponsiveContainer>
           </div>
