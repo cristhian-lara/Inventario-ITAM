@@ -16,6 +16,7 @@ interface MaintenanceRecord {
   scheduledDate: string;
   executionDate?: string;
   reason?: string;
+  startNote?: string;
   notes?: string;
   collaboratorInTurnId?: string;
   collaboratorInTurnName?: string;
@@ -58,6 +59,7 @@ const Maintenances: React.FC = () => {
     type: 'PREVENTIVE',
     scheduledDate: new Date().toISOString().split('T')[0],
     reason: '',
+    startNote: '',
     notes: '',
     executionDate: new Date().toISOString().split('T')[0]
   });
@@ -134,9 +136,9 @@ const Maintenances: React.FC = () => {
   });
 
   const startMutation = useMutation({
-    mutationFn: async (data: { id: string, reason: string }) => {
+    mutationFn: async (data: { id: string, startNote: string }) => {
       const res = await fetch(`${API_URL}/api/maintenances/${data.id}/start`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason: data.reason })
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ startNote: data.startNote })
       });
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
@@ -411,7 +413,7 @@ const Maintenances: React.FC = () => {
       submitAction = () => createMutation.mutate({ assetId: formData.assetId, type: formData.type, scheduledDate: formData.scheduledDate, reason: formData.reason });
     } else if (modalMode === 'start' && selectedRecord) {
       title = 'Iniciar Mantenimiento'; message = '¿Estás seguro de registrar el inicio de este mantenimiento?';
-      submitAction = () => startMutation.mutate({ id: selectedRecord.id, reason: formData.reason });
+      submitAction = () => startMutation.mutate({ id: selectedRecord.id, startNote: formData.startNote || '' });
     } else if (modalMode === 'complete' && selectedRecord) {
       title = 'Completar Mantenimiento'; message = '¿Estás seguro de dar por completado este mantenimiento?';
       submitAction = () => completeMutation.mutate({ id: selectedRecord.id, notes: formData.notes });
@@ -432,12 +434,12 @@ const Maintenances: React.FC = () => {
     setModalMode(mode); setSelectedRecord(record || null);
     setErrorMsg('');
     if (mode === 'create') {
-      setFormData({ assetId: '', type: 'PREVENTIVE', scheduledDate: new Date().toISOString().split('T')[0], reason: '', notes: '', executionDate: new Date().toISOString().split('T')[0] });
+      setFormData({ assetId: '', type: 'PREVENTIVE', scheduledDate: new Date().toISOString().split('T')[0], reason: '', startNote: '', notes: '', executionDate: new Date().toISOString().split('T')[0] });
       setAssetSearchTerm('');
     } else if (mode === 'forceSign') {
-      setFormData({ ...formData, reason: '' });
+      setFormData({ ...formData, reason: '', startNote: '' });
     } else if (record) {
-      setFormData({ ...formData, reason: record.reason || '', notes: record.notes || '' });
+      setFormData({ ...formData, reason: record.reason || '', startNote: record.startNote || '', notes: record.notes || '' });
     }
     setShowModal(true);
   };
@@ -985,8 +987,8 @@ const Maintenances: React.FC = () => {
                 <>
                   <p style={{ color: 'var(--text-muted)', marginBottom: '15px' }}>Iniciando mantenimiento para el activo <b>{selectedRecord?.assetId}</b>.</p>
                   <div className="form-group">
-                    <label>Motivo / Problema Detectado</label>
-                    <input required type="text" className="glass-input" value={formData.reason} onChange={e => setFormData({ ...formData, reason: e.target.value })} placeholder="Ej. Limpieza interna, Cambio de pasta térmica..." />
+                    <label>Diagnóstico Inicial / Notas de Inicio</label>
+                    <input required type="text" className="glass-input" value={formData.startNote} onChange={e => setFormData({ ...formData, startNote: e.target.value })} placeholder="Ej. Limpieza interna, Cambio de pasta térmica..." />
                   </div>
                 </>
               )}
@@ -1016,7 +1018,7 @@ const Maintenances: React.FC = () => {
                     <div className="history-content">
                       <h4><Calendar size={16} color="#3b82f6" /> Programación</h4>
                       <p><strong>Fecha:</strong> {new Date(selectedRecord.scheduledDate).toLocaleDateString('es-CO', { timeZone: 'UTC' })}</p>
-                      {selectedRecord.reason && <p><strong>Motivo / Problema:</strong> {selectedRecord.reason}</p>}
+                      {selectedRecord.reason && <p><strong>Motivo de Programación:</strong> {selectedRecord.reason}</p>}
                     </div>
                   </div>
                   
@@ -1026,6 +1028,7 @@ const Maintenances: React.FC = () => {
                       <div className="history-content">
                         <h4><Wrench size={16} color="#f59e0b" /> En Progreso</h4>
                         <p>El mantenimiento ha sido iniciado por el técnico.</p>
+                        {selectedRecord.startNote && <p><strong>Diagnóstico Inicial:</strong> {selectedRecord.startNote}</p>}
                       </div>
                     </div>
                   )}

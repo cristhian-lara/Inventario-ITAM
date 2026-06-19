@@ -8,6 +8,7 @@ export interface MaintenanceRecordProps {
     scheduledDate: Date;
     executionDate?: Date;
     reason?: string;
+    startNote?: string;
     notes?: string;
     collaboratorInTurnId?: string;
     collaboratorInTurnName?: string;
@@ -34,6 +35,7 @@ export class MaintenanceRecord {
     get scheduledDate(): Date { return this.props.scheduledDate; }
     get executionDate(): Date | undefined { return this.props.executionDate; }
     get reason(): string | undefined { return this.props.reason; }
+    get startNote(): string | undefined { return this.props.startNote; }
     get notes(): string | undefined { return this.props.notes; }
     get collaboratorInTurnId(): string | undefined { return this.props.collaboratorInTurnId; }
     get collaboratorInTurnName(): string | undefined { return this.props.collaboratorInTurnName; }
@@ -42,12 +44,12 @@ export class MaintenanceRecord {
     get signatureMetadata(): any { return this.props.signatureMetadata; }
     get pdfUrl(): string | undefined { return this.props.pdfUrl; }
 
-    public startMaintenance(reason?: string): void {
+    public startMaintenance(startNote?: string): void {
         if (this.props.status === 'COMPLETED' || this.props.status === 'CANCELLED') {
             throw new Error('No se puede iniciar un mantenimiento cerrado');
         }
         this.props.status = 'IN_PROGRESS';
-        if (reason) this.props.reason = reason;
+        if (startNote) this.props.startNote = startNote;
     }
 
     public completeMaintenance(executionDate: Date, notes?: string): MaintenanceRecord {

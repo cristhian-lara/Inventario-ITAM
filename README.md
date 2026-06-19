@@ -1,101 +1,162 @@
-# Inventario Ikusi
+# Inventario Ikusi - ITAM (IT Asset Management)
 
-Plataforma integral de gestión de inventarios para la administración de activos, colaboradores y mantenimientos.
+Plataforma integral de gestión de inventarios para la administración eficiente de activos tecnológicos, colaboradores, asignaciones y mantenimientos. Diseñada bajo principios de Clean Architecture y Domain-Driven Design (DDD).
 
-## Tecnologías Utilizadas
+## 🚀 Descripción General
 
-- **Frontend:** React (con TypeScript), Vite, React Query, React Router DOM, y CSS puro para los estilos de la interfaz de usuario.
-- **Backend:** Node.js, Express, TypeScript, TypeORM.
-- **Base de Datos:** PostgreSQL.
+Inventario Ikusi es una solución full-stack que digitaliza y centraliza el control de los recursos de TI. Permite hacer un seguimiento del ciclo de vida completo de cada dispositivo (laptops, celulares, periféricos), desde su alta en el sistema hasta su asignación, mantenimiento y eventual retiro. Adicionalmente, incluye flujos automatizados para la generación y firma digital de actas (Asignación y Paz y Salvo).
 
-## Estructura del Proyecto
+---
 
-El proyecto está dividido en dos partes principales:
-- `frontend/`: Aplicación cliente en React.
-- `src/` (y raíz): Código del servidor Node.js y configuración del backend.
+## ✨ Funcionalidades Principales
 
-## Requisitos Previos
+1. **Dashboard Intuitivo:** Vista general rápida con métricas del estado del inventario y gráficas de disponibilidad.
+2. **Catálogo Flexible de Activos:**
+   - Creación de categorías con campos personalizados (esquemas dinámicos).
+   - Control de estados: *Disponible, En Uso, En Mantenimiento, Pendiente de Revisión, Retirado*.
+3. **Gestión de Colaboradores:**
+   - Directorio de empleados.
+   - Vinculación a Departamentos y Centros de Costos (CECOS).
+4. **Asignación y Devolución (Actas y Firmas):**
+   - Proceso formal de entrega con generación de PDF automático.
+   - Envío de correos para recolección de firmas digitales.
+   - Posibilidad de firma forzada (Administrativa) con registro de IP y motivo.
+5. **Mantenimientos:**
+   - Programación de tareas preventivas y correctivas.
+   - Registro de diagnóstico, avance y bitácora.
+   - Firma de conformidad al finalizar la intervención.
+6. **Configuración Global:** Personalización de textos legales y parámetros del sistema en un solo lugar.
 
-Antes de ejecutar el proyecto, asegúrate de tener instalado:
-- [Node.js](https://nodejs.org/) (Versión 18 o superior recomendada).
-- [PostgreSQL](https://www.postgresql.org/) (Corriendo localmente o accesible mediante red).
-- Git.
+---
 
-## Descarga e Instalación
+## 🛠️ Requisitos Técnicos
+
+- **Node.js**: v18 o superior.
+- **Base de Datos**: PostgreSQL (versión 13+ recomendada).
+- **Gestor de paquetes**: npm o yarn.
+- **Git** para control de versiones.
+
+### Tecnologías Clave
+- **Frontend**: React 19, Vite, React Router DOM, React Query, Recharts, Lucide-React, CSS Puro (Dark Theme).
+- **Backend**: Node.js, Express, TypeScript, TypeORM, Jest (Testing), PDFKit (Generación de PDF), Nodemailer.
+
+---
+
+## 💻 Instalación y Ejecución Local
 
 1. **Clonar el repositorio:**
    ```bash
    git clone <URL_DEL_REPOSITORIO>
-   cd Inventario-Ikusi
+   cd Inventario-ITAM
    ```
 
 2. **Instalar dependencias del Backend:**
-   En la raíz del proyecto, ejecuta:
+   En la raíz del proyecto, instala los paquetes de Node.
    ```bash
    npm install
    ```
 
 3. **Instalar dependencias del Frontend:**
-   Navega a la carpeta `frontend` y ejecuta:
    ```bash
    cd frontend
    npm install
    ```
 
-## Configuración de Entorno
+4. **Configuración de Variables de Entorno (.env):**
+   Crea un archivo `.env` en la raíz del proyecto basándote en la configuración de tu entorno:
+   ```env
+   DB_HOST=localhost
+   DB_PORT=5432
+   DB_USERNAME=postgres
+   DB_PASSWORD=tu_password
+   DB_DATABASE=ikusi_db
+   PORT=3000
+   ```
 
-### Configuración del Backend
-En la raíz del proyecto, crea un archivo `.env` tomando como base la configuración que utilices para tu entorno. Debes incluir las variables de entorno para la conexión a la base de datos PostgreSQL y puertos.
-Ejemplo de `.env`:
-```env
-DB_HOST=localhost
-DB_PORT=5432
-DB_USERNAME=tu_usuario
-DB_PASSWORD=tu_contraseña
-DB_DATABASE=ikusi_db
-PORT=3000
+5. **Iniciar la aplicación (Modo Desarrollo):**
+
+   Necesitarás dos instancias de tu terminal.
+
+   *Terminal 1 (Backend):*
+   ```bash
+   # En la raíz del proyecto
+   npm run dev
+   # o
+   npm run start
+   ```
+   *Nota: TypeORM creará/sincronizará automáticamente las tablas en PostgreSQL al conectarse.*
+
+   *Terminal 2 (Frontend):*
+   ```bash
+   # Dentro de la carpeta frontend/
+   npm run dev
+   ```
+
+La plataforma estará disponible en `http://localhost:5173`.
+
+---
+
+## 📂 Estructura del Proyecto
+
+El código está organizado separando claramente las responsabilidades entre frontend y backend:
+
+```text
+📦 Inventario-ITAM
+├── 📂 frontend/               # Aplicación cliente (React + Vite)
+│   ├── 📂 src/
+│   │   ├── 📂 components/     # Componentes UI reutilizables
+│   │   ├── 📂 context/        # Proveedores de estado global (ej. ConfirmContext)
+│   │   ├── 📂 pages/          # Vistas principales de la app (Dashboard, Catalog, etc.)
+│   │   └── App.tsx / main.tsx # Entrada de la app frontend
+│   └── package.json
+│
+├── 📂 src/                    # Código fuente del Backend (Node.js + TS)
+│   ├── 📂 api/                # Controladores (Rutas Express) y config de servidor
+│   ├── 📂 modules/            # Módulos del negocio (Arquitectura Limpia)
+│   │   ├── 📂 assignment/     # Lógica de asignaciones y devoluciones
+│   │   ├── 📂 catalog/        # Gestión de activos y categorías
+│   │   ├── 📂 collaborator/   # Gestión de empleados, departamentos y CECOS
+│   │   └── 📂 maintenance/    # Flujos de mantenimiento de activos
+│   │       ├── 📂 domain/         # Entidades puras y contratos (interfaces)
+│   │       ├── 📂 application/    # Casos de uso
+│   │       └── 📂 infrastructure/ # Implementaciones de repositorios y BD
+│   └── 📂 shared/             # Servicios transversales (Email, Generación PDF)
+│
+├── 📂 __tests__/              # Pruebas unitarias en Jest (Use Cases)
+├── .env                       # Variables de configuración
+└── package.json               # Dependencias del backend y scripts globales
 ```
 
-*Nota: Es posible que tu aplicación ya maneje valores por defecto en los archivos de configuración, verifica `src/api/server.ts` y las entidades de TypeORM si requieres afinar la conexión.*
+### Propósito de archivos clave:
+- `src/api/server.ts`: Inicializa Express, middlewares (CORS, JSON), y conecta con TypeORM. Aquí se montan las rutas de los módulos.
+- `src/shared/infrastructure/services/PdfKitService.ts`: Lógica avanzada de dibujo y maquetación de actas PDF (Asignación, Mantenimiento, Devolución).
+- `frontend/src/index.css`: Sistema de diseño global (variables CSS) responsable de la estética moderna, modo oscuro y temas tipo "glassmorphism".
 
-### Configuración del Frontend
-Si el backend no corre en el puerto `3000`, debes actualizar la URL base de las peticiones en los componentes del frontend (ubicados en `frontend/src/pages/`).
+---
 
-## Ejecución en Local
+## 📘 Ejemplos Básicos de Uso
 
-Para levantar todo el entorno de desarrollo, necesitarás dos terminales:
+1. **Configurar una nueva Categoría:**
+   - Ve a **Configuración -> Categorías** y haz clic en *Nueva Categoría*.
+   - Añade el nombre (ej. "Laptop") y define atributos obligatorios (ej. "macAddress", "Memoria RAM").
+2. **Dar de alta un Activo:**
+   - Entra a **Catálogo de Activos** -> *Nuevo Activo*.
+   - Elige la categoría "Laptop". Se desplegarán los atributos configurados en el paso 1. Registra el Serial y sus especificaciones.
+3. **Asignar el Activo a un Empleado:**
+   - En el catálogo, busca el activo (estado *Disponible*).
+   - Presiona el botón de **Asignar**, selecciona a un colaborador de la lista.
+   - El sistema cambiará el estado a *Pendiente de Firma* y enviará un correo electrónico al colaborador con un link único para realizar su trazo de firma digital en el acta.
+4. **Firma Administrativa (Forzada):**
+   - Si el usuario no puede firmar, el administrador puede ir al activo en *Pendiente de Firma* y elegir **Firma Forzada (TI)**.
+   - Se pedirá un motivo justificante, el cual se registrará directamente dentro del documento PDF por auditoría.
 
-**Terminal 1: Iniciar el Backend**
-Ubicado en la raíz del proyecto (`Inventario-Ikusi/`), ejecuta:
+---
+
+## ✅ Pruebas Unitarias
+
+El proyecto cuenta con un entorno de testing basado en **Jest**. Las pruebas cubren la lógica core de los casos de uso (Application Layer) y de las entidades (Domain Layer).
+
+Para ejecutar la suite de pruebas:
 ```bash
-npm run start
-# o alternativamente:
-npx ts-node src/api/server.ts
+npm test
 ```
-El servidor iniciará (típicamente en el puerto 3000) y se conectará a la base de datos PostgreSQL, sincronizando las tablas automáticamente.
-
-**Terminal 2: Iniciar el Frontend**
-Navega a la carpeta `frontend/` y ejecuta:
-```bash
-cd frontend
-npm run dev
-```
-La aplicación web estará disponible en `http://localhost:5173`.
-
-## Funcionalidades Principales
-
-- **Dashboard:** Visión general con tarjetas de estado.
-- **Gestión de Activos:** Registro, visualización, modificación, asignación, y devolución de activos tecnológicos (Laptops, Celulares, Pantallas, etc.). Soporta características dinámicas según la categoría del activo.
-- **Configuración (Administración):** Permite administrar Categorías de Activos, Departamentos y Centros de Costos (CECOS).
-- **Colaboradores:** Administración de personal, asignación de departamentos, CECOS y visualización del perfil y activos asignados al colaborador.
-- **Mantenimientos:** Registro, consulta y notas asociadas al mantenimiento de los activos (Preventivo o Correctivo).
-
-## Decisiones de Arquitectura
-
-El proyecto está diseñado siguiendo **Clean Architecture** y principios de **Domain-Driven Design (DDD)** para el backend:
-- **Dominio:** Entidades y reglas de negocio puras (`/src/modules/*/domain`).
-- **Casos de Uso / Aplicación:** Lógica de orquestación (`/src/modules/*/application`).
-- **Infraestructura:** Repositorios, acceso a bases de datos (`/src/modules/*/infrastructure`).
-- **API (Presentación):** Rutas y controladores (`/src/api`).
-
-Esto garantiza alta mantenibilidad, bajo acoplamiento y facilidad para escalar el sistema a microservicios si se requiere en el futuro.

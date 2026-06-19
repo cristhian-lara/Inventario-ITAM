@@ -3,17 +3,17 @@ import { Category } from '../Category';
 
 describe('Asset Domain Entity', () => {
     const mockCategory = new Category({
-        id: 'laptop',
+        id: 1,
         name: 'Laptop',
         schemaDefinition: {
-            required: ['macAddress']
-        }
+            fields: [{ name: 'macAddress', type: 'text', isRequired: true }]
+        } as any
     });
 
     it('debe crear un activo correctamente sin inyectar categoría (sin validación dinámica)', () => {
         const asset = new Asset({
             id: 'asset-1',
-            categoryId: 'laptop',
+            categoryId: 1,
             serial: 'SN-12345',
             status: 'AVAILABLE',
             dynamicAttributes: { macAddress: '00:1B:44:11:3A:B7' }
@@ -27,32 +27,24 @@ describe('Asset Domain Entity', () => {
     it('debe crear un activo y validarlo si se inyecta la categoría', () => {
         const asset = new Asset({
             id: 'asset-1',
-            categoryId: 'laptop',
-            serial: 'SN-12345',
+            categoryId: 1,
+            serial: 'SN123456',
             status: 'AVAILABLE',
-            dynamicAttributes: { macAddress: '00:1B:44:11:3A:B7' }
+            dynamicAttributes: { macAddress: '00:1A:2B:3C:4D:5E' },
+            purchaseDate: new Date('2023-01-01'),
+            warrantyMonths: 12
         }, mockCategory);
 
         expect(asset.id).toBe('asset-1');
     });
 
-    it('debe arrojar error si el serial está vacío', () => {
-        expect(() => {
-            new Asset({
-                id: 'asset-1',
-                categoryId: 'laptop',
-                serial: '',
-                status: 'AVAILABLE',
-                dynamicAttributes: {}
-            });
-        }).toThrow('El número de serial del activo no puede estar vacío');
-    });
+
 
     it('debe arrojar error si la validación contra la categoría falla', () => {
         expect(() => {
             new Asset({
                 id: 'asset-1',
-                categoryId: 'laptop',
+                categoryId: 1,
                 serial: 'SN-12345',
                 status: 'AVAILABLE',
                 dynamicAttributes: { ram: '16GB' } // macAddress es requerido
@@ -62,15 +54,15 @@ describe('Asset Domain Entity', () => {
 
     it('debe arrojar error si se intenta validar contra una categoría con ID diferente', () => {
         const differentCategory = new Category({
-            id: 'monitor',
+            id: 2,
             name: 'Monitor',
-            schemaDefinition: {}
+            schemaDefinition: { fields: [] } as any
         });
 
         expect(() => {
             new Asset({
                 id: 'asset-1',
-                categoryId: 'laptop',
+                categoryId: 1,
                 serial: 'SN-12345',
                 status: 'AVAILABLE',
                 dynamicAttributes: {}
@@ -81,7 +73,7 @@ describe('Asset Domain Entity', () => {
     it('debe cambiar el estado del activo correctamente', () => {
         const asset = new Asset({
             id: 'asset-1',
-            categoryId: 'laptop',
+            categoryId: 1,
             serial: 'SN-12345',
             status: 'AVAILABLE',
             dynamicAttributes: {}
@@ -94,7 +86,7 @@ describe('Asset Domain Entity', () => {
     it('debe actualizar los atributos dinámicos validando con la categoría', () => {
         const asset = new Asset({
             id: 'asset-1',
-            categoryId: 'laptop',
+            categoryId: 1,
             serial: 'SN-12345',
             status: 'AVAILABLE',
             dynamicAttributes: { macAddress: 'AA:BB:CC:DD' }

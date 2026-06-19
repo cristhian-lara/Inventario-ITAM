@@ -20,6 +20,7 @@ export class PostgresMaintenanceRepository implements IMaintenanceRepository {
             scheduledDate: orm.scheduled_date,
             executionDate: orm.execution_date || undefined,
             reason: orm.reason || undefined,
+            startNote: orm.start_note || undefined,
             notes: orm.notes || undefined,
             collaboratorInTurnId: orm.collaborator_snapshot_id || undefined,
             collaboratorInTurnName: orm.collaborator_snapshot_name || undefined,
@@ -40,6 +41,7 @@ export class PostgresMaintenanceRepository implements IMaintenanceRepository {
         orm.scheduled_date = domain.scheduledDate;
         orm.execution_date = domain.executionDate;
         orm.reason = domain.reason;
+        orm.start_note = domain.startNote;
         orm.notes = domain.notes;
         orm.collaborator_snapshot_id = domain.collaboratorInTurnId;
         orm.collaborator_snapshot_name = domain.collaboratorInTurnName;

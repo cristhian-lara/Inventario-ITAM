@@ -2,32 +2,32 @@ import { Category } from '../Category';
 
 describe('Category Domain Entity', () => {
     const mockSchema = {
-        required: ['macAddress']
+        fields: [{ name: 'macAddress', type: 'text', isRequired: true }]
     };
 
     it('debe crear una categoría correctamente', () => {
         const category = new Category({
-            id: 'laptop',
+            id: 1,
             name: 'Laptop',
-            schemaDefinition: mockSchema
+            schemaDefinition: mockSchema as any
         });
 
-        expect(category.id).toBe('laptop');
+        expect(category.id).toBe(1);
         expect(category.name).toBe('Laptop');
         expect(category.schemaDefinition).toEqual(mockSchema);
     });
 
     it('debe arrojar error si se intenta crear sin ID o Nombre', () => {
         expect(() => {
-            new Category({ id: 'laptop', name: '', schemaDefinition: {} });
+            new Category({ id: 1, name: '', schemaDefinition: { fields: [] } });
         }).toThrow('Category name cannot be empty');
     });
 
     describe('Validación de Atributos Dinámicos', () => {
         const category = new Category({
-            id: 'laptop',
+            id: 1,
             name: 'Laptop',
-            schemaDefinition: mockSchema
+            schemaDefinition: mockSchema as any
         });
 
         it('debe pasar la validación con un payload válido', () => {

@@ -45,7 +45,7 @@ export class MaintenanceUseCases {
         return record;
     }
 
-    async startMaintenance(id: string, reason?: string): Promise<MaintenanceRecord> {
+    async startMaintenance(id: string, startNote?: string): Promise<MaintenanceRecord> {
         const record = await this.repo.findById(id);
         if (!record) throw new Error('Mantenimiento no encontrado');
         
@@ -56,7 +56,7 @@ export class MaintenanceUseCases {
         props.collaboratorInTurnId = activeAssignment?.collaboratorId;
         props.collaboratorInTurnName = activeAssignment?.collaboratorName;
 
-        record.startMaintenance(reason);
+        record.startMaintenance(startNote);
         await this.repo.save(record);
         return record;
     }

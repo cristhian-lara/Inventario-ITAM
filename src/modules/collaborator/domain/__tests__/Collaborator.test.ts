@@ -7,7 +7,7 @@ describe('Collaborator Domain Entity', () => {
             'collab-1',
             'Juan Perez',
             'juan@ikusi.com',
-            'IT',
+            1,
             'HQ',
             'ACTIVE',
             date,
@@ -26,7 +26,7 @@ describe('Collaborator Domain Entity', () => {
             'collab-2',
             'Maria Gomez',
             'maria@ikusi.com',
-            'RH',
+            2,
             'HQ'
         );
 

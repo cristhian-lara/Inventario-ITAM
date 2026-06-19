@@ -258,12 +258,17 @@ Este documento cancela la responsiva firmada en el momento de la asignación ori
                 });
                 
                 doc.moveDown(1.5);
-                doc.fontSize(12).font('Helvetica-Bold').text('Diagnóstico / Falla:');
+                doc.fontSize(12).font('Helvetica-Bold').text('Motivo de Programación:');
                 doc.moveDown(0.5);
                 doc.fontSize(10).font('Helvetica').text(record.reason || 'N/A', { align: 'justify', lineGap: 3 });
                 
                 doc.moveDown(1.5);
-                doc.fontSize(12).font('Helvetica-Bold').text('Trabajo Realizado / Notas:');
+                doc.fontSize(12).font('Helvetica-Bold').text('Diagnóstico de Inicio:');
+                doc.moveDown(0.5);
+                doc.fontSize(10).font('Helvetica').text(record.startNote || 'N/A', { align: 'justify', lineGap: 3 });
+                
+                doc.moveDown(1.5);
+                doc.fontSize(12).font('Helvetica-Bold').text('Trabajo Realizado / Notas Finales:');
                 doc.moveDown(0.5);
                 doc.fontSize(10).font('Helvetica').text(record.notes || 'N/A', { align: 'justify', lineGap: 3 });
 
@@ -294,7 +299,11 @@ Este documento cancela la responsiva firmada en el momento de la asignación ori
 
                 // DIBUJAR MARCA DE AGUA Y FIRMA DIGITAL EN TODAS LAS PÁGINAS AL FINAL
                 // record signature metadata might be appended later, but we use what we have or placeholder
-                const ipAddress = record.signatureMetadata?.ipAddress || 'Registrada en firma electrónica';
+                const ipAddress = record.signatureMetadata?.ipAddress 
+                    ? record.signatureMetadata.ipAddress 
+                    : (signatureBase64 && signatureBase64.startsWith('Firma forzada') 
+                        ? signatureBase64 
+                        : 'Registrada en firma electrónica');
                 
                 const range = doc.bufferedPageRange();
                 for (let i = range.start; i < range.start + range.count; i++) {
@@ -313,8 +322,12 @@ Este documento cancela la responsiva firmada en el momento de la asignación ori
                     const cryptoId = `Acta-Maint-Ikusi-${userNameNormalized}-${record.id}`;
                     doc.text(`ID Mantenimiento criptográfico: ${cryptoId}`, 70, doc.y);
                     doc.text(`Firma IP registrada: ${ipAddress}`, 70, doc.y);
-                    doc.text(`Sede: Bogotá`, 70, doc.y);
-                    doc.text(`Firmada por: ${record.collaboratorEmail || record.collaboratorInTurnName || 'Usuario Asignado'}`, 70, doc.y);
+                    doc.text(`Sede: ${record.collaboratorLocation || 'Bogotá'}`, 70, doc.y);
+                    const isForced = signatureBase64 && signatureBase64.startsWith('Firma forzada');
+                    const signedByText = isForced 
+                        ? `${record.collaboratorInTurnName || 'Usuario Asignado'} (Firma Forzada por Administrador)` 
+                        : (record.collaboratorInTurnName || 'Usuario Asignado');
+                    doc.text(`Firmada por: ${signedByText}`, 70, doc.y);
 
                     // Marca de agua lateral
                     doc.save();

@@ -45,6 +45,11 @@ export default function Catalog() {
   const [searchTerm, setSearchTerm] = useState('');
   const [retireModalAssetId, setRetireModalAssetId] = useState<string | null>(null);
   const [retireReason, setRetireReason] = useState('');
+  
+  // Modal de firma forzada (asignaciones)
+  const [forceActionModal, setForceActionModal] = useState<{ type: 'accept' | 'return', assetId: string } | null>(null);
+  const [forceReason, setForceReason] = useState('');
+
   const [showAddModal, setShowAddModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [newAsset, setNewAsset] = useState<{ id: string; categoryId: number | ''; serial: string; dynamicAttributes: any; purchaseDate?: string; warrantyMonths?: number; depreciationYears?: number; purchasePrice?: number }>({
@@ -161,6 +166,7 @@ export default function Catalog() {
       setTimeout(() => setSuccessMsg(''), 8000);
       setReturnId(null);
       queryClient.invalidateQueries({ queryKey: ['assets'] });
+      queryClient.invalidateQueries({ queryKey: ['assignments'] });
     },
     onError: (err: any) => {
       setErrorMsg(err.response?.data?.error || err.message);
@@ -187,6 +193,7 @@ export default function Catalog() {
       setTimeout(() => setSuccessMsg(''), 8000);
       setAssignModalAssetId(null);
       queryClient.invalidateQueries({ queryKey: ['assets'] });
+      queryClient.invalidateQueries({ queryKey: ['assignments'] });
     },
     onError: (err: any) => {
       setErrorMsg(err.response?.data?.error || err.message);
@@ -259,13 +266,16 @@ export default function Catalog() {
   });
 
   const forceAcceptMutation = useMutation({
-    mutationFn: async (assetId: string) => {
-      const response = await axios.post(`${API_URL}/api/assignments/force-accept-by-asset/${assetId}`);
+    mutationFn: async (data: { assetId: string, reason: string }) => {
+      const response = await axios.post(`${API_URL}/api/assignments/force-accept-by-asset/${data.assetId}`, { reason: data.reason });
       return response.data;
     },
     onSuccess: (data) => {
       setSuccessMsg(`Firma forzada completada (Administrativa).`);
+      setForceActionModal(null);
+      setForceReason('');
       queryClient.invalidateQueries({ queryKey: ['assets'] });
+      queryClient.invalidateQueries({ queryKey: ['assignments'] });
       if (data.documentPath) {
         window.open(`${API_URL}${data.documentPath}`, '_blank');
       }
@@ -277,13 +287,16 @@ export default function Catalog() {
   });
 
   const forceReturnMutation = useMutation({
-    mutationFn: async (assetId: string) => {
-      const response = await axios.post(`${API_URL}/api/assignments/force-return-by-asset/${assetId}`);
+    mutationFn: async (data: { assetId: string, reason: string }) => {
+      const response = await axios.post(`${API_URL}/api/assignments/force-return-by-asset/${data.assetId}`, { reason: data.reason });
       return response.data;
     },
     onSuccess: (data) => {
       setSuccessMsg(`Devolución forzada completada (Administrativa).`);
+      setForceActionModal(null);
+      setForceReason('');
       queryClient.invalidateQueries({ queryKey: ['assets'] });
+      queryClient.invalidateQueries({ queryKey: ['assignments'] });
       if (data.documentPath) {
         window.open(`${API_URL}${data.documentPath}`, '_blank');
       }
@@ -743,20 +756,7 @@ export default function Catalog() {
                         if (isPendingAcceptance) {
                           return (
                             <>
-                              <button
-                                className="btn-action"
-                                style={{ borderColor: '#22c55e', color: '#22c55e' }}
-                                title="Firma Forzada (TI)"
-                                onClick={() => {
-                                  confirm({
-                                    title: 'Firma Forzada (Asignación)',
-                                    message: '¿Estás seguro de forzar la firma de esta asignación? Esta acción es administrativa.',
-                                    type: 'info',
-                                    onConfirm: () => forceAcceptMutation.mutate(asset.id)
-                                  });
-                                }}
-                                disabled={forceAcceptMutation.isPending}
-                              >
+                              <button onClick={() => setForceActionModal({ type: 'accept', assetId: asset.id })} className="btn-action" style={{ borderColor: '#f59e0b', color: '#f59e0b' }} title="Firma Forzada (TI)">
                                 <AlertTriangle size={16} />
                               </button>
                               <button
@@ -808,15 +808,7 @@ export default function Catalog() {
                                 className="btn-action"
                                 style={{ borderColor: '#ef4444', color: '#ef4444' }}
                                 title="Devolución Forzada (TI)"
-                                onClick={() => {
-                                  confirm({
-                                    title: 'Devolución Forzada',
-                                    message: '¿Estás seguro de forzar la devolución? Esta acción es administrativa.',
-                                    type: 'danger',
-                                    onConfirm: () => forceReturnMutation.mutate(asset.id)
-                                  });
-                                }}
-                                disabled={forceReturnMutation.isPending}
+                                onClick={() => setForceActionModal({ type: 'return', assetId: asset.id })}
                               >
                                 <AlertTriangle size={16} />
                               </button>
@@ -880,6 +872,44 @@ export default function Catalog() {
         </div>
       </div>
 
+      {/* MODAL DE DEVOLUCIÓN FORZADA / ACEPTACIÓN FORZADA */}
+      {forceActionModal && (
+        <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(4px)' }}>
+          <div className="glass-panel" style={{ width: '400px', padding: '20px' }}>
+            <h3 style={{ marginTop: 0 }}>{forceActionModal.type === 'accept' ? 'Forzar Aceptación' : 'Forzar Devolución'}</h3>
+            <p style={{ color: 'var(--text-muted)', marginBottom: '1rem' }}>
+              Esta acción requiere registrar el motivo por el cual el administrador está firmando el acta forzadamente.
+            </p>
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              if (forceActionModal.type === 'accept') {
+                forceAcceptMutation.mutate({ assetId: forceActionModal.assetId, reason: forceReason });
+              } else {
+                forceReturnMutation.mutate({ assetId: forceActionModal.assetId, reason: forceReason });
+              }
+            }}>
+              <div className="form-group">
+                <label>Motivo / Justificación</label>
+                <textarea
+                  required
+                  className="glass-input"
+                  rows={3}
+                  value={forceReason}
+                  onChange={(e) => setForceReason(e.target.value)}
+                  placeholder="Ej. El usuario no tiene acceso a internet..."
+                ></textarea>
+              </div>
+              <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+                <button type="button" className="btn-glass" onClick={() => { setForceActionModal(null); setForceReason(''); }}>Cancelar</button>
+                <button type="submit" className="btn-primary" disabled={forceAcceptMutation.isPending || forceReturnMutation.isPending}>
+                  {forceAcceptMutation.isPending || forceReturnMutation.isPending ? 'Procesando...' : 'Confirmar Firma'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* MODAL CONFIRMACIÓN DEVOLUCIÓN */}
       {returnId && (
         <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(4px)' }}>
@@ -892,14 +922,15 @@ export default function Catalog() {
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginTop: '20px' }}>
               <button
                 onClick={() => setReturnId(null)}
-                style={{ padding: '10px 20px', background: 'transparent', border: '1px solid var(--border-glass)', color: 'white', borderRadius: '8px', cursor: 'pointer', fontWeight: 500 }}
+                className="btn-glass"
               >
                 Cancelar
               </button>
               <button
                 onClick={confirmReturn}
                 disabled={returnMutation.isPending}
-                style={{ padding: '10px 20px', background: '#eab308', border: 'none', color: '#000', fontWeight: 'bold', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
+                className="btn-danger"
+                style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
               >
                 {returnMutation.isPending ? 'Procesando...' : <><RefreshCw size={16} /> Confirmar</>}
               </button>

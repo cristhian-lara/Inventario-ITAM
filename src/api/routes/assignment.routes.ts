@@ -116,7 +116,8 @@ router.post('/resend-link-by-asset/:assetId', async (req, res) => {
 // Devolución Forzada (Administrativa)
 router.post('/:id/force-return', async (req, res) => {
     try {
-        const ipAddress = req.ip || req.socket.remoteAddress || 'unknown';
+        const reason = req.body.reason || 'Firma forzada administrativa';
+        const ipAddress = `Firma forzada por administrador.\nMotivo: ${reason}`;
         const returnedAssignment = await assignmentUseCases.forceReturn(req.params.id, ipAddress);
         
         // Actualizar el estado del activo en el Catálogo a AVAILABLE
@@ -189,7 +190,8 @@ router.post('/force-return-by-asset/:assetId', async (req, res) => {
         const assignment = await assignmentRepo.findCurrentByAssetId(req.params.assetId);
         if (!assignment) throw new Error('No se encontró asignación activa o pendiente');
         
-        const ipAddress = req.ip || req.socket.remoteAddress || 'unknown';
+        const reason = req.body.reason || 'Firma forzada administrativa';
+        const ipAddress = `Firma forzada por administrador.\nMotivo: ${reason}`;
         const returnedAssignment = await assignmentUseCases.forceReturn(assignment.id, ipAddress);
         
         await catalogUseCases.changeAssetStatus(returnedAssignment.assetId, 'AVAILABLE');
@@ -261,7 +263,8 @@ router.post('/force-accept-by-asset/:assetId', async (req, res) => {
         const assignment = await assignmentRepo.findCurrentByAssetId(req.params.assetId);
         if (!assignment) throw new Error('No se encontró asignación para forzar aceptación');
         
-        const ipAddress = req.ip || req.socket.remoteAddress || 'unknown';
+        const reason = req.body.reason || 'Firma forzada administrativa';
+        const ipAddress = `Firma forzada por administrador.\nMotivo: ${reason}`;
         const acceptedAssignment = await assignmentUseCases.forceAccept(assignment.id, ipAddress);
         
         await catalogUseCases.changeAssetStatus(acceptedAssignment.assetId, 'IN_USE');

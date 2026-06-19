@@ -24,6 +24,9 @@ export class MaintenanceOrmEntity {
     reason?: string;
 
     @Column({ type: 'text', nullable: true })
+    start_note?: string;
+
+    @Column({ type: 'text', nullable: true })
     notes?: string;
 
     @Column({ nullable: true })

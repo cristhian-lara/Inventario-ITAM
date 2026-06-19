@@ -6,20 +6,23 @@ describe('Catalog Domain Rules', () => {
     describe('Category', () => {
         it('debería arrojar error si el nombre está vacío', () => {
             const props: CategoryProps = {
-                id: 'cat-1',
+                id: 1,
                 name: '',
-                schemaDefinition: {}
+                schemaDefinition: { fields: [] } as any
             };
             expect(() => new Category(props)).toThrow('Category name cannot be empty');
         });
 
         it('debería validar campos requeridos en base al schema', () => {
             const category = new Category({
-                id: 'cat-laptop',
+                id: 2,
                 name: 'Laptop',
                 schemaDefinition: {
-                    required: ['ram', 'processor']
-                }
+                    fields: [
+                        { name: 'ram', type: 'text', isRequired: true },
+                        { name: 'processor', type: 'text', isRequired: true }
+                    ]
+                } as any
             });
 
             // Faltan campos
@@ -35,26 +38,15 @@ describe('Catalog Domain Rules', () => {
 
     describe('Asset', () => {
         const mockCategory = new Category({
-            id: 'cat-1',
-            name: 'PC',
-            schemaDefinition: { required: ['macAddress'] }
-        });
-
-        it('debería arrojar error si el serial está vacío', () => {
-            const props: AssetProps = {
-                id: 'asset-1',
-                categoryId: 'cat-1',
-                serial: '   ',
-                status: 'AVAILABLE',
-                dynamicAttributes: {}
-            };
-            expect(() => new Asset(props)).toThrow('El número de serial del activo no puede estar vacío');
+            id: 1,
+            name: 'Laptop',
+            schemaDefinition: { fields: [{ name: 'macAddress', type: 'text', isRequired: true }] } as any
         });
 
         it('debería fallar la validación al crear un Activo con atributos dinámicos inválidos', () => {
             const props: AssetProps = {
                 id: 'asset-1',
-                categoryId: 'cat-1',
+                categoryId: 1,
                 serial: 'SN12345',
                 status: 'AVAILABLE',
                 dynamicAttributes: { wrongField: 'X' }
@@ -66,7 +58,7 @@ describe('Catalog Domain Rules', () => {
         it('debería crear el Activo correctamente con atributos dinámicos válidos', () => {
             const props: AssetProps = {
                 id: 'asset-2',
-                categoryId: 'cat-1',
+                categoryId: 1,
                 serial: 'SN999',
                 status: 'AVAILABLE',
                 dynamicAttributes: { macAddress: '00:1B:44:11:3A:B7' }

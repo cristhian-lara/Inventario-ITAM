@@ -19,10 +19,10 @@ const assignmentAdapter: any = {
     async getActiveAssignmentForAsset(assetId: string) {
         const assignment = await assignmentRepo.findCurrentByAssetId(assetId);
         if (!assignment || !assignment.collaboratorId) return null;
-        
+
         const collaboratorRepo = new (require('../../modules/collaborator/infrastructure/PostgresCollaboratorRepository').PostgresCollaboratorRepository)(AppDataSource);
         const collaborator = await collaboratorRepo.findById(assignment.collaboratorId);
-        
+
         return {
             collaboratorId: assignment.collaboratorId,
             collaboratorName: collaborator?.name || 'Usuario Asignado',
@@ -37,11 +37,13 @@ const serializeRecord = (record: any) => {
     return {
         id: record.id,
         assetId: record.assetId,
+
         type: record.type,
         status: record.status,
         scheduledDate: record.scheduledDate,
         executionDate: record.executionDate,
         reason: record.reason,
+        startNote: record.startNote,
         notes: record.notes,
         collaboratorInTurnId: record.collaboratorInTurnId,
         collaboratorInTurnName: record.collaboratorInTurnName,
@@ -66,8 +68,8 @@ router.post('/', async (req, res) => {
 // 2. Iniciar mantenimiento
 router.post('/:id/start', async (req, res) => {
     try {
-        const { reason } = req.body;
-        const result = await useCases.startMaintenance(req.params.id, reason);
+        const { startNote } = req.body;
+        const result = await useCases.startMaintenance(req.params.id, startNote);
         res.json(serializeRecord(result));
     } catch (error: any) {
         res.status(400).json({ error: error.message });
@@ -122,7 +124,7 @@ router.get('/verify-token/:token', async (req, res) => {
         const jwt = require('jsonwebtoken');
         const secret = process.env.JWT_SECRET || 'secret';
         const decoded = jwt.verify(req.params.token, secret) as any;
-        
+
         const record = await repo.findById(decoded.maintenanceId);
         if (!record || record.signatureToken !== req.params.token) {
             return res.status(400).json({ error: 'Token inválido o expirado' });
@@ -144,7 +146,7 @@ router.get('/accept', async (req, res) => {
         const jwt = require('jsonwebtoken');
         const secret = process.env.JWT_SECRET || 'secret';
         const decoded = jwt.verify(token, secret) as any;
-        
+
         const ipAddress = req.ip || req.socket.remoteAddress || 'unknown';
         const userAgent = req.headers['user-agent'] || 'unknown';
 
@@ -153,7 +155,7 @@ router.get('/accept', async (req, res) => {
         // Generar PDF
         const { PdfKitService } = require('../../shared/infrastructure/services/PdfKitService');
         const documentService = new PdfKitService();
-        
+
         // Simular que traemos datos del activo para el PDF
         const catalogRepo = new (require('../../modules/catalog/infrastructure/PostgresCatalogRepository').PostgresCatalogRepository)(AppDataSource);
         const asset = await catalogRepo.getAssetById(record.assetId);
@@ -162,7 +164,7 @@ router.get('/accept', async (req, res) => {
             const category = await catalogRepo.getCategoryById(asset.categoryId);
             if (category) categoryName = category.name;
         }
-        
+
         const activeAssignment = await assignmentAdapter.getActiveAssignmentForAsset(record.assetId);
         const recordData = serializeRecord(record) as any;
         if (activeAssignment && !recordData.collaboratorInTurnName) {
@@ -172,7 +174,7 @@ router.get('/accept', async (req, res) => {
 
         // Generate PDF (sin firma gráfica)
         const pdfPath = await documentService.generateMaintenanceAct(recordData, asset, "", categoryName);
-        
+
         await useCases.updatePdfUrl(record.id, pdfPath);
 
         res.send(`
@@ -200,7 +202,7 @@ router.post('/sign', async (req, res) => {
         const jwt = require('jsonwebtoken');
         const secret = process.env.JWT_SECRET || 'secret';
         const decoded = jwt.verify(token, secret) as any;
-        
+
         const ip = req.ip || req.socket.remoteAddress || 'unknown';
         const userAgent = req.headers['user-agent'] || 'unknown';
 
@@ -209,7 +211,7 @@ router.post('/sign', async (req, res) => {
         // Generar PDF
         const { PdfKitService } = require('../../shared/infrastructure/services/PdfKitService');
         const documentService = new PdfKitService();
-        
+
         // Simular que traemos datos del activo para el PDF
         const catalogRepo = new (require('../../modules/catalog/infrastructure/PostgresCatalogRepository').PostgresCatalogRepository)(AppDataSource);
         const asset = await catalogRepo.getAssetById(record.assetId);
@@ -228,9 +230,9 @@ router.post('/sign', async (req, res) => {
 
         // Generate PDF
         const pdfPath = await documentService.generateMaintenanceAct(recordData, asset, signature, categoryName);
-        
+
         await useCases.updatePdfUrl(record.id, pdfPath);
-        
+
         res.json({ message: 'Firmado correctamente', pdfUrl: pdfPath });
     } catch (error: any) {
         res.status(400).json({ error: error.message });
@@ -242,13 +244,13 @@ router.post('/:id/force-sign', async (req, res) => {
     try {
         const { reason } = req.body;
         const adminId = 'admin'; // Simulación
-        
+
         const record = await useCases.forceSignMaintenance(req.params.id, reason, adminId);
 
         // Generar PDF
         const { PdfKitService } = require('../../shared/infrastructure/services/PdfKitService');
         const documentService = new PdfKitService();
-        
+
         const catalogRepo = new (require('../../modules/catalog/infrastructure/PostgresCatalogRepository').PostgresCatalogRepository)(AppDataSource);
         const asset = await catalogRepo.getAssetById(record.assetId);
         let categoryName = 'EQUIPO';
@@ -266,9 +268,9 @@ router.post('/:id/force-sign', async (req, res) => {
 
         const signatureText = `Firma forzada por administrador.\nMotivo: ${reason}`;
         const pdfPath = await documentService.generateMaintenanceAct(recordData, asset, signatureText, categoryName);
-        
+
         await useCases.updatePdfUrl(record.id, pdfPath);
-        
+
         res.json({ message: 'Mantenimiento firmado forzadamente', record: serializeRecord(record) });
     } catch (error: any) {
         res.status(400).json({ error: error.message });
