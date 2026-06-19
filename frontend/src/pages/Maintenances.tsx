@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Settings, Wrench, CheckCircle, AlertTriangle, Calendar, Plus, Clock, X, Mail, Edit3, Search, Server } from 'lucide-react';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, Legend } from 'recharts';
+import { Link } from 'react-router-dom';
+import ActionMenu from '../components/ActionMenu';
 import { useConfirm } from '../context/ConfirmContext';
 import './Maintenances.css';
 import { API_URL } from '../config';
@@ -743,7 +745,7 @@ const Maintenances: React.FC = () => {
                               <Plus size={16} /> Programar
                             </button>
                           ) : (
-                            <div style={{ display: 'flex', gap: '6px' }}>
+                            <ActionMenu>
                               <button className="btn-action" style={{ borderColor: '#8b5cf6', color: '#8b5cf6' }} title="Ver Historial" onClick={() => openModal('view', m)}>
                                 <Clock size={16} />
                               </button>
@@ -792,7 +794,7 @@ const Maintenances: React.FC = () => {
                                   <Mail size={16} />
                                 </button>
                               )}
-                            </div>
+                            </ActionMenu>
                           )}
                         </td>
                       </tr>

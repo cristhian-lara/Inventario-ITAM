@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
+import ActionMenu from '../components/ActionMenu';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { Plus, Search, UserCheck, UserX, UserPlus, Edit2, Upload, Eye, Crown } from 'lucide-react';
@@ -22,6 +23,9 @@ interface Collaborator {
 
 export default function Collaborators() {
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+  useEffect(() => { setCurrentPage(1); }, [searchTerm]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({ name: '', email: '', department: '', location: '', isLeader: false, leaderId: '', cecos: '', activationDate: new Date().toISOString().split('T')[0] });
   const [locationType, setLocationType] = useState('Medellín');
@@ -291,7 +295,7 @@ export default function Collaborators() {
                     </span>
                   </td>
                   <td>
-                    <div className="actions-container">
+                    <ActionMenu>
                       <button 
                         className="action-icon-btn edit-btn" 
                         onClick={() => handleEditClick(c)}
@@ -322,7 +326,7 @@ export default function Collaborators() {
                       >
                         {c.status === 'ACTIVE' ? <UserX size={16} /> : <UserCheck size={16} />}
                       </button>
-                    </div>
+                    </ActionMenu>
                   </td>
                 </tr>
               ))}

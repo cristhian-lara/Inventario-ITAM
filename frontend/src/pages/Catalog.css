@@ -47,7 +47,7 @@
 }
 
 .glass-table th {
-  padding: 16px 24px;
+  padding: 10px 10px;
   font-size: 13px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -58,7 +58,7 @@
 }
 
 .glass-table td {
-  padding: 16px 24px;
+  padding: 10px 10px;
   border-bottom: 1px solid var(--border-subtle);
   vertical-align: top;
   color: var(--text-main);

@@ -216,15 +216,7 @@ body {
     grid-template-columns: 1fr !important;
   }
 
-  /* Tables: allow horizontal scroll on small screens */
-  .table-responsive {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-
-  .glass-table {
-    min-width: 600px;
-  }
+  
 
   /* Stack catalog/page headers */
   .catalog-header,
@@ -335,4 +327,29 @@ body {
   padding: 30px;
   max-height: 90vh;
   overflow-y: auto;
+}
+
+/* ══════════════════════════════════════════════
+   GLOBAL TABLE RESPONSIVENESS
+   ══════════════════════════════════════════════ */
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.glass-table {
+  min-width: 900px;
+}
+
+.glass-table th:first-child,
+.glass-table td:first-child {
+  padding-left: 24px;
+}
+
+.glass-table th:last-child,
+.glass-table td:last-child {
+  padding-right: 24px;
+  min-width: 120px;
+  text-align: center;
 }

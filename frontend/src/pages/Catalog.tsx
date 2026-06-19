@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router-dom';
+import ActionMenu from '../components/ActionMenu';
 import axios from 'axios';
-import { Plus, Search, Tag, Cpu, HardDrive, Wifi, PlusCircle, MonitorSmartphone, RefreshCw, CheckCircle2, AlertCircle, AlertTriangle, UserCheck, Send, Upload , Trash2} from 'lucide-react';
+import { Plus, Search, Tag, Cpu, HardDrive, Wifi, PlusCircle, MonitorSmartphone, RefreshCw, CheckCircle2, AlertCircle, AlertTriangle, UserCheck, Send, Upload, Trash2 } from 'lucide-react';
 import { useConfirm } from '../context/ConfirmContext';
 import './Catalog.css';
 import { API_URL } from '../config';
@@ -21,15 +22,15 @@ export default function Catalog() {
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [modalErrorMsg, setModalErrorMsg] = useState('');
-  
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importing, setImporting] = useState(false);
-  const [importResult, setImportResult] = useState<{successful: number, failed: number, errors: string[]} | null>(null);
+  const [importResult, setImportResult] = useState<{ successful: number, failed: number, errors: string[] } | null>(null);
 
   // Estados de los modales
   const [returnId, setReturnId] = useState<string | null>(null);
   const [assignModalAssetId, setAssignModalAssetId] = useState<string | null>(null);
-  
+
   // Autocomplete state para asignación
   const [collabSearchTerm, setCollabSearchTerm] = useState('');
   const [showCollabDropdown, setShowCollabDropdown] = useState(false);
@@ -372,35 +373,35 @@ export default function Catalog() {
 
   if (error) return <div className="error-glass">Error al cargar el inventario: {(error as Error).message}</div>;
 
-    const filteredAssets = assets?.filter((asset: any) => {
-      if (filterRisk) {
-        if (asset.status === 'RETIRED') return false;
-        let atRisk = false;
-        const today = new Date();
-        // Normalize today to midnight (date only, no time)
-        today.setHours(0, 0, 0, 0);
-        if (asset.purchaseDate) {
-          // purchaseDate arrives as "2025-06-14T00:00:00.000Z" — parse as local date
-          const pdStr = typeof asset.purchaseDate === 'string'
-            ? asset.purchaseDate.split('T')[0]
-            : new Date(asset.purchaseDate).toISOString().split('T')[0];
-          const [pdYear, pdMonth, pdDay] = pdStr.split('-').map(Number);
-          const pd = new Date(pdYear, pdMonth - 1, pdDay); // local midnight
-  
-          if (asset.warrantyMonths) {
-            const wDate = new Date(pd);
-            wDate.setMonth(wDate.getMonth() + Number(asset.warrantyMonths));
-            if (wDate < today) atRisk = true;
-          }
-          if (asset.depreciationYears) {
-            const dDate = new Date(pd);
-            dDate.setFullYear(dDate.getFullYear() + Number(asset.depreciationYears));
-            if (dDate < today) atRisk = true;
-          }
+  const filteredAssets = assets?.filter((asset: any) => {
+    if (filterRisk) {
+      if (asset.status === 'RETIRED') return false;
+      let atRisk = false;
+      const today = new Date();
+      // Normalize today to midnight (date only, no time)
+      today.setHours(0, 0, 0, 0);
+      if (asset.purchaseDate) {
+        // purchaseDate arrives as "2025-06-14T00:00:00.000Z" — parse as local date
+        const pdStr = typeof asset.purchaseDate === 'string'
+          ? asset.purchaseDate.split('T')[0]
+          : new Date(asset.purchaseDate).toISOString().split('T')[0];
+        const [pdYear, pdMonth, pdDay] = pdStr.split('-').map(Number);
+        const pd = new Date(pdYear, pdMonth - 1, pdDay); // local midnight
+
+        if (asset.warrantyMonths) {
+          const wDate = new Date(pd);
+          wDate.setMonth(wDate.getMonth() + Number(asset.warrantyMonths));
+          if (wDate < today) atRisk = true;
         }
-        if (!atRisk) return false;
+        if (asset.depreciationYears) {
+          const dDate = new Date(pd);
+          dDate.setFullYear(dDate.getFullYear() + Number(asset.depreciationYears));
+          if (dDate < today) atRisk = true;
+        }
       }
-    
+      if (!atRisk) return false;
+    }
+
     if (filterCategory !== 'all') {
       if (Number(asset.categoryId) !== Number(filterCategory)) return false;
     }
@@ -448,17 +449,17 @@ export default function Catalog() {
             ref={fileInputRef}
             onChange={handleImport}
           />
-          <button 
-            className="btn-secondary" 
-            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', borderRadius: '12px', background: 'var(--glass-bg)', color: 'var(--text-main)', border: '1px solid var(--border-glass)', cursor: 'pointer', fontWeight: '500', transition: 'all 0.3s ease' }} 
-            onClick={handleDownloadTemplate} 
+          <button
+            className="btn-secondary"
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', borderRadius: '12px', background: 'var(--glass-bg)', color: 'var(--text-main)', border: '1px solid var(--border-glass)', cursor: 'pointer', fontWeight: '500', transition: 'all 0.3s ease' }}
+            onClick={handleDownloadTemplate}
           >
             Descargar Plantilla
           </button>
-          <button 
-            className="btn-secondary" 
-            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', borderRadius: '12px', background: 'var(--glass-bg)', color: 'var(--text-main)', border: '1px solid var(--border-glass)', cursor: 'pointer', fontWeight: '500', transition: 'all 0.3s ease' }} 
-            onClick={() => fileInputRef.current?.click()} 
+          <button
+            className="btn-secondary"
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', borderRadius: '12px', background: 'var(--glass-bg)', color: 'var(--text-main)', border: '1px solid var(--border-glass)', cursor: 'pointer', fontWeight: '500', transition: 'all 0.3s ease' }}
+            onClick={() => fileInputRef.current?.click()}
             disabled={importing}
           >
             {importing ? 'Importando...' : <><Upload size={18} /> Importar (.xlsx, .csv)</>}
@@ -503,7 +504,7 @@ export default function Catalog() {
                   <strong style={{ color: '#ef4444' }}>Fallidos:</strong> {importResult.failed}
                 </p>
               </div>
-              
+
               {importResult.errors && importResult.errors.length > 0 && (
                 <div style={{ marginTop: '15px', padding: '15px', background: 'rgba(239, 68, 68, 0.1)', borderRadius: '8px', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
                   <h4 style={{ color: '#ef4444', margin: '0 0 10px 0', fontSize: '14px' }}>Detalles de errores:</h4>
@@ -513,7 +514,7 @@ export default function Catalog() {
                 </div>
               )}
             </div>
-            <button 
+            <button
               onClick={() => setImportResult(null)}
               style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '5px' }}
             >
@@ -535,18 +536,18 @@ export default function Catalog() {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <select 
-            className="glass-input" 
-            value={filterCategory} 
+          <select
+            className="glass-input"
+            value={filterCategory}
             onChange={(e) => setFilterCategory(e.target.value)}
             style={{ width: 'auto' }}
           >
             <option value="all">Todas las Categorías</option>
             {categories?.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
-          <select 
-            className="glass-input" 
-            value={filterStatus} 
+          <select
+            className="glass-input"
+            value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
             style={{ width: 'auto' }}
           >
@@ -558,8 +559,8 @@ export default function Catalog() {
             <option value="RETIRED">Retirado / Baja</option>
           </select>
           {(filterCategory !== 'all' || filterStatus !== 'all' || searchTerm !== '' || filterRisk) && (
-            <button 
-              className="btn-glass" 
+            <button
+              className="btn-glass"
               onClick={() => {
                 setFilterCategory('all');
                 setFilterStatus('all');
@@ -577,32 +578,24 @@ export default function Catalog() {
           <table className="glass-table">
             <thead>
               <tr>
-                <th>Placa Ikusi</th>
+                <th>Placa</th>
                 <th>Categoría</th>
-                <th>Asignado a (Correo)</th>
-                <th>Especificaciones Principales</th>
+                <th>Asignado a</th>
+                <th>Características</th>
                 <th>Estado</th>
                 <th>Acciones</th>
               </tr>
             </thead>
             <tbody>
-              {filteredAssets?.map((asset) => (
+              {filteredAssets?.map(asset => (
                 <tr key={asset.id} className="table-row">
-                  <td className="fw-600">
-                    <Link
-                      to={`/assets/${asset.id}`}
-                      style={{ color: 'var(--accent-blue)', textDecoration: 'none', fontFamily: 'monospace', fontWeight: 700, fontSize: '14px' }}
-                      title="Ver Hoja de Vida del Equipo"
-                    >
+                  <td style={{ fontWeight: 600 }}>
+                    <Link to={`/assets/${asset.id}`} style={{ color: 'var(--accent-blue)', textDecoration: 'none' }}>
                       {asset.id}
                     </Link>
                   </td>
+                  <td>{categories?.find(c => c.id === asset.categoryId)?.name || 'Desconocida'}</td>
                   <td>
-                    <span className="badge badge-category">
-                      <Tag size={12} /> {categories?.find((c: any) => c.id === Number(asset.categoryId))?.name || asset.categoryId}
-                    </span>
-                  </td>
-                  <td style={{ color: 'var(--text-muted)' }}>
                     {(() => {
                       const activeAssignment = getActiveAssignmentForAsset(asset.id);
                       if (activeAssignment && activeAssignment.collaboratorId) {
@@ -618,37 +611,71 @@ export default function Catalog() {
                   </td>
                   <td className="specs-cell">
                     <div className="specs-cell-inner">
-                    <span className="spec-tag" title="Serial">
-                      <HardDrive size={12} /> {asset.serial || 'N/A'}
-                    </span>
-                    {Object.entries(asset.dynamicAttributes || {}).map(([key, value]) => {
-                      if (!value || String(value).trim() === '') return null;
-                      const lowerKey = key.toLowerCase();
-                      
-                      // Ocultar etiquetas duplicadas/confusas migradas del excel
-                      if (
-                        lowerKey.includes('fecha de compra') ||
-                        lowerKey.includes('precio') ||
-                        lowerKey.includes('depreciaci') ||
-                        lowerKey.includes('garant') ||
-                        lowerKey.includes('warranty')
-                      ) return null;
+                      {(() => {
+                        const category = categories?.find(c => c.id === asset.categoryId);
+                        const requiresPlaca = category?.schemaDefinition?.requiresPlacaIkusi !== false;
 
-                      let Icon = Tag;
-                      if (lowerKey.includes('proces') || lowerKey.includes('cpu')) Icon = Cpu;
-                      else if (lowerKey.includes('ram') || lowerKey.includes('mem') || lowerKey.includes('disco') || lowerKey.includes('disk')) Icon = HardDrive;
-                      else if (lowerKey.includes('mac') || lowerKey.includes('wifi') || lowerKey.includes('red') || lowerKey.includes('ip')) Icon = Wifi;
-                      
-                      return (
-                        <span key={key} className="spec-tag" title={key}>
-                          <Icon size={12} /> {String(value)}
-                        </span>
-                      );
-                    })}
-                    {(!asset.dynamicAttributes || Object.values(asset.dynamicAttributes).every(v => !v || String(v).trim() === '')) && 
-                      <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Sin specs</span>
-                    }
-                    
+                        if (!requiresPlaca) {
+                          // Mostrar todas las características para periféricos (sin placa)
+                          return (
+                            <>
+                              {asset.serial && (
+                                <span className="spec-tag" title="Serial">
+                                  <HardDrive size={12} /> {asset.serial}
+                                </span>
+                              )}
+                              {Object.entries(asset.dynamicAttributes || {}).map(([key, value]) => {
+                                if (!value || String(value).trim() === '') return null;
+                                const lowerKey = key.toLowerCase();
+
+                                if (
+                                  lowerKey.includes('fecha de compra') ||
+                                  lowerKey.includes('precio') ||
+                                  lowerKey.includes('depreciaci') ||
+                                  lowerKey.includes('garant') ||
+                                  lowerKey.includes('warranty')
+                                ) return null;
+
+                                let Icon = Tag;
+                                if (lowerKey.includes('proces') || lowerKey.includes('cpu')) Icon = Cpu;
+                                else if (lowerKey.includes('ram') || lowerKey.includes('mem') || lowerKey.includes('disco') || lowerKey.includes('disk')) Icon = HardDrive;
+                                else if (lowerKey.includes('mac') || lowerKey.includes('wifi') || lowerKey.includes('red') || lowerKey.includes('ip')) Icon = Wifi;
+
+                                return (
+                                  <span key={key} className="spec-tag" title={key}>
+                                    <Icon size={12} /> {String(value)}
+                                  </span>
+                                );
+                              })}
+                              {(!asset.dynamicAttributes || Object.values(asset.dynamicAttributes).every(v => !v || String(v).trim() === '')) && !asset.serial &&
+                                <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Sin specs</span>
+                              }
+                            </>
+                          );
+                        }
+
+                        // Equipos con placa: Mostrar solo Hostname y Modelo
+                        const hostname = asset.dynamicAttributes?.Hostname || asset.dynamicAttributes?.hostname || asset.dynamicAttributes?.HOSTNAME;
+                        const modelo = asset.dynamicAttributes?.Modelo || asset.dynamicAttributes?.modelo || asset.dynamicAttributes?.MODELO || asset.dynamicAttributes?.Model || asset.dynamicAttributes?.model;
+
+                        return (
+                          <>
+                            {hostname && (
+                              <span className="spec-tag" title="Hostname">
+                                <MonitorSmartphone size={12} /> {hostname}
+                              </span>
+                            )}
+                            {modelo && (
+                              <span className="spec-tag" title="Modelo">
+                                <Tag size={12} /> {modelo}
+                              </span>
+                            )}
+                            {!hostname && !modelo && (
+                              <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Sin specs</span>
+                            )}
+                          </>
+                        );
+                      })()}
                     </div>
                   </td>
                   <td>
@@ -678,41 +705,25 @@ export default function Catalog() {
                           </>
                         );
                       }
-                      
+
                       return (
-                        <>
-                          <span className={`badge badge-status badge-${asset.status.toLowerCase()}`}>
-                            {asset.status === 'AVAILABLE' ? 'Disponible' :
-                              asset.status === 'IN_USE' ? 'En Uso' : asset.status}
-                          </span>
-                          {asset.status === 'IN_USE' && (
-                            <div style={{ marginTop: '8px', fontSize: '12px' }}>
-                              {activeAssignment ? (
-                                <span style={{ color: 'var(--text-muted)' }}>
-                                  En uso por:{' '}
-                                  <Link to={`/collaborators/${activeAssignment.collaboratorId}`} style={{ color: 'var(--accent-blue)', textDecoration: 'none' }}>
-                                    Ver perfil
-                                  </Link>
-                                </span>
-                              ) : (
-                                <span style={{ color: 'var(--text-muted)' }}>Asignado</span>
-                              )}
-                            </div>
-                          )}
-                        </>
+                        <span className={`badge badge-status badge-${asset.status.toLowerCase()}`}>
+                          {asset.status === 'AVAILABLE' ? 'Disponible' :
+                            asset.status === 'IN_USE' ? 'En Uso' : asset.status}
+                        </span>
                       );
                     })()}
                   </td>
                   <td>
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <ActionMenu>
                       <Link
-                          to={`/assets/${asset.id}`}
-                          className="btn-action"
-                          style={{ borderColor: 'var(--ikusi-green)', color: 'var(--ikusi-green)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}
-                          title="Hoja de Vida del Equipo"
-                        >
-                          📋
-                        </Link>
+                        to={`/assets/${asset.id}`}
+                        className="btn-action"
+                        style={{ borderColor: 'var(--ikusi-green)', color: 'var(--ikusi-green)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}
+                        title="Hoja de Vida del Equipo"
+                      >
+                        📋
+                      </Link>
                       {asset.status !== 'RETIRED' && (
                         <button
                           className="btn-action"
@@ -724,92 +735,30 @@ export default function Catalog() {
                         </button>
                       )}
 
-                    {(() => {
-                      const activeAssignment = getActiveAssignmentForAsset(asset.id);
-                      const isPendingAcceptance = activeAssignment?.status === 'PENDING_ACCEPTANCE';
-                      const isPendingReturn = activeAssignment?.status === 'PENDING_RETURN';
-                      
-                      if (isPendingAcceptance) {
-                        return (
-                          <>
-                            <button
-                              className="btn-action"
-                              style={{ borderColor: '#22c55e', color: '#22c55e' }}
-                              title="Firma Forzada (TI)"
-                              onClick={() => {
-                                confirm({
-                                  title: 'Firma Forzada (Asignación)',
-                                  message: '¿Estás seguro de forzar la firma de esta asignación? Esta acción es administrativa.',
-                                  type: 'info',
-                                  onConfirm: () => forceAcceptMutation.mutate(asset.id)
-                                });
-                              }}
-                              disabled={forceAcceptMutation.isPending}
-                            >
-                              <AlertTriangle size={16} />
-                            </button>
-                            <button
-                              className="btn-action"
-                              style={{ borderColor: '#3b82f6', color: '#3b82f6' }}
-                              title="Reenviar Link de Firma"
-                              onClick={() => {
-                                confirm({
-                                  title: 'Reenviar Enlace',
-                                  message: '¿Estás seguro de reenviar el enlace de firma al colaborador?',
-                                  type: 'info',
-                                  onConfirm: () => resendLinkMutation.mutate(asset.id)
-                                });
-                              }}
-                              disabled={resendLinkMutation.isPending}
-                            >
-                              <RefreshCw size={16} />
-                            </button>
-                          </>
-                        );
-                      }
+                      {(() => {
+                        const activeAssignment = getActiveAssignmentForAsset(asset.id);
+                        const isPendingAcceptance = activeAssignment?.status === 'PENDING_ACCEPTANCE';
+                        const isPendingReturn = activeAssignment?.status === 'PENDING_RETURN';
 
-                      if (asset.status === 'AVAILABLE' && !isPendingAcceptance && !isPendingReturn) {
-                        return (
-                          <button
-                            className="btn-action btn-assign"
-                            title="Asignar Activo"
-                            onClick={() => handleAssignClick(asset.id)}
-                          >
-                            <PlusCircle size={16} />
-                          </button>
-                        );
-                      }
-
-                      if (asset.status === 'IN_USE' || isPendingReturn) {
-                        return (
-                          <>
-                            {!isPendingReturn && (
+                        if (isPendingAcceptance) {
+                          return (
+                            <>
                               <button
-                                className="btn-action btn-return"
-                                title="Iniciar Devolución"
-                                onClick={() => handleReturnClick(asset.id)}
-                                disabled={returnMutation.isPending}
+                                className="btn-action"
+                                style={{ borderColor: '#22c55e', color: '#22c55e' }}
+                                title="Firma Forzada (TI)"
+                                onClick={() => {
+                                  confirm({
+                                    title: 'Firma Forzada (Asignación)',
+                                    message: '¿Estás seguro de forzar la firma de esta asignación? Esta acción es administrativa.',
+                                    type: 'info',
+                                    onConfirm: () => forceAcceptMutation.mutate(asset.id)
+                                  });
+                                }}
+                                disabled={forceAcceptMutation.isPending}
                               >
-                                <RefreshCw size={16} />
+                                <AlertTriangle size={16} />
                               </button>
-                            )}
-                            <button
-                              className="btn-action"
-                              style={{ borderColor: '#ef4444', color: '#ef4444' }}
-                              title="Devolución Forzada (TI)"
-                              onClick={() => {
-                                confirm({
-                                  title: 'Devolución Forzada',
-                                  message: '¿Estás seguro de forzar la devolución? Esta acción es administrativa.',
-                                  type: 'danger',
-                                  onConfirm: () => forceReturnMutation.mutate(asset.id)
-                                });
-                              }}
-                              disabled={forceReturnMutation.isPending}
-                            >
-                              <AlertTriangle size={16} />
-                            </button>
-                            {isPendingReturn && (
                               <button
                                 className="btn-action"
                                 style={{ borderColor: '#3b82f6', color: '#3b82f6' }}
@@ -826,28 +775,93 @@ export default function Catalog() {
                               >
                                 <RefreshCw size={16} />
                               </button>
-                            )}
-                          </>
-                        );
-                      }
-                      
-                      return null;
-                    })()}
-                    {asset.status !== 'RETIRED' && (
-                      <button
-                        className="btn-action"
-                        style={{ borderColor: '#ef4444', color: '#ef4444' }}
-                        title="Dar de Baja"
-                        onClick={() => {
-                          setRetireReason('');
-                          setRetireModalAssetId(asset.id);
-                        }}
-                        disabled={retireAssetMutation.isPending}
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    )}
-                    </div>
+                            </>
+                          );
+                        }
+
+                        if (asset.status === 'AVAILABLE' && !isPendingAcceptance && !isPendingReturn) {
+                          return (
+                            <button
+                              className="btn-action btn-assign"
+                              title="Asignar Activo"
+                              onClick={() => handleAssignClick(asset.id)}
+                            >
+                              <PlusCircle size={16} />
+                            </button>
+                          );
+                        }
+
+                        if (asset.status === 'IN_USE' || isPendingReturn) {
+                          return (
+                            <>
+                              {!isPendingReturn && (
+                                <button
+                                  className="btn-action btn-return"
+                                  title="Iniciar Devolución"
+                                  onClick={() => handleReturnClick(asset.id)}
+                                  disabled={returnMutation.isPending}
+                                >
+                                  <RefreshCw size={16} />
+                                </button>
+                              )}
+                              <button
+                                className="btn-action"
+                                style={{ borderColor: '#ef4444', color: '#ef4444' }}
+                                title="Devolución Forzada (TI)"
+                                onClick={() => {
+                                  confirm({
+                                    title: 'Devolución Forzada',
+                                    message: '¿Estás seguro de forzar la devolución? Esta acción es administrativa.',
+                                    type: 'danger',
+                                    onConfirm: () => forceReturnMutation.mutate(asset.id)
+                                  });
+                                }}
+                                disabled={forceReturnMutation.isPending}
+                              >
+                                <AlertTriangle size={16} />
+                              </button>
+                              {isPendingReturn && (
+                                <button
+                                  className="btn-action"
+                                  style={{ borderColor: '#3b82f6', color: '#3b82f6' }}
+                                  title="Reenviar Link de Firma"
+                                  onClick={() => {
+                                    confirm({
+                                      title: 'Reenviar Enlace',
+                                      message: '¿Estás seguro de reenviar el enlace de firma al colaborador?',
+                                      type: 'info',
+                                      onConfirm: () => resendLinkMutation.mutate(asset.id)
+                                    });
+                                  }}
+                                  disabled={resendLinkMutation.isPending}
+                                >
+                                  <RefreshCw size={16} />
+                                </button>
+                              )}
+                            </>
+                          );
+                        }
+
+                        return null;
+                      })()}
+                      {asset.status !== 'RETIRED' && (
+                        <button
+                          className="btn-action"
+                          style={{ borderColor: '#ef4444', color: '#ef4444' }}
+                          title="Dar de Baja"
+                          onClick={() => {
+                            confirm({
+                              title: 'Dar de Baja',
+                              message: '¿Estás seguro de dar de baja este activo? Esta acción no se puede deshacer.',
+                              type: 'danger',
+                              onConfirm: () => retireMutation.mutate(asset.id)
+                            });
+                          }}
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      )}
+                    </ActionMenu>
                   </td>
                 </tr>
               ))}
@@ -1050,13 +1064,13 @@ export default function Catalog() {
                 {modalErrorMsg}
               </div>
             )}
-            <form onSubmit={(e) => { 
-              e.preventDefault(); 
+            <form onSubmit={(e) => {
+              e.preventDefault();
               const submitAction = () => {
                 if (isEditing) {
                   editAssetMutation.mutate(newAsset);
                 } else {
-                  addAssetMutation.mutate(newAsset); 
+                  addAssetMutation.mutate(newAsset);
                 }
               };
 
@@ -1093,21 +1107,21 @@ export default function Catalog() {
 
               {newAsset.categoryId && (
                 <>
-                                    <div className="form-group">
+                  <div className="form-group">
                     <label>
                       {(() => {
-                         const cat = categories?.find((c: any) => c.id === newAsset.categoryId);
-                         return cat?.schemaDefinition?.requiresPlacaIkusi !== false ? "Placa Ikusi" : "ID Interno (Generado automáticamente)";
+                        const cat = categories?.find((c: any) => c.id === newAsset.categoryId);
+                        return cat?.schemaDefinition?.requiresPlacaIkusi !== false ? "Placa Ikusi" : "ID Interno (Generado automáticamente)";
                       })()}
                     </label>
-                    <input 
-                       type="text" 
-                       required={categories?.find((c: any) => c.id === newAsset.categoryId)?.schemaDefinition?.requiresPlacaIkusi !== false}
-                       className="glass-input" 
-                       value={newAsset.id} 
-                       disabled={isEditing || categories?.find((c: any) => c.id === newAsset.categoryId)?.schemaDefinition?.requiresPlacaIkusi === false} 
-                       onChange={e => setNewAsset({ ...newAsset, id: e.target.value })} 
-                       placeholder={categories?.find((c: any) => c.id === newAsset.categoryId)?.schemaDefinition?.requiresPlacaIkusi !== false ? "Ej. AST-2026-050" : "Autogenerado (Ej: 000001)"} 
+                    <input
+                      type="text"
+                      required={categories?.find((c: any) => c.id === newAsset.categoryId)?.schemaDefinition?.requiresPlacaIkusi !== false}
+                      className="glass-input"
+                      value={newAsset.id}
+                      disabled={isEditing || categories?.find((c: any) => c.id === newAsset.categoryId)?.schemaDefinition?.requiresPlacaIkusi === false}
+                      onChange={e => setNewAsset({ ...newAsset, id: e.target.value })}
+                      placeholder={categories?.find((c: any) => c.id === newAsset.categoryId)?.schemaDefinition?.requiresPlacaIkusi !== false ? "Ej. AST-2026-050" : "Autogenerado (Ej: 000001)"}
                     />
                   </div>
                   <div className="form-group">
@@ -1210,9 +1224,9 @@ export default function Catalog() {
             </p>
             <div className="form-group" style={{ textAlign: 'left' }}>
               <label>Por favor, indica el motivo por el cual se da de baja este activo:</label>
-              <textarea 
-                className="glass-input" 
-                value={retireReason} 
+              <textarea
+                className="glass-input"
+                value={retireReason}
                 onChange={(e) => setRetireReason(e.target.value)}
                 style={{ minHeight: '80px', resize: 'vertical' }}
                 autoFocus
@@ -1220,15 +1234,15 @@ export default function Catalog() {
               />
             </div>
             <div style={{ display: 'flex', gap: '10px', marginTop: '24px', justifyContent: 'center' }}>
-              <button 
-                className="btn-glass" 
+              <button
+                className="btn-glass"
                 onClick={() => setRetireModalAssetId(null)}
                 style={{ padding: '10px 20px' }}
               >
                 Cancelar
               </button>
-              <button 
-                className="btn-primary" 
+              <button
+                className="btn-primary"
                 style={{ background: '#ef4444', borderColor: '#ef4444', opacity: retireReason.trim() ? 1 : 0.5, padding: '10px 20px' }}
                 onClick={() => {
                   if (retireReason.trim()) {
