@@ -486,11 +486,7 @@ export default function AssetProfile() {
                                                 </div>
                                             </div>
 
-                                            {(m.reason || m.notes) && (
-                                                <p className="maint-notes">
-                                                    {m.notes || m.reason}
-                                                </p>
-                                            )}
+                                            {/* Notes removed to keep timeline clean */}
 
                                             {m.collaboratorInTurnName && (
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '8px', fontSize: '12px', color: 'var(--text-muted)' }}>

@@ -162,9 +162,16 @@ router.get('/accept', async (req, res) => {
             const category = await catalogRepo.getCategoryById(asset.categoryId);
             if (category) categoryName = category.name;
         }
+        
+        const activeAssignment = await assignmentAdapter.getActiveAssignmentForAsset(record.assetId);
+        const recordData = serializeRecord(record) as any;
+        if (activeAssignment && !recordData.collaboratorInTurnName) {
+            recordData.collaboratorInTurnName = activeAssignment.collaboratorName;
+            recordData.collaboratorEmail = activeAssignment.collaboratorEmail;
+        }
 
         // Generate PDF (sin firma gráfica)
-        const pdfPath = await documentService.generateMaintenanceAct(record, asset, "", categoryName);
+        const pdfPath = await documentService.generateMaintenanceAct(recordData, asset, "", categoryName);
         
         await useCases.updatePdfUrl(record.id, pdfPath);
 
@@ -212,8 +219,15 @@ router.post('/sign', async (req, res) => {
             if (category) categoryName = category.name;
         }
 
+        const activeAssignment = await assignmentAdapter.getActiveAssignmentForAsset(record.assetId);
+        const recordData = serializeRecord(record) as any;
+        if (activeAssignment && !recordData.collaboratorInTurnName) {
+            recordData.collaboratorInTurnName = activeAssignment.collaboratorName;
+            recordData.collaboratorEmail = activeAssignment.collaboratorEmail;
+        }
+
         // Generate PDF
-        const pdfPath = await documentService.generateMaintenanceAct(record, asset, signature, categoryName);
+        const pdfPath = await documentService.generateMaintenanceAct(recordData, asset, signature, categoryName);
         
         await useCases.updatePdfUrl(record.id, pdfPath);
         
@@ -243,8 +257,15 @@ router.post('/:id/force-sign', async (req, res) => {
             if (category) categoryName = category.name;
         }
 
+        const activeAssignment = await assignmentAdapter.getActiveAssignmentForAsset(record.assetId);
+        const recordData = serializeRecord(record) as any;
+        if (activeAssignment && !recordData.collaboratorInTurnName) {
+            recordData.collaboratorInTurnName = activeAssignment.collaboratorName;
+            recordData.collaboratorEmail = activeAssignment.collaboratorEmail;
+        }
+
         const signatureText = `Firma forzada por administrador.\nMotivo: ${reason}`;
-        const pdfPath = await documentService.generateMaintenanceAct(record, asset, signatureText, categoryName);
+        const pdfPath = await documentService.generateMaintenanceAct(recordData, asset, signatureText, categoryName);
         
         await useCases.updatePdfUrl(record.id, pdfPath);
         

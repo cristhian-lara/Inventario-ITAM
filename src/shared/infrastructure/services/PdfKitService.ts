@@ -247,9 +247,7 @@ Este documento cancela la responsiva firmada en el momento de la asignación ori
                     rows: [
                         ['Tipo de Mantenimiento', record.type === 'PREVENTIVE' ? 'Preventivo' : 'Correctivo'],
                         ['Usuario en Turno', record.collaboratorInTurnName || 'N/A'],
-                        ['Fecha de Ejecución', record.executionDate ? new Date(record.executionDate).toLocaleDateString('es-CO') : new Date().toLocaleDateString('es-CO')],
-                        ['Diagnóstico / Falla', record.reason || 'N/A'],
-                        ['Trabajo Realizado', record.notes || 'N/A']
+                        ['Fecha de Ejecución', record.executionDate ? new Date(record.executionDate).toLocaleDateString('es-CO') : new Date().toLocaleDateString('es-CO')]
                     ]
                 };
 
@@ -258,6 +256,16 @@ Este documento cancela la responsiva firmada en el momento de la asignación ori
                     prepareHeader: () => doc.font('Helvetica-Bold').fontSize(10),
                     prepareRow: () => doc.font('Helvetica').fontSize(10)
                 });
+                
+                doc.moveDown(1.5);
+                doc.fontSize(12).font('Helvetica-Bold').text('Diagnóstico / Falla:');
+                doc.moveDown(0.5);
+                doc.fontSize(10).font('Helvetica').text(record.reason || 'N/A', { align: 'justify', lineGap: 3 });
+                
+                doc.moveDown(1.5);
+                doc.fontSize(12).font('Helvetica-Bold').text('Trabajo Realizado / Notas:');
+                doc.moveDown(0.5);
+                doc.fontSize(10).font('Helvetica').text(record.notes || 'N/A', { align: 'justify', lineGap: 3 });
 
                 doc.addPage();
 
@@ -295,16 +303,18 @@ Este documento cancela la responsiva firmada en el momento de la asignación ori
                     const bottom = doc.page.margins.bottom;
                     doc.page.margins.bottom = 0;
                     
-                    const footerY = doc.page.height - 110;
-                    doc.fontSize(8).font('Helvetica-Bold').fillColor('#00a650');
-                    doc.text('DOCUMENTO FIRMADO DIGITALMENTE', 50, footerY, { lineBreak: false });
+                    const footerY = doc.page.height - 130;
+                    doc.fontSize(10).font('Helvetica-Bold').fillColor('#00a650');
+                    doc.text('DOCUMENTO FIRMADO DIGITALMENTE', 70, footerY, { lineBreak: false });
                     
-                    doc.fontSize(8).fillColor('#000000').font('Helvetica');
-                    doc.text(`Localidad: Bogotá`, 50, footerY + 12, { lineBreak: false });
-                    doc.text(`Tipo de Documento: Acta de Mantenimiento`, 50, footerY + 24, { lineBreak: false });
-                    doc.text(`ID Mantenimiento Criptográfico: ${record.id}`, 50, footerY + 36, { lineBreak: false });
-                    doc.text(`Firma IP Registrada: ${ipAddress}`, 50, footerY + 48, { lineBreak: false });
-                    doc.text(`Nombre: ${record.collaboratorInTurnName || 'Usuario Asignado'}`, 50, footerY + 60, { lineBreak: false });
+                    doc.fontSize(9).fillColor('#000000').font('Helvetica');
+                    doc.moveDown(1);
+                    const userNameNormalized = (record.collaboratorInTurnName || 'Usuario Asignado').replace(/ /g, '+');
+                    const cryptoId = `Acta-Maint-Ikusi-${userNameNormalized}-${record.id}`;
+                    doc.text(`ID Mantenimiento criptográfico: ${cryptoId}`, 70, doc.y);
+                    doc.text(`Firma IP registrada: ${ipAddress}`, 70, doc.y);
+                    doc.text(`Sede: Bogotá`, 70, doc.y);
+                    doc.text(`Firmada por: ${record.collaboratorEmail || record.collaboratorInTurnName || 'Usuario Asignado'}`, 70, doc.y);
 
                     // Marca de agua lateral
                     doc.save();
