@@ -334,8 +334,14 @@ body {
    ══════════════════════════════════════════════ */
 .table-responsive {
   width: 100%;
-  overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 1000px) {
+  .table-responsive {
+    overflow-x: auto;
+    min-height: 300px; /* Previene que el menú de acciones se corte en móvil */
+  }
 }
 
 .glass-table {

@@ -7,7 +7,7 @@
 
 .table-container {
   padding: 0;
-  overflow: hidden;
+  /* overflow: hidden; eliminado para no recortar los menús desplegables */
 }
 
 .table-controls {
@@ -37,7 +37,7 @@
 }
 
 .table-responsive {
-  overflow-x: auto;
+  /* overflow-x: auto; eliminado para que no recorte los dropdowns, controlado por index.css */
 }
 
 .glass-table {
