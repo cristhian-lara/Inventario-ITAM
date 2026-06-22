@@ -4,6 +4,7 @@ import { AppDataSource } from '../database/postgres';
 import { SettingEntity } from '../../../modules/settings/infrastructure/orm/Setting.entity';
 import * as path from 'path';
 import { IDocumentService, AssignmentDocumentData } from '../../contracts/IDocumentService';
+import { SharePointService } from './SharePointService';
 
 export class PdfKitService implements IDocumentService {
     private readonly storageDir = path.join(__dirname, '../../../../storage/pdfs');
@@ -187,7 +188,10 @@ Este documento cancela la responsiva firmada en el momento de la asignación ori
                 doc.flushPages();
                 doc.end();
 
-                stream.on('finish', () => {
+                stream.on('finish', async () => {
+                    const sharePointService = new SharePointService();
+                    const folderName = data.actType === 'RETURN' ? 'Devoluciones' : 'Asignaciones';
+                    await sharePointService.uploadPdf(filePath, fileName, folderName);
                     resolve(`/pdfs/${fileName}`);
                 });
 
@@ -343,7 +347,9 @@ Este documento cancela la responsiva firmada en el momento de la asignación ori
                 doc.flushPages();
                 doc.end();
 
-                stream.on('finish', () => {
+                stream.on('finish', async () => {
+                    const sharePointService = new SharePointService();
+                    await sharePointService.uploadPdf(filePath, fileName, 'Mantenimientos');
                     resolve(`/pdfs/${fileName}`);
                 });
 

@@ -71,6 +71,18 @@ Inventario Ikusi es una solución full-stack que digitaliza y centraliza el cont
    DB_PASSWORD=tu_password
    DB_DATABASE=ikusi_db
    PORT=3000
+
+   # Correos Electrónicos
+   SMTP_HOST=smtp.office365.com
+   SMTP_PORT=587
+   SMTP_USER=no-reply@tuempresa.com
+   SMTP_PASS=tu_contraseña
+
+   # Azure AD / SharePoint (Subida de Actas a la Nube)
+   AZURE_TENANT_ID=tu_tenant_id
+   AZURE_CLIENT_ID=tu_client_id
+   AZURE_CLIENT_SECRET=tu_client_secret
+   SHAREPOINT_DRIVE_ID=tu_drive_id
    ```
 
 5. **Iniciar la aplicación (Modo Desarrollo):**

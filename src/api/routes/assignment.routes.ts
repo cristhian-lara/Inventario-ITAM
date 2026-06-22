@@ -71,8 +71,10 @@ router.get('/', async (req, res) => {
 // Iniciar devolución
 router.post('/:id/return', async (req, res) => {
     try {
-        const { email } = req.body;
-        const assignment = await assignmentUseCases.initiateReturn(req.params.id, email || 'test@ikusi.com');
+        const { email } = req.body || {};
+        const existing = await assignmentRepo.findById(req.params.id);
+        const collaborator = existing ? await collaboratorRepo.findById(existing.collaboratorId) : null;
+        const assignment = await assignmentUseCases.initiateReturn(req.params.id, email || (collaborator ? collaborator.email : 'test@ikusi.com'));
         res.json(assignment);
     } catch (error: any) {
         res.status(400).json({ error: error.message });
@@ -82,8 +84,10 @@ router.post('/:id/return', async (req, res) => {
 // Iniciar devolución por Asset ID
 router.post('/return-by-asset/:assetId', async (req, res) => {
     try {
-        const { email } = req.body;
-        const assignment = await assignmentUseCases.initiateReturnByAsset(req.params.assetId, email || 'test@ikusi.com');
+        const { email } = req.body || {};
+        const existing = await assignmentRepo.findCurrentByAssetId(req.params.assetId);
+        const collaborator = existing ? await collaboratorRepo.findById(existing.collaboratorId) : null;
+        const assignment = await assignmentUseCases.initiateReturnByAsset(req.params.assetId, email || (collaborator ? collaborator.email : 'test@ikusi.com'));
         res.json(assignment);
     } catch (error: any) {
         res.status(400).json({ error: error.message });
@@ -93,8 +97,10 @@ router.post('/return-by-asset/:assetId', async (req, res) => {
 // Reenviar Link de Firma
 router.post('/:id/resend-link', async (req, res) => {
     try {
-        const { email } = req.body;
-        await assignmentUseCases.resendLink(req.params.id, email);
+        const { email } = req.body || {};
+        const existing = await assignmentRepo.findById(req.params.id);
+        const collaborator = existing ? await collaboratorRepo.findById(existing.collaboratorId) : null;
+        await assignmentUseCases.resendLink(req.params.id, email || (collaborator ? collaborator.email : 'test@ikusi.com'));
         res.json({ message: 'Enlace reenviado exitosamente' });
     } catch (error: any) {
         res.status(400).json({ error: error.message });
@@ -103,10 +109,11 @@ router.post('/:id/resend-link', async (req, res) => {
 
 router.post('/resend-link-by-asset/:assetId', async (req, res) => {
     try {
-        const { email } = req.body;
-        const assignment = await assignmentRepo.findActiveByAssetId(req.params.assetId);
+        const { email } = req.body || {};
+        const assignment = await assignmentRepo.findCurrentByAssetId(req.params.assetId);
         if (!assignment) throw new Error('No se encontró asignación activa');
-        await assignmentUseCases.resendLink(assignment.id, email || 'test@ikusi.com');
+        const collaborator = await collaboratorRepo.findById(assignment.collaboratorId);
+        await assignmentUseCases.resendLink(assignment.id, email || (collaborator ? collaborator.email : 'test@ikusi.com'));
         res.json({ message: 'Enlace reenviado exitosamente' });
     } catch (error: any) {
         res.status(400).json({ error: error.message });
