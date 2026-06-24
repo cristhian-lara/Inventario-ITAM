@@ -5,6 +5,10 @@ import { BrowserRouter } from 'react-router-dom'
 import App from './App.tsx'
 import './index.css'
 import { ConfirmProvider } from './context/ConfirmContext.tsx'
+import axios from 'axios';
+
+// Evitar que Ngrok bloquee las peticiones de la API con error 403 o la pantalla de advertencia
+axios.defaults.headers.common['ngrok-skip-browser-warning'] = '69420';
 
 const queryClient = new QueryClient()
 
