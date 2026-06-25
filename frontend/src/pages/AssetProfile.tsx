@@ -391,7 +391,7 @@ export default function AssetProfile() {
                                     {maintenances?.length ?? '—'}
                                 </div>
                                 <div style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px', marginTop: '2px' }}>
-                                    Mantentos
+                                    Mantenimientos
                                 </div>
                             </div>
                             <div style={{ background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: '8px', padding: '10px 4px' }}>
