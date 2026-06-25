@@ -24,6 +24,28 @@ const catalogUseCases = new CatalogUseCases(catalogRepo);
 const collaboratorRepo = new PostgresCollaboratorRepository();
 const departmentRepo = new PostgresDepartmentRepository();
 
+async function getOtherAssignedAssets(collaboratorId: string, currentAssignmentId: string) {
+    const allAssignments = await assignmentRepo.findAllActive();
+    const otherAssignments = allAssignments.filter(a => a.collaboratorId === collaboratorId && a.id !== currentAssignmentId && a.status === 'ACCEPTED');
+    const otherAssignedAssets = [];
+    const allCategories = await catalogUseCases.getAllCategories();
+    for (const a of otherAssignments) {
+        const ast = await catalogUseCases.getAssetById(a.assetId);
+        if (ast) {
+            const cat = allCategories.find(c => c.id === ast.categoryId);
+            otherAssignedAssets.push({
+                placa: ast.id,
+                host: (ast.dynamicAttributes?.hostname || ast.dynamicAttributes?.Hostname) || 'N/A',
+                cat: cat ? cat.name : 'N/A',
+                marca: (ast.dynamicAttributes?.marca || ast.dynamicAttributes?.Marca || ast.dynamicAttributes?.brand || ast.dynamicAttributes?.Brand) || 'Generico',
+                serial: ast.serial || 'N/A',
+                modelo: (ast.dynamicAttributes?.modelo || ast.dynamicAttributes?.Modelo || ast.dynamicAttributes?.model || ast.dynamicAttributes?.Model) || 'Generico'
+            });
+        }
+    }
+    return otherAssignedAssets;
+}
+
 // 1. Iniciar Asignación
 router.post('/', async (req, res) => {
     try {
@@ -150,7 +172,10 @@ router.post('/:id/force-return', async (req, res) => {
             }
         }
 
+        const otherAssignedAssets = await getOtherAssignedAssets(returnedAssignment.collaboratorId, returnedAssignment.id);
+
         const documentPath = await documentService.generateAssignmentAct({
+            otherAssignedAssets,
             actType: 'RETURN',
             assignmentId: returnedAssignment.id,
             collaboratorName: realColName,
@@ -222,7 +247,10 @@ router.post('/force-return-by-asset/:assetId', async (req, res) => {
             }
         }
 
+        const otherAssignedAssets = await getOtherAssignedAssets(returnedAssignment.collaboratorId, returnedAssignment.id);
+
         const documentPath = await documentService.generateAssignmentAct({
+            otherAssignedAssets,
             actType: 'RETURN',
             assignmentId: returnedAssignment.id,
             collaboratorName: realColName,
@@ -296,7 +324,10 @@ router.post('/force-accept-by-asset/:assetId', async (req, res) => {
             }
         }
 
+        const otherAssignedAssets = await getOtherAssignedAssets(acceptedAssignment.collaboratorId, acceptedAssignment.id);
+
         const documentPath = await documentService.generateAssignmentAct({
+            otherAssignedAssets,
             actType: 'ASSIGNMENT',
             assignmentId: acceptedAssignment.id,
             collaboratorName: realColName,
@@ -377,7 +408,10 @@ router.get('/:id/confirm-return', async (req, res) => {
             }
         }
 
+        const otherAssignedAssets = await getOtherAssignedAssets(returnedAssignment.collaboratorId, returnedAssignment.id);
+
         const documentPath = await documentService.generateAssignmentAct({
+            otherAssignedAssets,
             actType: 'RETURN',
             assignmentId: returnedAssignment.id,
             collaboratorName: realColName,
@@ -468,7 +502,10 @@ router.get('/:id/accept', async (req, res) => {
             }
         }
 
+        const otherAssignedAssets = await getOtherAssignedAssets(acceptedAssignment.collaboratorId, acceptedAssignment.id);
+
         const documentPath = await documentService.generateAssignmentAct({
+            otherAssignedAssets,
             actType: 'ASSIGNMENT',
             assignmentId: acceptedAssignment.id,
             collaboratorName: realColName,

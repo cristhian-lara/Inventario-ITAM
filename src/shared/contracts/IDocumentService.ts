@@ -23,6 +23,14 @@ export interface AssignmentDocumentData {
     legalTextOverride?: string;
     isForcedSignature?: boolean;
     signatureEmail?: string;
+    otherAssignedAssets?: {
+        placa: string;
+        host: string;
+        cat: string;
+        marca: string;
+        serial: string;
+        modelo: string;
+    }[];
 }
 
 export interface IDocumentService {

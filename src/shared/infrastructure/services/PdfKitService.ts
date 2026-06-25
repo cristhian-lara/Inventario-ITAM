@@ -86,29 +86,22 @@ export class PdfKitService implements IDocumentService {
                     prepareRow: () => doc.font('Helvetica').fontSize(8).fillColor('black')
                 });
 
-                const isLaptopOrComputer = data.assetType && (data.assetType.toLowerCase().includes('laptop') || data.assetType.toLowerCase().includes('computador') || data.assetType.toLowerCase().includes('desktop'));
-                
-                if (data.requiresPlacaIkusi && isLaptopOrComputer) {
+                if (data.otherAssignedAssets && data.otherAssignedAssets.length > 0) {
                     doc.moveDown(1);
-                    const tableEspecificaciones = {
-                        title: 'Especificaciones actuales',
+                    const tableOtrosActivos = {
+                        title: 'Otros Activos Asignados al Colaborador',
                         headers: [
-                            { label: 'Hostname', property: 'host', width: 120 },
-                            { label: 'Versión OS', property: 'os', width: 120 },
-                            { label: 'Procesador', property: 'proc', width: 120 },
-                            { label: 'Memoria Ram', property: 'ram', width: 120 }
+                            { label: 'Placa Ikusi', property: 'placa', width: 80 },
+                            { label: 'Hostname', property: 'host', width: 80 },
+                            { label: 'Categoría', property: 'cat', width: 80 },
+                            { label: 'Marca', property: 'marca', width: 80 },
+                            { label: 'S/N', property: 'serial', width: 80 },
+                            { label: 'Modelo', property: 'modelo', width: 80 }
                         ],
-                        datas: [
-                            {
-                                host: data.assetHostname || 'N/A',
-                                os: data.assetVersionOs || 'N/A',
-                                proc: data.assetProcessor || 'N/A',
-                                ram: data.assetRam || 'N/A'
-                            }
-                        ]
+                        datas: data.otherAssignedAssets
                     };
 
-                    await doc.table(tableEspecificaciones, {
+                    await doc.table(tableOtrosActivos, {
                         width: 480, x: 70,
                         prepareHeader: () => doc.font('Helvetica-Bold').fontSize(8).fillColor('black'),
                         prepareRow: () => doc.font('Helvetica').fontSize(8).fillColor('black')
