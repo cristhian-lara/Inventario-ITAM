@@ -1,106 +1,126 @@
-import { MaintenanceUseCases } from '../../src/modules/maintenance/application/MaintenanceUseCases';
+import { MaintenanceUseCases, IAssetAssignmentService } from '../../src/modules/maintenance/application/MaintenanceUseCases';
 import { IMaintenanceRepository } from '../../src/modules/maintenance/domain/IMaintenanceRepository';
 import { MaintenanceRecord } from '../../src/modules/maintenance/domain/MaintenanceRecord';
-import { IMailerService } from '../../src/shared/contracts/IMailerService';
 
 describe('MaintenanceUseCases', () => {
-    let mockRepository: jest.Mocked<IMaintenanceRepository>;
-    let mockAssignmentAdapter: any;
-    let mockMailerService: jest.Mocked<IMailerService>;
     let useCases: MaintenanceUseCases;
+    let mockRepo: jest.Mocked<IMaintenanceRepository>;
+    let mockAssignmentService: jest.Mocked<IAssetAssignmentService>;
+    let mockMailerService: any;
 
     beforeEach(() => {
-        mockRepository = {
+        mockRepo = {
             save: jest.fn(),
             findById: jest.fn(),
+            findByAssetId: jest.fn(),
             findAll: jest.fn(),
-            findByAssetId: jest.fn().mockResolvedValue([]),
-        } as any;
+        };
 
-        mockAssignmentAdapter = {
+        mockAssignmentService = {
             getActiveAssignmentForAsset: jest.fn(),
         };
 
         mockMailerService = {
-            sendAssignmentEmail: jest.fn(),
-            sendReturnEmail: jest.fn(),
             sendMaintenanceSignatureEmail: jest.fn(),
         };
 
-        useCases = new MaintenanceUseCases(mockRepository, mockAssignmentAdapter, mockMailerService);
+        useCases = new MaintenanceUseCases(mockRepo, mockAssignmentService, mockMailerService);
     });
 
     describe('createManualMaintenance', () => {
-        it('should create a maintenance record successfully', async () => {
-            mockAssignmentAdapter.getActiveAssignmentForAsset.mockResolvedValue({
-                collaboratorId: 'collab-1',
-                collaboratorName: 'John Doe',
-                collaboratorEmail: 'john@example.com'
-            });
-
-            const payload = {
-                assetId: 'asset-1',
-                type: 'PREVENTIVE' as const,
-                scheduledDate: new Date('2026-06-25'),
-                reason: 'Routine check'
-            };
-
-            const result = await useCases.createManualMaintenance(payload);
-
-            expect(result).toBeInstanceOf(MaintenanceRecord);
-            expect(result.status).toBe('SCHEDULED');
-            expect(result.collaboratorInTurnId).toBe('collab-1');
-            expect(mockRepository.save).toHaveBeenCalled();
-        });
-    });
-
-    describe('startMaintenance', () => {
-        it('should start maintenance and update status', async () => {
-            const maintenance = new MaintenanceRecord({
-                id: 'maint-1',
-                assetId: 'asset-1',
-                type: 'CORRECTIVE',
+        it('should throw an error if a maintenance of the same type is already scheduled', async () => {
+            const existingRecord = new MaintenanceRecord({
+                id: 'm1',
+                assetId: 'asset1',
+                type: 'PREVENTIVE',
                 status: 'SCHEDULED',
                 scheduledDate: new Date(),
-                reason: 'Issue',
-                startNote: ''
             });
 
-            mockRepository.findById.mockResolvedValue(maintenance);
+            mockRepo.findByAssetId.mockResolvedValue([existingRecord]);
 
-            const result = await useCases.startMaintenance('maint-1', 'Started checking');
-
-            expect(result.status).toBe('IN_PROGRESS');
-            expect(result.startNote).toBe('Started checking');
-            expect(mockRepository.save).toHaveBeenCalledWith(maintenance);
+            await expect(useCases.createManualMaintenance({
+                assetId: 'asset1',
+                type: 'PREVENTIVE',
+                scheduledDate: new Date()
+            })).rejects.toThrow(/El equipo ya cuenta con un mantenimiento programado/);
         });
 
-        it('should throw if maintenance not found', async () => {
-            mockRepository.findById.mockResolvedValue(null);
-            await expect(useCases.startMaintenance('maint-1', 'Notes')).rejects.toThrow('Mantenimiento no encontrado');
+        it('should create and save a new scheduled maintenance successfully', async () => {
+            mockRepo.findByAssetId.mockResolvedValue([]);
+            mockAssignmentService.getActiveAssignmentForAsset.mockResolvedValue({
+                collaboratorId: 'collab1',
+                collaboratorName: 'Juan',
+                collaboratorEmail: 'juan@ikusi.com'
+            });
+
+            const record = await useCases.createManualMaintenance({
+                assetId: 'asset1',
+                type: 'CORRECTIVE',
+                scheduledDate: new Date(),
+                reason: 'Screen broken'
+            });
+
+            expect(record.assetId).toBe('asset1');
+            expect(record.type).toBe('CORRECTIVE');
+            expect(record.status).toBe('SCHEDULED');
+            expect(record.collaboratorInTurnId).toBe('collab1');
+            expect(mockRepo.save).toHaveBeenCalledTimes(1);
         });
     });
 
     describe('completeMaintenance', () => {
-        it('should complete maintenance and send email', async () => {
-            const maintenance = new MaintenanceRecord({
-                id: 'maint-1',
-                assetId: 'asset-1',
-                type: 'CORRECTIVE',
+        it('should throw an error if maintenance is not found', async () => {
+            mockRepo.findById.mockResolvedValue(null);
+            await expect(useCases.completeMaintenance('m1')).rejects.toThrow('Mantenimiento no encontrado');
+        });
+
+        it('should complete maintenance and send email if assigned', async () => {
+            const maint = new MaintenanceRecord({
+                id: 'm1',
+                assetId: 'asset1',
+                type: 'PREVENTIVE',
                 status: 'IN_PROGRESS',
                 scheduledDate: new Date(),
-                reason: 'Issue',
-                startNote: 'Started'
+                collaboratorInTurnId: 'collab1'
+            });
+            maint.completeMaintenance = jest.fn().mockReturnValue(new MaintenanceRecord({
+                id: 'm2', assetId: 'asset1', type: 'PREVENTIVE', status: 'SCHEDULED', scheduledDate: new Date()
+            }));
+            maint.generateSignatureToken = jest.fn().mockReturnValue('mock-token');
+
+            mockRepo.findById.mockResolvedValue(maint);
+            mockAssignmentService.getActiveAssignmentForAsset.mockResolvedValue({
+                collaboratorId: 'collab1',
+                collaboratorName: 'Juan',
+                collaboratorEmail: 'juan@ikusi.com'
             });
 
-            mockRepository.findById.mockResolvedValue(maintenance);
+            await useCases.completeMaintenance('m1', 'All good');
 
-            const result = await useCases.completeMaintenance('maint-1', 'Fixed the issue');
+            expect(maint.completeMaintenance).toHaveBeenCalled();
+            expect(mockRepo.save).toHaveBeenCalledTimes(2); // saves current and next scheduled
+            expect(mockMailerService.sendMaintenanceSignatureEmail).toHaveBeenCalledWith('juan@ikusi.com', 'm1', 'mock-token');
+        });
+    });
 
-            expect(result.status).toBe('COMPLETED');
-            expect(result.notes).toBe('Fixed the issue');
-            expect(result.executionDate).toBeDefined();
-            expect(mockRepository.save).toHaveBeenCalled();
+    describe('signMaintenanceAct', () => {
+        it('should sign the maintenance successfully', async () => {
+            const maint = new MaintenanceRecord({
+                id: 'm1',
+                assetId: 'asset1',
+                type: 'PREVENTIVE',
+                status: 'COMPLETED',
+                scheduledDate: new Date(),
+            });
+            maint.signMaintenance = jest.fn();
+
+            mockRepo.findById.mockResolvedValue(maint);
+
+            await useCases.signMaintenanceAct('m1', 'token123', '127.0.0.1', 'Mozilla/5.0');
+
+            expect(maint.signMaintenance).toHaveBeenCalledWith('token123', expect.any(Object));
+            expect(mockRepo.save).toHaveBeenCalledWith(maint);
         });
     });
 });

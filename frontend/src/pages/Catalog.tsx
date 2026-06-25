@@ -1216,7 +1216,7 @@ export default function Catalog() {
                               className="glass-input"
                               pattern={regex}
                               title={regexMsg}
-                              value={(newAsset.dynamicAttributes[attrName] || '').replace(new RegExp(`\\s?${unit}$`), '')}
+                              value={String(newAsset.dynamicAttributes[attrName] || '').replace(new RegExp(`\\s?${unit}$`), '')}
                               onChange={(e) => {
                                 const val = e.target.value;
                                 const finalVal = val && unit ? `${val} ${unit}` : val;

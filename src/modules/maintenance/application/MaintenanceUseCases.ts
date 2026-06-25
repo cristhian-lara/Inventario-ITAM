@@ -49,6 +49,14 @@ export class MaintenanceUseCases {
         const record = await this.repo.findById(id);
         if (!record) throw new Error('Mantenimiento no encontrado');
         
+        const existingMaintenances = await this.repo.findByAssetId(record.assetId);
+        const inProgressMaintenance = existingMaintenances.find(m => m.status === 'IN_PROGRESS' && m.type === record.type && m.id !== id);
+        
+        if (inProgressMaintenance) {
+            const typeStr = record.type === 'PREVENTIVE' ? 'Preventivo' : 'Correctivo';
+            throw new Error(`Ya hay un mantenimiento ${typeStr} en progreso para este activo.`);
+        }
+
         // Actualizamos snapshot por si se asignó a alguien distinto desde que se programó
         const activeAssignment = await this.assignmentService.getActiveAssignmentForAsset(record.assetId);
         

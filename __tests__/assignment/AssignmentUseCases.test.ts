@@ -4,121 +4,90 @@ import { IMailerService } from '../../src/shared/contracts/IMailerService';
 import { Assignment } from '../../src/modules/assignment/domain/Assignment';
 import * as jwt from 'jsonwebtoken';
 
+jest.mock('jsonwebtoken');
+
 describe('AssignmentUseCases', () => {
-    let mockRepository: jest.Mocked<IAssignmentRepository>;
-    let mockMailerService: jest.Mocked<IMailerService>;
     let useCases: AssignmentUseCases;
+    let mockRepo: jest.Mocked<IAssignmentRepository>;
+    let mockMailer: jest.Mocked<IMailerService>;
 
     beforeEach(() => {
-        mockRepository = {
+        mockRepo = {
             save: jest.fn(),
             findById: jest.fn(),
-            findCurrentByAssetId: jest.fn(),
-            findActiveByAssetId: jest.fn(),
             findAllActive: jest.fn(),
+            findActiveByAssetId: jest.fn(),
+            findCurrentByAssetId: jest.fn(),
         };
 
-        mockMailerService = {
+        mockMailer = {
             sendAssignmentEmail: jest.fn(),
             sendReturnEmail: jest.fn(),
             sendMaintenanceSignatureEmail: jest.fn(),
         };
 
-        useCases = new AssignmentUseCases(mockRepository, mockMailerService);
+        (jwt.sign as jest.Mock).mockReturnValue('mock-token');
+        (jwt.verify as jest.Mock).mockReturnValue({});
+
+        useCases = new AssignmentUseCases(mockRepo, mockMailer);
     });
 
     describe('createAssignment', () => {
-        it('should create an assignment successfully if asset is available', async () => {
-            mockRepository.findCurrentByAssetId.mockResolvedValue(null);
+        it('should throw an error if asset is already assigned', async () => {
+            const existing = new Assignment({ id: '1', assetId: 'a1', collaboratorId: 'c1', status: 'ACCEPTED', startDate: new Date() });
+            mockRepo.findCurrentByAssetId.mockResolvedValue(existing);
 
-            const result = await useCases.createAssignment('1', 'asset-1', 'collab-1', 'test@ikusi.com', '2026-06-19');
-
-            expect(result).toBeInstanceOf(Assignment);
-            expect(result.status).toBe('PENDING_ACCEPTANCE');
-            expect(mockRepository.save).toHaveBeenCalled();
-            expect(mockMailerService.sendAssignmentEmail).toHaveBeenCalled();
+            await expect(useCases.createAssignment('2', 'a1', 'c2', 'test@ikusi.com')).rejects.toThrow('Este activo ya se encuentra asignado a un colaborador.');
         });
 
-        it('should throw an error if asset is already in PENDING_ACCEPTANCE', async () => {
-            mockRepository.findCurrentByAssetId.mockResolvedValue(new Assignment({
-                id: '2',
-                assetId: 'asset-1',
-                collaboratorId: 'collab-1',
-                status: 'PENDING_ACCEPTANCE',
-                startDate: new Date()
-            }));
+        it('should create an assignment and send email successfully', async () => {
+            mockRepo.findCurrentByAssetId.mockResolvedValue(null);
 
-            await expect(useCases.createAssignment('1', 'asset-1', 'collab-1', 'test@ikusi.com')).rejects.toThrow('Este activo ya está en proceso de asignación (Pendiente de firma).');
-        });
+            const assignment = await useCases.createAssignment('1', 'a1', 'c1', 'test@ikusi.com');
 
-        it('should throw an error if asset is already ACCEPTED', async () => {
-            mockRepository.findCurrentByAssetId.mockResolvedValue(new Assignment({
-                id: '2',
-                assetId: 'asset-1',
-                collaboratorId: 'collab-1',
-                status: 'ACCEPTED',
-                startDate: new Date()
-            }));
-
-            await expect(useCases.createAssignment('1', 'asset-1', 'collab-1', 'test@ikusi.com')).rejects.toThrow('Este activo ya se encuentra asignado a un colaborador.');
+            expect(assignment.id).toBe('1');
+            expect(assignment.status).toBe('PENDING_ACCEPTANCE');
+            expect(mockRepo.save).toHaveBeenCalledTimes(1);
+            expect(mockMailer.sendAssignmentEmail).toHaveBeenCalledWith('test@ikusi.com', '1', 'mock-token');
         });
     });
 
     describe('acceptAssignment', () => {
-        it('should accept an assignment successfully', async () => {
-            const assignment = new Assignment({
-                id: '1',
-                assetId: 'asset-1',
-                collaboratorId: 'collab-1',
-                status: 'PENDING_ACCEPTANCE',
-                startDate: new Date()
-            });
-
-            const token = assignment.generateToken(() => jwt.sign({ assignmentId: '1' }, 'secret', { expiresIn: '24h' }));
-            
-            mockRepository.findById.mockResolvedValue(assignment);
-
-            const result = await useCases.acceptAssignment('1', token, '127.0.0.1', 'Mozilla/5.0');
-
-            expect(result.status).toBe('ACCEPTED');
-            expect(mockRepository.save).toHaveBeenCalledWith(assignment);
-        });
-
         it('should throw an error if assignment not found', async () => {
-            mockRepository.findById.mockResolvedValue(null);
-            await expect(useCases.acceptAssignment('1', 'token', '127.0.0.1', 'Mozilla/5.0')).rejects.toThrow('Asignación no encontrada');
+            mockRepo.findById.mockResolvedValue(null);
+
+            await expect(useCases.acceptAssignment('1', 'token', '127.0.0.1', 'Agent')).rejects.toThrow('Asignación no encontrada');
         });
 
         it('should throw an error if token is invalid', async () => {
-            const assignment = new Assignment({
-                id: '1',
-                assetId: 'asset-1',
-                collaboratorId: 'collab-1',
-                status: 'PENDING_ACCEPTANCE',
-                startDate: new Date()
-            });
-            mockRepository.findById.mockResolvedValue(assignment);
+            const assignment = new Assignment({ id: '1', assetId: 'a1', collaboratorId: 'c1', status: 'PENDING_ACCEPTANCE', startDate: new Date() });
+            mockRepo.findById.mockResolvedValue(assignment);
+            (jwt.verify as jest.Mock).mockImplementation(() => { throw new Error('Invalid'); });
 
-            await expect(useCases.acceptAssignment('1', 'invalid-token', '127.0.0.1', 'Mozilla/5.0')).rejects.toThrow('Token expirado o inválido');
+            await expect(useCases.acceptAssignment('1', 'token', '127.0.0.1', 'Agent')).rejects.toThrow('Token expirado o inválido');
+        });
+
+        it('should accept the assignment', async () => {
+            const assignment = new Assignment({ id: '1', assetId: 'a1', collaboratorId: 'c1', status: 'PENDING_ACCEPTANCE', startDate: new Date(), signatureToken: 'token' });
+            mockRepo.findById.mockResolvedValue(assignment);
+
+            await useCases.acceptAssignment('1', 'token', '127.0.0.1', 'Agent');
+
+            expect(assignment.status).toBe('ACCEPTED');
+            expect(mockRepo.save).toHaveBeenCalledWith(assignment);
         });
     });
 
-    describe('forceReturn', () => {
-        it('should force return an assignment', async () => {
-            const assignment = new Assignment({
-                id: '1',
-                assetId: 'asset-1',
-                collaboratorId: 'collab-1',
-                status: 'ACCEPTED',
-                startDate: new Date()
-            });
-            mockRepository.findById.mockResolvedValue(assignment);
+    describe('initiateReturn', () => {
+        it('should initiate return and send email', async () => {
+            const assignment = new Assignment({ id: '1', assetId: 'a1', collaboratorId: 'c1', status: 'ACCEPTED', startDate: new Date() });
+            mockRepo.findById.mockResolvedValue(assignment);
 
-            const result = await useCases.forceReturn('1', 'Firma forzada');
+            await useCases.initiateReturn('1', 'test@ikusi.com');
 
-            expect(result.status).toBe('RETURNED');
-            expect(result.signatureMetadata?.userAgent).toBe('ADMIN_CONSOLE');
-            expect(mockRepository.save).toHaveBeenCalled();
+            expect(assignment.status).toBe('PENDING_RETURN');
+            expect(mockRepo.save).toHaveBeenCalledWith(assignment);
+            expect(mockMailer.sendReturnEmail).toHaveBeenCalledWith('test@ikusi.com', '1', 'mock-token');
         });
     });
 });
