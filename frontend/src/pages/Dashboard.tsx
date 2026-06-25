@@ -143,11 +143,33 @@ export default function Dashboard() {
     try {
       const res = await axios.get(`${API_URL}/api/catalog/assets`);
       const data = res.data;
-      const rows = ['ID,Status,Categoria,FechaCompra,GarantiaMeses,DepreciacionAnos'];
+      const rows = ['ID,Hostname,Status,Categoria,FechaCompra,GarantiaMeses,DepreciacionAnos,AsignadoA'];
       for (const row of data) {
-        rows.push([row.id, row.status, row.categoryId, row.purchaseDate || '', row.warrantyMonths || '', row.depreciationYears || ''].join(','));
+        const category = categories?.find(c => Number(c.id) === Number(row.categoryId));
+        const categoryName = category ? category.name : row.categoryId;
+        const hostname = row.dynamicAttributes?.Hostname || row.dynamicAttributes?.hostname || '';
+
+        let assignedTo = '';
+        if (row.status === 'IN_USE') {
+          const activeAssignment = assignments?.find(a => a.assetId === row.id && (a.status === 'ACCEPTED' || a.status === 'PENDING_RETURN'));
+          if (activeAssignment) {
+            const collab = collaborators?.find(c => c.id === activeAssignment.collaboratorId);
+            if (collab) assignedTo = collab.email;
+          }
+        }
+
+        rows.push([
+          row.id, 
+          hostname,
+          row.status, 
+          categoryName, 
+          row.purchaseDate || '', 
+          row.warrantyMonths || '', 
+          row.depreciationYears || '',
+          assignedTo
+        ].join(','));
       }
-      const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
+      const blob = new Blob(['\uFEFF' + rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;

@@ -386,7 +386,7 @@ const Maintenances: React.FC = () => {
   // ── CSV Export ─────────────────────────────────────────────────────────────
   const exportToCSV = () => {
     if (!filteredData || filteredData.length === 0) return;
-    const headers = ['ID Mantenimiento', 'Placa Ikusi', 'Tipo', 'Estado', 'Fecha Programada', 'Fecha Ejecución', 'Dias Retraso', 'Usuario en Turno', 'Motivo', 'Notas Resolución'];
+    const headers = ['ID Mantenimiento', 'Placa Ikusi', 'Hostname', 'Tipo', 'Estado', 'Fecha Programada', 'Fecha Ejecución', 'Dias Retraso', 'Usuario en Turno', 'Motivo', 'Notas Resolución'];
     const rows = filteredData.map(m => {
       let delayDays = 0;
       if (m?.status === 'COMPLETED' && m?.executionDate && m?.scheduledDate) {
@@ -394,15 +394,20 @@ const Maintenances: React.FC = () => {
       } else if (m.status === 'SCHEDULED' && new Date(m.scheduledDate) < new Date()) {
         delayDays = Math.max(0, Math.floor((new Date().getTime() - new Date(m.scheduledDate).getTime()) / (1000 * 3600 * 24)));
       }
-      return [m.id, m.assetId, m?.type === 'PREVENTIVE' ? 'Preventivo' : 'Correctivo', m.status, m.scheduledDate.split('T')[0], m.executionDate ? m.executionDate.split('T')[0] : 'N/A', delayDays.toString(), m?.collaboratorInTurnName || 'N/A', `"${(m.reason || '').replace(/"/g, '""')}"`, `"${(m.notes || '').replace(/"/g, '""')}"`];
+      const asset = assets?.find(a => a.id === m.assetId);
+      const hostname = asset?.dynamicAttributes?.Hostname || asset?.dynamicAttributes?.hostname || 'N/A';
+      return [m.id, m.assetId, hostname, m?.type === 'PREVENTIVE' ? 'Preventivo' : 'Correctivo', m.status, m.scheduledDate.split('T')[0], m.executionDate ? m.executionDate.split('T')[0] : 'N/A', delayDays.toString(), m?.collaboratorInTurnName || 'N/A', `"${(m.reason || '').replace(/"/g, '""')}"`, `"${(m.notes || '').replace(/"/g, '""')}"`];
     });
-    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    const csvContent = [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = window.URL.createObjectURL(blob);
     const link = document.createElement("a");
-    link.setAttribute("href", encodeURI(csvContent));
-    link.setAttribute("download", `reporte_mantenimientos_${new Date().toISOString().split('T')[0]}.csv`);
+    link.href = url;
+    link.download = `reporte_mantenimientos_${new Date().toISOString().split('T')[0]}.csv`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
