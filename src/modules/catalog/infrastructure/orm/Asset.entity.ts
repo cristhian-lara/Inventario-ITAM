@@ -6,7 +6,7 @@ export class AssetOrmEntity {
     @PrimaryColumn()
     id!: string;
 
-    @Column()
+    @Column({ nullable: true })
     category_id!: number;
 
     @Column({ nullable: true })

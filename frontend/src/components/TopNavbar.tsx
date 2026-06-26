@@ -1,21 +1,31 @@
 import { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { PackageSearch, Users, Activity, LogOut, Settings as SettingsIcon, Menu, X } from 'lucide-react';
+import { useAuth, Role } from '../context/AuthContext';
 import './TopNavbar.css';
 
 export default function TopNavbar() {
   const location = useLocation();
+  const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
+  const { user, logout } = useAuth();
 
-  const navLinks = [
-    { path: '/', label: 'Dashboard', icon: <Activity size={20} /> },
-    { path: '/settings', label: 'Administración', icon: <SettingsIcon size={20} /> },
-    { path: '/collaborators', label: 'Colaboradores', icon: <Users size={20} /> },
-    { path: '/assets', label: 'Catálogo', icon: <PackageSearch size={20} /> },
-    { path: '/maintenances', label: 'Mantenimiento', icon: <SettingsIcon size={20} /> }
+  const allNavLinks = [
+    { path: '/', label: 'Dashboard', icon: <Activity size={20} />, roles: [Role.ADMINISTRADOR, Role.VISUALIZADOR] },
+    { path: '/settings', label: 'Administración', icon: <SettingsIcon size={20} />, roles: [Role.ADMINISTRADOR] },
+    { path: '/collaborators', label: 'Colaboradores', icon: <Users size={20} />, roles: [Role.ADMINISTRADOR] },
+    { path: '/assets', label: 'Catálogo', icon: <PackageSearch size={20} />, roles: [Role.ADMINISTRADOR] },
+    { path: '/maintenances', label: 'Mantenimiento', icon: <SettingsIcon size={20} />, roles: [Role.ADMINISTRADOR] }
   ];
 
+  const navLinks = allNavLinks.filter(link => user && link.roles.includes(user.role as Role));
+
   const closeMenu = () => setMenuOpen(false);
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
 
   return (
     <>
@@ -44,12 +54,12 @@ export default function TopNavbar() {
         <div className="navbar-right">
           {/* Desktop user */}
           <div className="user-profile">
-            <div className="avatar">AD</div>
+            <div className="avatar">{user?.username?.substring(0, 2).toUpperCase() || 'U'}</div>
             <div className="user-info">
-              <span className="user-name">Admin</span>
+              <span className="user-name">{user?.username || 'Usuario'}</span>
             </div>
           </div>
-          <button className="btn-icon" aria-label="Cerrar sesión">
+          <button className="btn-icon" aria-label="Cerrar sesión" onClick={handleLogout}>
             <LogOut size={20} />
           </button>
 
@@ -91,9 +101,12 @@ export default function TopNavbar() {
             </nav>
             <div className="mobile-drawer-footer">
               <div className="user-profile">
-                <div className="avatar">AD</div>
-                <span className="user-name">Admin</span>
+                <div className="avatar">{user?.username?.substring(0, 2).toUpperCase() || 'U'}</div>
+                <span className="user-name">{user?.username || 'Usuario'}</span>
               </div>
+              <button className="btn-icon" style={{ marginLeft: 'auto' }} onClick={handleLogout}>
+                <LogOut size={20} />
+              </button>
             </div>
           </div>
         </div>

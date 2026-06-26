@@ -11,7 +11,7 @@ export class CollaboratorOrmEntity {
     @Column({ unique: true })
     email!: string;
 
-    @Column()
+    @Column({ nullable: true })
     department!: number;
 
     @Column()

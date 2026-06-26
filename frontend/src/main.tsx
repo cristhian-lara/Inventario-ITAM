@@ -10,16 +10,20 @@ import axios from 'axios';
 // Evitar que Ngrok bloquee las peticiones de la API con error 403 o la pantalla de advertencia
 axios.defaults.headers.common['ngrok-skip-browser-warning'] = '69420';
 
+import { AuthProvider } from './context/AuthContext'
+
 const queryClient = new QueryClient()
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <ConfirmProvider>
-          <App />
-        </ConfirmProvider>
-      </BrowserRouter>
+      <AuthProvider>
+        <BrowserRouter>
+          <ConfirmProvider>
+            <App />
+          </ConfirmProvider>
+        </BrowserRouter>
+      </AuthProvider>
     </QueryClientProvider>
   </React.StrictMode>,
 )

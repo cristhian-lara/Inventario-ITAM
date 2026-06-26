@@ -57,13 +57,14 @@ export class PostgresCatalogRepository implements ICatalogRepository {
         const ormEntity = await this.assetRepo.findOneBy({ id });
         if (!ormEntity) return null;
 
-        // Necesitamos la categoría para instanciar el Agregado de Dominio validando sus datos
-        const category = await this.getCategoryById(ormEntity.category_id);
-        if (!category) throw new Error('Inconsistencia en BD: Activo sin Categoría');
+        let category = null;
+        if (ormEntity.category_id != null) {
+            category = await this.getCategoryById(ormEntity.category_id);
+        }
 
         return new Asset({
             id: ormEntity.id,
-            categoryId: ormEntity.category_id,
+            categoryId: ormEntity.category_id || 0,
             serial: ormEntity.serial,
             status: ormEntity.status as AssetStatus,
             dynamicAttributes: ormEntity.dynamic_data,
@@ -79,20 +80,17 @@ export class PostgresCatalogRepository implements ICatalogRepository {
         const assets: Asset[] = [];
         
         for (const orm of ormEntities) {
-            const category = await this.getCategoryById(orm.category_id);
-            if (category) {
-                assets.push(new Asset({
-                    id: orm.id,
-                    categoryId: orm.category_id,
-                    serial: orm.serial,
-                    status: orm.status as AssetStatus,
-                    dynamicAttributes: orm.dynamic_data,
-                    purchaseDate: orm.purchase_date,
-                    warrantyMonths: orm.warranty_months,
-                    depreciationYears: orm.depreciation_years,
-                    purchasePrice: orm.purchase_price ? parseFloat(orm.purchase_price as any) : undefined
-                }));
-            }
+            assets.push(new Asset({
+                id: orm.id,
+                categoryId: orm.category_id || 0,
+                serial: orm.serial,
+                status: orm.status as AssetStatus,
+                dynamicAttributes: orm.dynamic_data,
+                purchaseDate: orm.purchase_date,
+                warrantyMonths: orm.warranty_months,
+                depreciationYears: orm.depreciation_years,
+                purchasePrice: orm.purchase_price ? parseFloat(orm.purchase_price as any) : undefined
+            }));
         }
         return assets;
     }

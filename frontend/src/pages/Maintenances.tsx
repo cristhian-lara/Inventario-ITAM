@@ -275,14 +275,9 @@ const Maintenances: React.FC = () => {
   });
 
   // Global coverage metrics
-  const validCategoryNames = ['computadores', 'laptops', 'computador', 'laptop', 'laptos'];
-  const validCategoryIds = new Set(categories?.filter(c => validCategoryNames.includes((c.name || '').toLowerCase())).map(c => c.id.toString()));
-  
-  const isCategoriesLoaded = categories && categories.length > 0;
   const filteredAssets = assets?.filter(a => {
     if (a.status === 'RETIRED') return false;
-    if (!isCategoriesLoaded) return false;
-    return validCategoryIds.has(a.categoryId?.toString());
+    return true;
   }) || [];
 
   const totalAssetsCount = filteredAssets.length;

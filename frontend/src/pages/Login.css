@@ -1,0 +1,144 @@
+.login-wrapper {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background-color: var(--bg-main);
+    width: 100%;
+    overflow: hidden;
+}
+
+/* Ambient glow effects using Ikusi green */
+.login-ambient-glow {
+    position: absolute;
+    width: 600px;
+    height: 600px;
+    background: radial-gradient(circle, var(--ikusi-green-glow) 0%, transparent 70%);
+    top: -200px;
+    left: -200px;
+    border-radius: 50%;
+    filter: blur(60px);
+    z-index: 0;
+    opacity: 0.8;
+}
+
+.login-ambient-glow-2 {
+    position: absolute;
+    width: 500px;
+    height: 500px;
+    background: radial-gradient(circle, rgba(37, 99, 235, 0.05) 0%, transparent 70%);
+    bottom: -150px;
+    right: -100px;
+    border-radius: 50%;
+    filter: blur(60px);
+    z-index: 0;
+}
+
+.login-card {
+    position: relative;
+    z-index: 10;
+    padding: 3rem;
+    width: 100%;
+    max-width: 440px;
+    text-align: center;
+}
+
+.login-header {
+    margin-bottom: 2.5rem;
+}
+
+.login-logo {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.login-logo .logo-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    background: var(--ikusi-green);
+    color: white;
+    font-weight: 800;
+    font-size: 1.25rem;
+    border-radius: 10px;
+    box-shadow: 0 4px 12px var(--ikusi-green-glow);
+}
+
+.login-logo .logo-text {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-main);
+    letter-spacing: -0.02em;
+}
+
+.login-header h2 {
+    color: var(--text-main);
+    font-size: 1.75rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    letter-spacing: -0.01em;
+}
+
+.login-header p {
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+    line-height: 1.5;
+}
+
+.login-error {
+    background-color: #fef2f2;
+    color: var(--accent-red);
+    padding: 1rem;
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+    font-size: 0.9rem;
+    border: 1px solid #fecaca;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.login-form {
+    text-align: left;
+}
+
+.login-form .form-group {
+    margin-bottom: 1.5rem;
+}
+
+.login-form label {
+    display: block;
+    margin-bottom: 0.5rem;
+    color: var(--text-main);
+    font-weight: 600;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.login-button {
+    width: 100%;
+    padding: 14px;
+    margin-top: 1rem;
+    font-size: 1rem;
+    justify-content: center;
+}
+
+.login-button:disabled {
+    background-color: var(--border-strong);
+    box-shadow: none;
+    cursor: not-allowed;
+}
+
+.login-footer {
+    margin-top: 2.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border-subtle);
+    color: var(--text-muted);
+    font-size: 0.85rem;
+}
