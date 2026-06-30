@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { AssignmentUseCases } from '../../modules/assignment/application/AssignmentUseCases';
 import { PostgresAssignmentRepository } from '../../modules/assignment/infrastructure/PostgresAssignmentRepository';
-import { NodemailerService } from '../../shared/infrastructure/services/NodemailerService';
+import { WebexNotificationService } from '../../shared/infrastructure/services/WebexNotificationService';
 import { PdfKitService } from '../../shared/infrastructure/services/PdfKitService';
 import express from 'express';
 import { CatalogUseCases } from '../../modules/catalog/application/CatalogUseCases';
@@ -14,7 +14,7 @@ import { v4 as uuidv4 } from 'uuid';
 const router = Router();
 
 const assignmentRepo = new PostgresAssignmentRepository();
-const mailerService = new NodemailerService();
+const mailerService = new WebexNotificationService();
 const documentService = new PdfKitService();
 const assignmentUseCases = new AssignmentUseCases(assignmentRepo, mailerService);
 
@@ -46,6 +46,58 @@ async function getOtherAssignedAssets(collaboratorId: string, currentAssignmentI
     return otherAssignedAssets;
 }
 
+async function generateDraftPdf(assignment: any, actType: 'ASSIGNMENT' | 'RETURN'): Promise<string> {
+    const asset = await catalogUseCases.getAssetById(assignment.assetId);
+    const allCategories = await catalogUseCases.getAllCategories();
+    const category = asset ? allCategories.find(c => c.id === asset.categoryId) : null;
+    const requiresPlaca = category ? category.schemaDefinition.requiresPlacaIkusi !== false : true;
+    
+    const collaborator = await collaboratorRepo.findById(assignment.collaboratorId);
+    const ceco = collaborator && collaborator.dynamicAttributes ? collaborator.dynamicAttributes['CECOS'] || collaborator.dynamicAttributes['cecos'] || collaborator.dynamicAttributes['CECO'] || 'N/A' : 'N/A';
+    const sede = collaborator ? collaborator.location : 'N/A';
+    const realColName = collaborator ? collaborator.name : assignment.collaboratorId;
+    const realColEmail = collaborator ? collaborator.email : 'test@ikusi.com';
+    let realDept = 'Sistemas';
+    if (collaborator && collaborator.department) {
+        try {
+            const dept = await departmentRepo.findById(Number(collaborator.department));
+            if (dept) realDept = dept.name;
+            else realDept = collaborator.department.toString();
+        } catch(e) {
+            realDept = collaborator.department.toString();
+        }
+    }
+
+    const otherAssignedAssets = await getOtherAssignedAssets(assignment.collaboratorId, assignment.id);
+
+    return await documentService.generateAssignmentAct({
+        otherAssignedAssets,
+        actType,
+        assignmentId: assignment.id,
+        collaboratorName: realColName,
+        collaboratorEmail: realColEmail,
+        department: realDept,
+        ceco: ceco,
+        sede: sede,
+        assetId: assignment.assetId,
+        assetSerial: asset ? (asset.serial || 'N/A') : 'N/A',
+        assetType: category ? category.name : 'Laptop',
+        assetBrand: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.marca || asset.dynamicAttributes.Marca || asset.dynamicAttributes.brand || asset.dynamicAttributes.Brand) || 'Generico' : 'Generico',
+        assetHostname: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.hostname || asset.dynamicAttributes.Hostname) || 'N/A' : 'N/A',
+        assetVersionOs: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.versionOs || asset.dynamicAttributes.VersionOS || asset.dynamicAttributes['Version OS'] || asset.dynamicAttributes['Versión OS'] || asset.dynamicAttributes['Sistema Operativo'] || asset.dynamicAttributes['Sistema operativo'] || asset.dynamicAttributes['SistemaOperativo'] || asset.dynamicAttributes['OS'] || asset.dynamicAttributes['os']) || 'N/A' : 'N/A',
+        assetModel: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.modelo || asset.dynamicAttributes.Modelo) || 'Generico' : 'Generico',
+        assetMac: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.macAddress || asset.dynamicAttributes.MacAddress || asset.dynamicAttributes.MAC || asset.dynamicAttributes['MAC Address']) || 'N/A' : 'N/A',
+        assetRam: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.ram || asset.dynamicAttributes.RAM || asset.dynamicAttributes.Ram || asset.dynamicAttributes['Memoria RAM']) || 'N/A' : 'N/A',
+        assetProcessor: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.processor || asset.dynamicAttributes.Processor || asset.dynamicAttributes.Procesador || asset.dynamicAttributes.procesador) || 'N/A' : 'N/A',
+        assetStorage: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.storage || asset.dynamicAttributes.Storage || asset.dynamicAttributes.Almacenamiento || asset.dynamicAttributes.Disco) || 'N/A' : 'N/A',
+        requiresPlacaIkusi: typeof requiresPlaca !== 'undefined' ? requiresPlaca : true,
+        ipAddress: 'PENDIENTE DE FIRMA',
+        timestamp: new Date(),
+        isForcedSignature: false,
+        signatureEmail: realColEmail
+    });
+}
+
 // 1. Iniciar Asignación
 router.post('/', async (req, res) => {
     try {
@@ -60,8 +112,11 @@ router.post('/', async (req, res) => {
             return res.status(400).json({ error: `El activo ${assetId} no se puede asignar porque su estado actual es: ${asset.status}` });
         }
 
-        const assignment = await assignmentUseCases.createAssignment(id, assetId, collaboratorId, collaboratorEmail, startDate);
+        const { assignment, token } = await assignmentUseCases.createAssignment(id, assetId, collaboratorId, collaboratorEmail, startDate);
         
+        const documentPath = await generateDraftPdf(assignment, 'ASSIGNMENT');
+        await mailerService.sendAssignmentEmail(collaboratorEmail, assignment.id, token, documentPath);
+
         res.status(201).json({
             message: 'Asignación iniciada y correo enviado exitosamente.',
             assignmentId: assignment.id,
@@ -96,7 +151,12 @@ router.post('/:id/return', async (req, res) => {
         const { email } = req.body || {};
         const existing = await assignmentRepo.findById(req.params.id);
         const collaborator = existing ? await collaboratorRepo.findById(existing.collaboratorId) : null;
-        const assignment = await assignmentUseCases.initiateReturn(req.params.id, email || (collaborator ? collaborator.email : 'test@ikusi.com'));
+        const realEmail = email || (collaborator ? collaborator.email : 'test@ikusi.com');
+        const { assignment, token } = await assignmentUseCases.initiateReturn(req.params.id, realEmail);
+        
+        const documentPath = await generateDraftPdf(assignment, 'RETURN');
+        await mailerService.sendReturnEmail(realEmail, assignment.id, token, documentPath);
+        
         res.json(assignment);
     } catch (error: any) {
         res.status(400).json({ error: error.message });
@@ -109,7 +169,12 @@ router.post('/return-by-asset/:assetId', async (req, res) => {
         const { email } = req.body || {};
         const existing = await assignmentRepo.findCurrentByAssetId(req.params.assetId);
         const collaborator = existing ? await collaboratorRepo.findById(existing.collaboratorId) : null;
-        const assignment = await assignmentUseCases.initiateReturnByAsset(req.params.assetId, email || (collaborator ? collaborator.email : 'test@ikusi.com'));
+        const realEmail = email || (collaborator ? collaborator.email : 'test@ikusi.com');
+        const { assignment, token } = await assignmentUseCases.initiateReturnByAsset(req.params.assetId, realEmail);
+        
+        const documentPath = await generateDraftPdf(assignment, 'RETURN');
+        await mailerService.sendReturnEmail(realEmail, assignment.id, token, documentPath);
+        
         res.json(assignment);
     } catch (error: any) {
         res.status(400).json({ error: error.message });
@@ -122,7 +187,18 @@ router.post('/:id/resend-link', async (req, res) => {
         const { email } = req.body || {};
         const existing = await assignmentRepo.findById(req.params.id);
         const collaborator = existing ? await collaboratorRepo.findById(existing.collaboratorId) : null;
-        await assignmentUseCases.resendLink(req.params.id, email || (collaborator ? collaborator.email : 'test@ikusi.com'));
+        const realEmail = email || (collaborator ? collaborator.email : 'test@ikusi.com');
+        const { assignment, token } = await assignmentUseCases.resendLink(req.params.id, realEmail);
+        
+        const actType = assignment.status === 'PENDING_ACCEPTANCE' ? 'ASSIGNMENT' : 'RETURN';
+        const documentPath = await generateDraftPdf(assignment, actType);
+        
+        if (actType === 'ASSIGNMENT') {
+            await mailerService.sendAssignmentEmail(realEmail, assignment.id, token, documentPath);
+        } else {
+            await mailerService.sendReturnEmail(realEmail, assignment.id, token, documentPath);
+        }
+
         res.json({ message: 'Enlace reenviado exitosamente' });
     } catch (error: any) {
         res.status(400).json({ error: error.message });
@@ -132,10 +208,21 @@ router.post('/:id/resend-link', async (req, res) => {
 router.post('/resend-link-by-asset/:assetId', async (req, res) => {
     try {
         const { email } = req.body || {};
-        const assignment = await assignmentRepo.findCurrentByAssetId(req.params.assetId);
-        if (!assignment) throw new Error('No se encontró asignación activa');
-        const collaborator = await collaboratorRepo.findById(assignment.collaboratorId);
-        await assignmentUseCases.resendLink(assignment.id, email || (collaborator ? collaborator.email : 'test@ikusi.com'));
+        const existing = await assignmentRepo.findCurrentByAssetId(req.params.assetId);
+        if (!existing) throw new Error('No se encontró asignación activa');
+        const collaborator = await collaboratorRepo.findById(existing.collaboratorId);
+        const realEmail = email || (collaborator ? collaborator.email : 'test@ikusi.com');
+        const { assignment, token } = await assignmentUseCases.resendLink(existing.id, realEmail);
+        
+        const actType = assignment.status === 'PENDING_ACCEPTANCE' ? 'ASSIGNMENT' : 'RETURN';
+        const documentPath = await generateDraftPdf(assignment, actType);
+        
+        if (actType === 'ASSIGNMENT') {
+            await mailerService.sendAssignmentEmail(realEmail, assignment.id, token, documentPath);
+        } else {
+            await mailerService.sendReturnEmail(realEmail, assignment.id, token, documentPath);
+        }
+
         res.json({ message: 'Enlace reenviado exitosamente' });
     } catch (error: any) {
         res.status(400).json({ error: error.message });
@@ -449,12 +536,66 @@ router.get('/:id/confirm-return', async (req, res) => {
         ));
 
         res.send(`
-            <div style="text-align:center; padding: 50px; font-family: sans-serif;">
-                <h1 style="color:#e0a800;">¡Paz y Salvo Generado!</h1>
-                <p>El equipo ha sido devuelto satisfactoriamente. Tu firma digital ha sido registrada con la IP <b>${ipAddress}</b>.</p>
-                <p>El activo vuelve a estar disponible en el inventario general.</p>
-                <a href="http://localhost:3000${documentPath}" target="_blank" style="display:inline-block; margin-top:20px; padding:10px 20px; background:#e0a800; color:white; text-decoration:none; border-radius:5px;">Ver Acta de Paz y Salvo (PDF)</a>
-            </div>
+            <!DOCTYPE html>
+            <html lang="es">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Devolución Exitosa</title>
+                <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+                <style>
+                    body {
+                        font-family: 'Inter', sans-serif;
+                        background-color: #f9fafb;
+                        display: flex;
+                        justify-content: center;
+                        align-items: center;
+                        min-height: 100vh;
+                        margin: 0;
+                    }
+                    .container {
+                        background: #ffffff;
+                        padding: 40px 50px;
+                        border-radius: 12px;
+                        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+                        text-align: center;
+                        max-width: 500px;
+                        width: 100%;
+                    }
+                    .icon {
+                        background-color: #fef3c7;
+                        color: #d97706;
+                        width: 64px;
+                        height: 64px;
+                        border-radius: 50%;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        margin: 0 auto 24px;
+                    }
+                    .icon svg { width: 32px; height: 32px; }
+                    h1 { font-size: 24px; font-weight: 600; margin-bottom: 12px; color: #111827; }
+                    p { color: #6b7280; font-size: 15px; line-height: 1.6; margin-bottom: 24px; }
+                    .details { background: #f3f4f6; padding: 16px; border-radius: 8px; margin-bottom: 32px; font-size: 14px; color: #374151; }
+                    .btn { display: inline-block; background-color: #111827; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 6px; font-weight: 500; transition: background-color 0.2s ease; }
+                    .btn:hover { background-color: #374151; }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="icon">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                    </div>
+                    <h1>¡Paz y Salvo Generado!</h1>
+                    <p>El equipo ha sido devuelto satisfactoriamente. El activo vuelve a estar disponible en el inventario general.</p>
+                    <div class="details">
+                        <strong>Dirección IP:</strong> ${ipAddress}<br>
+                        <strong>Fecha:</strong> ${new Date().toLocaleDateString('es-CO')}
+                    </div>
+                    <a href="http://localhost:3000${documentPath}" target="_blank" class="btn">Descargar Paz y Salvo (PDF)</a>
+                </div>
+            </body>
+            </html>
         `);
     } catch (error: any) {
         res.status(400).send(`Error procesando la devolución: ${error.message}`);
@@ -543,12 +684,66 @@ router.get('/:id/accept', async (req, res) => {
         ));
 
         res.send(`
-            <div style="text-align:center; padding: 50px; font-family: sans-serif;">
-                <h1 style="color: green;">✅ Asignación Aceptada</h1>
-                <p>El activo ha sido asignado a tu nombre. Tu firma digital ha sido registrada exitosamente con la IP <b>${ipAddress}</b>.</p>
-                <p>Se ha generado el Acta Física (PDF) inmutable.</p>
-                <a href="http://localhost:3000${documentPath}" target="_blank" style="display:inline-block; margin-top:20px; padding:10px 20px; background:#00a650; color:white; text-decoration:none; border-radius:5px;">Ver Acta Firmada (PDF)</a>
-            </div>
+            <!DOCTYPE html>
+            <html lang="es">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Asignación Aceptada</title>
+                <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+                <style>
+                    body {
+                        font-family: 'Inter', sans-serif;
+                        background-color: #f9fafb;
+                        display: flex;
+                        justify-content: center;
+                        align-items: center;
+                        min-height: 100vh;
+                        margin: 0;
+                    }
+                    .container {
+                        background: #ffffff;
+                        padding: 40px 50px;
+                        border-radius: 12px;
+                        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+                        text-align: center;
+                        max-width: 500px;
+                        width: 100%;
+                    }
+                    .icon {
+                        background-color: #d1fae5;
+                        color: #10b981;
+                        width: 64px;
+                        height: 64px;
+                        border-radius: 50%;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        margin: 0 auto 24px;
+                    }
+                    .icon svg { width: 32px; height: 32px; }
+                    h1 { font-size: 24px; font-weight: 600; margin-bottom: 12px; color: #111827; }
+                    p { color: #6b7280; font-size: 15px; line-height: 1.6; margin-bottom: 24px; }
+                    .details { background: #f3f4f6; padding: 16px; border-radius: 8px; margin-bottom: 32px; font-size: 14px; color: #374151; }
+                    .btn { display: inline-block; background-color: #111827; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 6px; font-weight: 500; transition: background-color 0.2s ease; }
+                    .btn:hover { background-color: #374151; }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="icon">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                    </div>
+                    <h1>Asignación Aceptada</h1>
+                    <p>El activo ha sido asignado a tu nombre. Tu firma digital ha sido registrada exitosamente en nuestro sistema.</p>
+                    <div class="details">
+                        <strong>Dirección IP:</strong> ${ipAddress}<br>
+                        <strong>Fecha:</strong> ${new Date().toLocaleDateString('es-CO')}
+                    </div>
+                    <a href="http://localhost:3000${documentPath}" target="_blank" class="btn">Descargar Acta Firmada (PDF)</a>
+                </div>
+            </body>
+            </html>
         `);
     } catch (error: any) {
         res.status(400).send(`

@@ -4,13 +4,15 @@ import { PostgresMaintenanceRepository } from '../../modules/maintenance/infrast
 import { AppDataSource } from '../../shared/infrastructure/database/postgres';
 import { AssignmentUseCases } from '../../modules/assignment/application/AssignmentUseCases';
 import { PostgresAssignmentRepository } from '../../modules/assignment/infrastructure/PostgresAssignmentRepository';
-import { NodemailerService } from '../../shared/infrastructure/services/NodemailerService';
+import { WebexNotificationService } from '../../shared/infrastructure/services/WebexNotificationService';
+import { PdfKitService } from '../../shared/infrastructure/services/PdfKitService';
 
 const router = Router();
 
 // Dependencias
 const repo = new PostgresMaintenanceRepository(AppDataSource);
-const mailerService = new NodemailerService();
+const mailerService = new WebexNotificationService();
+const documentService = new PdfKitService();
 
 // Fake o adaptamos IAssetAssignmentService
 const assignmentRepo = new PostgresAssignmentRepository();

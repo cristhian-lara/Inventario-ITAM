@@ -14,7 +14,7 @@ export class AssignmentUseCases {
     /**
      * Inicia una asignación, genera el JWT de firma y envía el correo.
      */
-    async createAssignment(id: string, assetId: string, collaboratorId: string, collaboratorEmail: string, startDate?: string): Promise<Assignment> {
+    async createAssignment(id: string, assetId: string, collaboratorId: string, collaboratorEmail: string, startDate?: string): Promise<{ assignment: Assignment; token: string }> {
         const existingAssignment = await this.repository.findCurrentByAssetId(assetId);
         
         if (existingAssignment) {
@@ -42,9 +42,9 @@ export class AssignmentUseCases {
         });
 
         await this.repository.save(assignment);
-        await this.mailerService.sendAssignmentEmail(collaboratorEmail, id, token);
+        // await this.mailerService.sendAssignmentEmail(collaboratorEmail, id, token); // MOVED TO ROUTES
 
-        return assignment;
+        return { assignment, token };
     }
 
     /**
@@ -87,7 +87,7 @@ export class AssignmentUseCases {
         return this.repository.findAllActive();
     }
 
-    async initiateReturn(assignmentId: string, collaboratorEmail: string): Promise<Assignment> {
+    async initiateReturn(assignmentId: string, collaboratorEmail: string): Promise<{ assignment: Assignment; token: string }> {
         const assignment = await this.repository.findById(assignmentId);
         if (!assignment) throw new Error('Asignación no encontrada');
 
@@ -99,12 +99,12 @@ export class AssignmentUseCases {
         });
 
         await this.repository.save(assignment);
-        await this.mailerService.sendReturnEmail(collaboratorEmail, assignmentId, token);
+        // await this.mailerService.sendReturnEmail(collaboratorEmail, assignmentId, token);
 
-        return assignment;
+        return { assignment, token };
     }
 
-    async initiateReturnByAsset(assetId: string, collaboratorEmail: string): Promise<Assignment> {
+    async initiateReturnByAsset(assetId: string, collaboratorEmail: string): Promise<{ assignment: Assignment; token: string }> {
         const assignment = await this.repository.findActiveByAssetId(assetId);
         if (!assignment) throw new Error('No se encontró una asignación activa para este activo');
         return this.initiateReturn(assignment.id, collaboratorEmail);
@@ -131,7 +131,7 @@ export class AssignmentUseCases {
         return assignment;
     }
 
-    async resendLink(assignmentId: string, email: string): Promise<void> {
+    async resendLink(assignmentId: string, email: string): Promise<{ assignment: Assignment; token: string }> {
         const assignment = await this.repository.findById(assignmentId);
         if (!assignment) throw new Error('Asignación no encontrada');
         
@@ -142,13 +142,11 @@ export class AssignmentUseCases {
         
         await this.repository.save(assignment);
         
-        if (assignment.status === 'PENDING_ACCEPTANCE') {
-            await this.mailerService.sendAssignmentEmail(email, assignmentId, token);
-        } else if (assignment.status === 'PENDING_RETURN') {
-            await this.mailerService.sendReturnEmail(email, assignmentId, token);
-        } else {
+        if (assignment.status !== 'PENDING_ACCEPTANCE' && assignment.status !== 'PENDING_RETURN') {
             throw new Error('La asignación no está pendiente de firma');
         }
+
+        return { assignment, token };
     }
 
     async forceReturn(assignmentId: string, ipAddress: string): Promise<Assignment> {
