@@ -122,7 +122,9 @@ export default function Catalog() {
     queryFn: async () => {
       const response = await axios.get(`${API_URL}/api/catalog/assets`);
       return response.data;
-    }
+    },
+    refetchInterval: 30000, // Auto-refetch every 30 seconds
+    staleTime: 10000,
   });
 
   const { data: categories } = useQuery<any[]>({
@@ -138,7 +140,9 @@ export default function Catalog() {
     queryFn: async () => {
       const response = await axios.get(`${API_URL}/api/assignments`);
       return response.data;
-    }
+    },
+    refetchInterval: 30000, // Auto-refetch every 30 seconds
+    staleTime: 10000,
   });
 
   const getActiveAssignmentForAsset = (assetId: string) => {
