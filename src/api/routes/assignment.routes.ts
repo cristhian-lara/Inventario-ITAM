@@ -79,18 +79,20 @@ async function generateDraftPdf(assignment: any, actType: 'ASSIGNMENT' | 'RETURN
         department: realDept,
         ceco: ceco,
         sede: sede,
-        assetId: assignment.assetId,
-        assetSerial: asset ? (asset.serial || 'N/A') : 'N/A',
-        assetType: category ? category.name : 'Laptop',
-        assetBrand: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.marca || asset.dynamicAttributes.Marca || asset.dynamicAttributes.brand || asset.dynamicAttributes.Brand) || 'Generico' : 'Generico',
-        assetHostname: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.hostname || asset.dynamicAttributes.Hostname) || 'N/A' : 'N/A',
-        assetVersionOs: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.versionOs || asset.dynamicAttributes.VersionOS || asset.dynamicAttributes['Version OS'] || asset.dynamicAttributes['Versión OS'] || asset.dynamicAttributes['Sistema Operativo'] || asset.dynamicAttributes['Sistema operativo'] || asset.dynamicAttributes['SistemaOperativo'] || asset.dynamicAttributes['OS'] || asset.dynamicAttributes['os']) || 'N/A' : 'N/A',
-        assetModel: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.modelo || asset.dynamicAttributes.Modelo) || 'Generico' : 'Generico',
-        assetMac: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.macAddress || asset.dynamicAttributes.MacAddress || asset.dynamicAttributes.MAC || asset.dynamicAttributes['MAC Address']) || 'N/A' : 'N/A',
-        assetRam: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.ram || asset.dynamicAttributes.RAM || asset.dynamicAttributes.Ram || asset.dynamicAttributes['Memoria RAM']) || 'N/A' : 'N/A',
-        assetProcessor: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.processor || asset.dynamicAttributes.Processor || asset.dynamicAttributes.Procesador || asset.dynamicAttributes.procesador) || 'N/A' : 'N/A',
-        assetStorage: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.storage || asset.dynamicAttributes.Storage || asset.dynamicAttributes.Almacenamiento || asset.dynamicAttributes.Disco) || 'N/A' : 'N/A',
-        requiresPlacaIkusi: typeof requiresPlaca !== 'undefined' ? requiresPlaca : true,
+        assets: [{
+            assetId: assignment.assetId,
+            assetSerial: asset ? (asset.serial || 'N/A') : 'N/A',
+            assetType: category ? category.name : 'Laptop',
+            assetBrand: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.marca || asset.dynamicAttributes.Marca || asset.dynamicAttributes.brand || asset.dynamicAttributes.Brand) || 'Generico' : 'Generico',
+            assetHostname: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.hostname || asset.dynamicAttributes.Hostname) || 'N/A' : 'N/A',
+            assetVersionOs: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.versionOs || asset.dynamicAttributes.VersionOS || asset.dynamicAttributes['Version OS'] || asset.dynamicAttributes['Versión OS'] || asset.dynamicAttributes['Sistema Operativo'] || asset.dynamicAttributes['Sistema operativo'] || asset.dynamicAttributes['SistemaOperativo'] || asset.dynamicAttributes['OS'] || asset.dynamicAttributes['os']) || 'N/A' : 'N/A',
+            assetModel: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.modelo || asset.dynamicAttributes.Modelo) || 'Generico' : 'Generico',
+            assetMac: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.macAddress || asset.dynamicAttributes.MacAddress || asset.dynamicAttributes.MAC || asset.dynamicAttributes['MAC Address']) || 'N/A' : 'N/A',
+            assetRam: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.ram || asset.dynamicAttributes.RAM || asset.dynamicAttributes.Ram || asset.dynamicAttributes['Memoria RAM']) || 'N/A' : 'N/A',
+            assetProcessor: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.processor || asset.dynamicAttributes.Processor || asset.dynamicAttributes.Procesador || asset.dynamicAttributes.procesador) || 'N/A' : 'N/A',
+            assetStorage: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.storage || asset.dynamicAttributes.Storage || asset.dynamicAttributes.Almacenamiento || asset.dynamicAttributes.Disco) || 'N/A' : 'N/A',
+            requiresPlacaIkusi: typeof requiresPlaca !== 'undefined' ? requiresPlaca : true
+        }],
         ipAddress: 'PENDIENTE DE FIRMA',
         timestamp: new Date(),
         isForcedSignature: false,
@@ -270,6 +272,7 @@ router.post('/:id/force-return', async (req, res) => {
             department: realDept,
             ceco: ceco,
             sede: sede,
+            assets: [{
             assetId: returnedAssignment.assetId,
             assetSerial: asset ? (asset.serial || 'N/A') : 'N/A',
             assetType: category ? category.name : 'Laptop',
@@ -281,7 +284,8 @@ router.post('/:id/force-return', async (req, res) => {
             assetRam: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.ram || asset.dynamicAttributes.RAM || asset.dynamicAttributes.Ram || asset.dynamicAttributes['Memoria RAM']) || 'N/A' : 'N/A',
             assetProcessor: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.processor || asset.dynamicAttributes.Processor || asset.dynamicAttributes.Procesador || asset.dynamicAttributes.procesador) || 'N/A' : 'N/A',
             assetStorage: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.storage || asset.dynamicAttributes.Storage || asset.dynamicAttributes.Almacenamiento || asset.dynamicAttributes.Disco) || 'N/A' : 'N/A',
-            requiresPlacaIkusi: typeof requiresPlaca !== 'undefined' ? requiresPlaca : true,
+            requiresPlacaIkusi: typeof requiresPlaca !== 'undefined' ? requiresPlaca : true
+        }],
             ipAddress,
             timestamp: new Date(),
             isForcedSignature: req.path.includes('force') ? true : false,
@@ -345,6 +349,7 @@ router.post('/force-return-by-asset/:assetId', async (req, res) => {
             department: realDept,
             ceco: ceco,
             sede: sede,
+            assets: [{
             assetId: returnedAssignment.assetId,
             assetSerial: asset ? (asset.serial || 'N/A') : 'N/A',
             assetType: category ? category.name : 'Laptop',
@@ -356,7 +361,8 @@ router.post('/force-return-by-asset/:assetId', async (req, res) => {
             assetRam: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.ram || asset.dynamicAttributes.RAM || asset.dynamicAttributes.Ram || asset.dynamicAttributes['Memoria RAM']) || 'N/A' : 'N/A',
             assetProcessor: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.processor || asset.dynamicAttributes.Processor || asset.dynamicAttributes.Procesador || asset.dynamicAttributes.procesador) || 'N/A' : 'N/A',
             assetStorage: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.storage || asset.dynamicAttributes.Storage || asset.dynamicAttributes.Almacenamiento || asset.dynamicAttributes.Disco) || 'N/A' : 'N/A',
-            requiresPlacaIkusi: typeof requiresPlaca !== 'undefined' ? requiresPlaca : true,
+            requiresPlacaIkusi: typeof requiresPlaca !== 'undefined' ? requiresPlaca : true
+        }],
             ipAddress,
             timestamp: new Date(),
             isForcedSignature: req.path.includes('force') ? true : false,
@@ -422,6 +428,7 @@ router.post('/force-accept-by-asset/:assetId', async (req, res) => {
             department: realDept,
             ceco: ceco,
             sede: sede,
+            assets: [{
             assetId: acceptedAssignment.assetId,
             assetSerial: asset ? (asset.serial || 'N/A') : 'N/A',
             assetType: category ? category.name : 'Laptop',
@@ -433,7 +440,8 @@ router.post('/force-accept-by-asset/:assetId', async (req, res) => {
             assetRam: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.ram || asset.dynamicAttributes.RAM || asset.dynamicAttributes.Ram || asset.dynamicAttributes['Memoria RAM']) || 'N/A' : 'N/A',
             assetProcessor: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.processor || asset.dynamicAttributes.Processor || asset.dynamicAttributes.Procesador || asset.dynamicAttributes.procesador) || 'N/A' : 'N/A',
             assetStorage: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.storage || asset.dynamicAttributes.Storage || asset.dynamicAttributes.Almacenamiento || asset.dynamicAttributes.Disco) || 'N/A' : 'N/A',
-            requiresPlacaIkusi: typeof requiresPlaca !== 'undefined' ? requiresPlaca : true,
+            requiresPlacaIkusi: typeof requiresPlaca !== 'undefined' ? requiresPlaca : true
+        }],
             ipAddress,
             timestamp: new Date(),
             isForcedSignature: req.path.includes('force') ? true : false,
@@ -506,6 +514,7 @@ router.get('/:id/confirm-return', async (req, res) => {
             department: realDept,
             ceco: ceco,
             sede: sede,
+            assets: [{
             assetId: returnedAssignment.assetId,
             assetSerial: asset ? (asset.serial || 'N/A') : 'N/A',
             assetType: category ? category.name : 'Laptop',
@@ -517,7 +526,8 @@ router.get('/:id/confirm-return', async (req, res) => {
             assetRam: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.ram || asset.dynamicAttributes.RAM || asset.dynamicAttributes.Ram || asset.dynamicAttributes['Memoria RAM']) || 'N/A' : 'N/A',
             assetProcessor: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.processor || asset.dynamicAttributes.Processor || asset.dynamicAttributes.Procesador || asset.dynamicAttributes.procesador) || 'N/A' : 'N/A',
             assetStorage: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.storage || asset.dynamicAttributes.Storage || asset.dynamicAttributes.Almacenamiento || asset.dynamicAttributes.Disco) || 'N/A' : 'N/A',
-            requiresPlacaIkusi: typeof requiresPlaca !== 'undefined' ? requiresPlaca : true,
+            requiresPlacaIkusi: typeof requiresPlaca !== 'undefined' ? requiresPlaca : true
+        }],
             ipAddress,
             timestamp: new Date(),
             isForcedSignature: req.path.includes('force') ? true : false,
@@ -654,6 +664,7 @@ router.get('/:id/accept', async (req, res) => {
             department: realDept,
             ceco: ceco,
             sede: sede,
+            assets: [{
             assetId: acceptedAssignment.assetId,
             assetSerial: asset ? (asset.serial || 'N/A') : 'N/A',
             assetType: category ? category.name : 'Laptop',
@@ -665,7 +676,8 @@ router.get('/:id/accept', async (req, res) => {
             assetRam: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.ram || asset.dynamicAttributes.RAM || asset.dynamicAttributes.Ram || asset.dynamicAttributes['Memoria RAM']) || 'N/A' : 'N/A',
             assetProcessor: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.processor || asset.dynamicAttributes.Processor || asset.dynamicAttributes.Procesador || asset.dynamicAttributes.procesador) || 'N/A' : 'N/A',
             assetStorage: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.storage || asset.dynamicAttributes.Storage || asset.dynamicAttributes.Almacenamiento || asset.dynamicAttributes.Disco) || 'N/A' : 'N/A',
-            requiresPlacaIkusi: typeof requiresPlaca !== 'undefined' ? requiresPlaca : true,
+            requiresPlacaIkusi: typeof requiresPlaca !== 'undefined' ? requiresPlaca : true
+        }],
             ipAddress,
             timestamp: new Date(),
             isForcedSignature: req.path.includes('force') ? true : false,
@@ -796,6 +808,202 @@ router.get('/asset/:assetId/history', async (req, res) => {
         res.json(enriched);
     } catch (error: any) {
         res.status(500).json({ error: error.message });
+    }
+});
+
+
+router.post('/batch-return', async (req, res) => {
+    try {
+        const { assignmentIds, email, reason } = req.body;
+        if (!assignmentIds || !Array.isArray(assignmentIds) || assignmentIds.length === 0 || !email) {
+            return res.status(400).json({ error: 'Missing required fields (assignmentIds, email)' });
+        }
+
+        const { assignments, token } = await assignmentUseCases.initiateBatchReturn(assignmentIds);
+
+        const firstAssignment = assignments[0];
+        const collaborator = await collaboratorRepo.findById(firstAssignment.collaboratorId);
+        
+        let assetsDetails = [];
+        for (const id of assignmentIds) {
+            const assign = assignments.find(a => a.id === id);
+            if (assign) {
+                const asset = await catalogUseCases.getAssetById(assign.assetId);
+                let category;
+                if (asset) category = await catalogRepo.getCategoryById(asset.categoryId);
+                
+                assetsDetails.push({
+                    assetId: assign.assetId,
+                    assetSerial: asset ? (asset.serial || 'N/A') : 'N/A',
+                    assetType: category ? category.name : 'Laptop',
+                    assetBrand: asset?.dynamicAttributes?.marca || asset?.dynamicAttributes?.Marca || 'Generico',
+                    assetHostname: asset?.dynamicAttributes?.hostname || asset?.dynamicAttributes?.Hostname || 'N/A',
+                    assetVersionOs: asset?.dynamicAttributes?.versionOs || 'N/A',
+                    assetModel: asset?.dynamicAttributes?.modelo || asset?.dynamicAttributes?.Modelo || 'Generico',
+                    assetMac: asset?.dynamicAttributes?.macAddress || 'N/A',
+                    assetRam: asset?.dynamicAttributes?.ram || 'N/A',
+                    assetProcessor: asset?.dynamicAttributes?.processor || 'N/A',
+                    assetStorage: asset?.dynamicAttributes?.storage || 'N/A',
+                    requiresPlacaIkusi: true
+                });
+            }
+        }
+
+        const documentPath = await documentService.generateAssignmentAct({
+            actType: 'RETURN',
+            assignmentId: `BATCH-${Date.now()}`,
+            collaboratorName: collaborator?.name || 'N/A',
+            collaboratorEmail: email,
+            department: collaborator ? String(collaborator.department) : 'N/A',
+            assets: assetsDetails,
+            ipAddress: 'PENDIENTE DE FIRMA',
+            timestamp: new Date(),
+            isForcedSignature: false,
+            returnReason: reason || 'Fin de asignación'
+        });
+
+        const approveUrl = `${process.env.FRONTEND_URL || 'http://localhost:5000'}/api/assignments/batch-accept-return?token=${token}`;
+        
+        const mailOptions = {
+            to: email,
+            subject: 'Revisión y Firma de Acta de Devolución Múltiple',
+            html: `<p>Hola ${collaborator?.name || 'Colaborador'},</p>
+                   <p>Se ha iniciado un proceso de devolución múltiple para los activos a tu cargo.</p>
+                   <p>Por favor, revisa el documento adjunto. Si todo es correcto, haz clic en el siguiente enlace para confirmar la devolución:</p>
+                   <p><a href="${approveUrl}">Confirmar Devolución</a></p>`,
+            documentPath
+        };
+
+        await mailerService.sendReturnEmail(email, 'BATCH', token, documentPath);
+
+        res.json({ message: 'Devolución múltiple iniciada', assignments });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+router.get('/batch-accept-return', async (req, res) => {
+    try {
+        const token = req.query.token as string;
+        if (!token) return res.status(400).json({ error: 'Token is required' });
+
+        const ipAddress = req.ip || req.connection.remoteAddress || 'Unknown IP';
+        const userAgent = req.headers['user-agent'] || 'Unknown User Agent';
+
+        const assignments = await assignmentUseCases.confirmBatchReturn(token, ipAddress, userAgent);
+
+        if (assignments.length > 0) {
+            const firstAssignment = assignments[0];
+            const collaborator = await collaboratorRepo.findById(firstAssignment.collaboratorId);
+            
+            let assetsDetails = [];
+            for (const assign of assignments) {
+                const asset = await catalogUseCases.getAssetById(assign.assetId);
+                let category;
+                if (asset) category = await catalogRepo.getCategoryById(asset.categoryId);
+                
+                assetsDetails.push({
+                    assetId: assign.assetId,
+                    assetSerial: asset ? (asset.serial || 'N/A') : 'N/A',
+                    assetType: category ? category.name : 'Laptop',
+                    assetBrand: asset?.dynamicAttributes?.marca || asset?.dynamicAttributes?.Marca || 'Generico',
+                    assetHostname: asset?.dynamicAttributes?.hostname || asset?.dynamicAttributes?.Hostname || 'N/A',
+                    assetVersionOs: asset?.dynamicAttributes?.versionOs || 'N/A',
+                    assetModel: asset?.dynamicAttributes?.modelo || asset?.dynamicAttributes?.Modelo || 'Generico',
+                    assetMac: asset?.dynamicAttributes?.macAddress || 'N/A',
+                    assetRam: asset?.dynamicAttributes?.ram || 'N/A',
+                    assetProcessor: asset?.dynamicAttributes?.processor || 'N/A',
+                    assetStorage: asset?.dynamicAttributes?.storage || 'N/A',
+                    requiresPlacaIkusi: true
+                });
+
+                if (asset) {
+                    await catalogUseCases.changeAssetStatus(asset.id, 'AVAILABLE');
+                }
+            }
+
+            const documentPath = await documentService.generateAssignmentAct({
+                actType: 'RETURN',
+                assignmentId: `BATCH-${Date.now()}`,
+                collaboratorName: collaborator?.name || 'N/A',
+                collaboratorEmail: collaborator?.email || 'N/A',
+                department: collaborator ? String(collaborator.department) : 'N/A',
+                assets: assetsDetails,
+                ipAddress,
+                timestamp: new Date(),
+                isForcedSignature: false
+            });
+
+            if (process.env.EMAIL_PROVIDER === 'webex' && collaborator?.email) {
+                await mailerService.sendReturnEmail(collaborator.email, 'BATCH', token, documentPath);
+            }
+        }
+
+        res.send(`
+            <!DOCTYPE html>
+            <html lang="es">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Devolución Múltiple Confirmada</title>
+                <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+                <style>
+                    body { font-family: 'Inter', sans-serif; background-color: #f9fafb; margin: 0; padding: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+                    .card { background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05), 0 10px 15px rgba(0, 0, 0, 0.1); padding: 40px; text-align: center; max-width: 500px; width: 90%; }
+                    .icon { background-color: #d1fae5; color: #10b981; width: 80px; height: 80px; border-radius: 50%; display: flex; justify-content: center; align-items: center; margin: 0 auto 24px; }
+                    .icon svg { width: 40px; height: 40px; }
+                    h1 { color: #111827; font-size: 24px; font-weight: 700; margin-bottom: 16px; }
+                    p { color: #4b5563; font-size: 16px; line-height: 1.5; margin-bottom: 24px; }
+                    .success-text { color: #10b981; font-weight: 600; }
+                </style>
+            </head>
+            <body>
+                <div class="card">
+                    <div class="icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                        </svg>
+                    </div>
+                    <h1>Devolución Completada</h1>
+                    <p>Has confirmado exitosamente la devolución múltiple de los equipos.</p>
+                    <p class="success-text">El acta final con los detalles ha sido enviada a tu Webex.</p>
+                </div>
+            </body>
+            </html>
+        `);
+    } catch (error: any) {
+        res.status(400).send(`
+            <!DOCTYPE html>
+            <html lang="es">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Error en la Devolución</title>
+                <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+                <style>
+                    body { font-family: 'Inter', sans-serif; background-color: #f9fafb; margin: 0; padding: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+                    .card { background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05), 0 10px 15px rgba(0, 0, 0, 0.1); padding: 40px; text-align: center; max-width: 500px; width: 90%; }
+                    .icon { background-color: #fee2e2; color: #ef4444; width: 80px; height: 80px; border-radius: 50%; display: flex; justify-content: center; align-items: center; margin: 0 auto 24px; }
+                    .icon svg { width: 40px; height: 40px; }
+                    h1 { color: #111827; font-size: 24px; font-weight: 700; margin-bottom: 16px; }
+                    p { color: #4b5563; font-size: 16px; line-height: 1.5; margin-bottom: 24px; }
+                    .error-text { color: #ef4444; font-weight: 600; }
+                </style>
+            </head>
+            <body>
+                <div class="card">
+                    <div class="icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </div>
+                    <h1>Ocurrió un error</h1>
+                    <p class="error-text">${error.message || 'El enlace es inválido o ha expirado.'}</p>
+                    <p>Por favor, contacta a soporte de TI para más información.</p>
+                </div>
+            </body>
+            </html>
+        `);
     }
 });
 

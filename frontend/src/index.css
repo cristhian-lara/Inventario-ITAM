@@ -334,18 +334,19 @@ body {
    ══════════════════════════════════════════════ */
 .table-responsive {
   width: 100%;
+  overflow-x: auto;
   -webkit-overflow-scrolling: touch;
-}
-
-@media (max-width: 1000px) {
-  .table-responsive {
-    overflow-x: auto;
-    min-height: 300px; /* Previene que el menú de acciones se corte en móvil */
-  }
+  min-height: 300px;
 }
 
 .glass-table {
-  min-width: 900px;
+  min-width: 950px;
+  table-layout: fixed;
+}
+
+.glass-table td {
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .glass-table th:first-child,

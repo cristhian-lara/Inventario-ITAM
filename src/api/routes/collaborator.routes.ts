@@ -5,11 +5,13 @@ import { PostgresCollaboratorRepository } from '../../modules/collaborator/infra
 import { PostgresDepartmentRepository } from '../../modules/collaborator/infrastructure/PostgresDepartmentRepository';
 import { PostgresCecosRepository } from '../../modules/collaborator/infrastructure/PostgresCecosRepository';
 import { CollaboratorUseCases } from '../../modules/collaborator/application/CollaboratorUseCases';
+import { PostgresAssignmentRepository } from '../../modules/assignment/infrastructure/PostgresAssignmentRepository';
 
 export const collaboratorRouter = Router();
 const collaboratorRepository = new PostgresCollaboratorRepository();
 const departmentRepository = new PostgresDepartmentRepository();
 const cecosRepository = new PostgresCecosRepository();
+const assignmentRepository = new PostgresAssignmentRepository();
 const useCases = new CollaboratorUseCases(collaboratorRepository, departmentRepository, cecosRepository);
 
 // --- Departments Routes ---
@@ -91,7 +93,17 @@ collaboratorRouter.put('/cecos/:id', async (req, res) => {
 collaboratorRouter.get('/', async (req, res) => {
     try {
         const collaborators = await useCases.getAllCollaborators();
-        res.json(collaborators);
+        const allAssignments = await assignmentRepository.findAllActive();
+        
+        const response = collaborators.map(c => {
+            const assignedAssetsCount = allAssignments.filter(a => a.collaboratorId === c.id && (a.status === 'ACCEPTED' || a.status === 'PENDING_ACCEPTANCE')).length;
+            return {
+                ...c,
+                assignedAssetsCount
+            };
+        });
+        
+        res.json(response);
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
@@ -101,7 +113,14 @@ collaboratorRouter.get('/:id', async (req, res) => {
     try {
         const collaborator = await useCases.getCollaboratorById(req.params.id);
         if (!collaborator) return res.status(404).json({ error: 'Collaborator not found' });
-        res.json(collaborator);
+        
+        const allAssignments = await assignmentRepository.findAllActive();
+        const assignedAssetsCount = allAssignments.filter(a => a.collaboratorId === collaborator.id && (a.status === 'ACCEPTED' || a.status === 'PENDING_ACCEPTANCE')).length;
+        
+        res.json({
+            ...collaborator,
+            assignedAssetsCount
+        });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }

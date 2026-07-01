@@ -34,15 +34,21 @@ export class PdfKitService implements IDocumentService {
 
                 drawHeader();
 
+                const generalData = [
+                    { c: 'Nombre de usuario', v: data.collaboratorName || 'N/A' },
+                    { c: 'Correo electrónico', v: data.collaboratorEmail || 'N/A' },
+                    { c: 'CECO', v: data.ceco || 'N/A' },
+                    { c: 'Departamento', v: data.department || 'N/A' }
+                ];
+
+                if (data.actType === 'RETURN' && data.returnReason) {
+                    generalData.push({ c: 'Motivo de devolución', v: data.returnReason });
+                }
+
                 const tableGeneral = {
                     title: 'Datos Generales',
                     headers: [{ label: 'Campo', property: 'c', width: 150 }, { label: 'Valor', property: 'v', width: 330 }],
-                    datas: [
-                        { c: 'Nombre de usuario', v: data.collaboratorName || 'N/A' },
-                        { c: 'Correo electrónico', v: data.collaboratorEmail || 'N/A' },
-                        { c: 'CECO', v: data.ceco || 'N/A' },
-                        { c: 'Departamento', v: data.department || 'N/A' }
-                    ]
+                    datas: generalData
                 };
 
                 await doc.table(tableGeneral, {
@@ -57,7 +63,7 @@ export class PdfKitService implements IDocumentService {
                 doc.moveDown(1);
 
                 const tableAsignados = {
-                    title: 'Activos Asignados',
+                    title: data.actType === 'RETURN' ? 'Activos Devueltos' : 'Activos Asignados',
                     headers: [
                         { label: 'Placa Ikusi', property: 'placa', width: 60 },
                         { label: 'Hostname', property: 'host', width: 70 },
@@ -67,17 +73,15 @@ export class PdfKitService implements IDocumentService {
                         { label: 'Modelo', property: 'modelo', width: 80 },
                         { label: 'Asignación', property: 'fecha', width: 60 }
                     ],
-                    datas: [
-                        {
-                            placa: data.requiresPlacaIkusi ? data.assetId : 'N/A',
-                            host: data.assetHostname || 'N/A',
-                            cat: data.assetType || 'N/A',
-                            marca: data.assetBrand || 'Generico',
-                            serial: data.assetSerial || 'N/A',
-                            modelo: data.assetModel || 'Generico',
-                            fecha: data.timestamp.toLocaleDateString()
-                        }
-                    ]
+                    datas: data.assets.map(asset => ({
+                        placa: asset.requiresPlacaIkusi ? asset.assetId : 'N/A',
+                        host: asset.assetHostname || 'N/A',
+                        cat: asset.assetType || 'N/A',
+                        marca: asset.assetBrand || 'Generico',
+                        serial: asset.assetSerial || 'N/A',
+                        modelo: asset.assetModel || 'Generico',
+                        fecha: data.timestamp.toLocaleDateString()
+                    }))
                 };
 
                 await doc.table(tableAsignados, {

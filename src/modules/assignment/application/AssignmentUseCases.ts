@@ -104,6 +104,28 @@ export class AssignmentUseCases {
         return { assignment, token };
     }
 
+    async initiateBatchReturn(assignmentIds: string[]): Promise<{ assignments: Assignment[]; token: string }> {
+        const assignments: Assignment[] = [];
+        for (const id of assignmentIds) {
+            const assignment = await this.repository.findById(id);
+            if (!assignment) throw new Error(`Asignación ${id} no encontrada`);
+            assignment.initiateReturn();
+            assignments.push(assignment);
+        }
+
+        const secret = process.env.JWT_SECRET || 'secret';
+        const token = jwt.sign({ assignmentIds }, secret, { expiresIn: '24h' });
+
+        for (const assignment of assignments) {
+            // We just store the single token across all of them or don't use the domain logic for batch token creation,
+            // we manually set the token or just save the state change
+            assignment.generateToken(() => token);
+            await this.repository.save(assignment);
+        }
+
+        return { assignments, token };
+    }
+
     async initiateReturnByAsset(assetId: string, collaboratorEmail: string): Promise<{ assignment: Assignment; token: string }> {
         const assignment = await this.repository.findActiveByAssetId(assetId);
         if (!assignment) throw new Error('No se encontró una asignación activa para este activo');
@@ -129,6 +151,36 @@ export class AssignmentUseCases {
 
         await this.repository.save(assignment);
         return assignment;
+    }
+
+    async confirmBatchReturn(token: string, ipAddress: string, userAgent: string): Promise<Assignment[]> {
+        const secret = process.env.JWT_SECRET || 'secret';
+        let payload: any;
+        try {
+            payload = jwt.verify(token, secret);
+        } catch (error) {
+            throw new Error('Token expirado o inválido');
+        }
+
+        const assignmentIds: string[] = payload.assignmentIds;
+        if (!assignmentIds || !Array.isArray(assignmentIds)) {
+            throw new Error('Token no es válido para devolución múltiple');
+        }
+
+        const assignments: Assignment[] = [];
+        for (const id of assignmentIds) {
+            const assignment = await this.repository.findById(id);
+            if (assignment) {
+                assignment.confirmReturn(token, {
+                    ipAddress,
+                    userAgent,
+                    timestamp: new Date()
+                });
+                await this.repository.save(assignment);
+                assignments.push(assignment);
+            }
+        }
+        return assignments;
     }
 
     async resendLink(assignmentId: string, email: string): Promise<{ assignment: Assignment; token: string }> {

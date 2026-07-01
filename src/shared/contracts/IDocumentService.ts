@@ -6,21 +6,24 @@ export interface AssignmentDocumentData {
     department: string;
     ceco?: string;
     sede?: string;
-    assetId: string;
-    assetType: string; // Category Name
-    assetBrand?: string;
-    assetHostname?: string;
-    assetVersionOs?: string;
-    assetSerial: string;
-    assetModel: string;
-    assetMac: string;
-    assetProcessor: string;
-    assetRam: string;
-    assetStorage: string;
-    requiresPlacaIkusi?: boolean; // Added for peripherals logic
+    assets: {
+        assetId: string;
+        assetType: string;
+        assetBrand?: string;
+        assetHostname?: string;
+        assetVersionOs?: string;
+        assetSerial: string;
+        assetModel: string;
+        assetMac: string;
+        assetProcessor: string;
+        assetRam: string;
+        assetStorage: string;
+        requiresPlacaIkusi?: boolean;
+    }[];
     ipAddress: string;
     timestamp: Date;
     legalTextOverride?: string;
+    returnReason?: string;
     isForcedSignature?: boolean;
     signatureEmail?: string;
     otherAssignedAssets?: {

@@ -1,4 +1,14 @@
 /* Styles specific to Collaborators if any */
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(24px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 .badge-inactive {
   background: #fee2e2;
   color: #dc2626;
