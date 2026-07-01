@@ -602,7 +602,7 @@ router.get('/:id/confirm-return', async (req, res) => {
                         <strong>Dirección IP:</strong> ${ipAddress}<br>
                         <strong>Fecha:</strong> ${new Date().toLocaleDateString('es-CO')}
                     </div>
-                    <a href="http://localhost:3000${documentPath}" target="_blank" class="btn">Descargar Paz y Salvo (PDF)</a>
+                    <a href="${process.env.BACKEND_URL || 'http://localhost:3000'}${documentPath}" target="_blank" class="btn">Descargar Paz y Salvo (PDF)</a>
                 </div>
             </body>
             </html>
@@ -752,7 +752,7 @@ router.get('/:id/accept', async (req, res) => {
                         <strong>Dirección IP:</strong> ${ipAddress}<br>
                         <strong>Fecha:</strong> ${new Date().toLocaleDateString('es-CO')}
                     </div>
-                    <a href="http://localhost:3000${documentPath}" target="_blank" class="btn">Descargar Acta Firmada (PDF)</a>
+                    <a href="${process.env.BACKEND_URL || 'http://localhost:3000'}${documentPath}" target="_blank" class="btn">Descargar Acta Firmada (PDF)</a>
                 </div>
             </body>
             </html>
