@@ -17,7 +17,7 @@ export class PostgresAssignmentRepository implements IAssignmentRepository {
             end_date: assignment.endDate,
             signature_token: assignment.signatureToken,
             signature_metadata: assignment.signatureMetadata,
-            document_path: (assignment as any).props?.documentPath || undefined
+            document_path: assignment.documentPath || undefined
         });
         await this.repo.save(ormEntity);
     }
@@ -34,7 +34,8 @@ export class PostgresAssignmentRepository implements IAssignmentRepository {
             startDate: ormEntity.start_date,
             endDate: ormEntity.end_date,
             signatureToken: ormEntity.signature_token,
-            signatureMetadata: ormEntity.signature_metadata
+            signatureMetadata: ormEntity.signature_metadata,
+            documentPath: ormEntity.document_path
         });
     }
 
@@ -50,7 +51,8 @@ export class PostgresAssignmentRepository implements IAssignmentRepository {
             startDate: ormEntity.start_date,
             endDate: ormEntity.end_date,
             signatureToken: ormEntity.signature_token,
-            signatureMetadata: ormEntity.signature_metadata
+            signatureMetadata: ormEntity.signature_metadata,
+            documentPath: ormEntity.document_path
         }));
     }
 
@@ -66,7 +68,8 @@ export class PostgresAssignmentRepository implements IAssignmentRepository {
             startDate: ormEntity.start_date,
             endDate: ormEntity.end_date,
             signatureToken: ormEntity.signature_token,
-            signatureMetadata: ormEntity.signature_metadata
+            signatureMetadata: ormEntity.signature_metadata,
+            documentPath: ormEntity.document_path
         });
     }
 
@@ -86,7 +89,8 @@ export class PostgresAssignmentRepository implements IAssignmentRepository {
             startDate: ormEntity.start_date,
             endDate: ormEntity.end_date,
             signatureToken: ormEntity.signature_token,
-            signatureMetadata: ormEntity.signature_metadata
+            signatureMetadata: ormEntity.signature_metadata,
+            documentPath: ormEntity.document_path
         });
     }
 }

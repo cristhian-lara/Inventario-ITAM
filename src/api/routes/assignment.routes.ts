@@ -935,7 +935,7 @@ router.get('/batch-accept-return', async (req, res) => {
             });
 
             if (process.env.EMAIL_PROVIDER === 'webex' && collaborator?.email) {
-                await mailerService.sendReturnEmail(collaborator.email, 'BATCH', token, documentPath);
+                await mailerService.sendFinalPdfEmail(collaborator.email, documentPath);
             }
         }
 

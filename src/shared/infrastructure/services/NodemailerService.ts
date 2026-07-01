@@ -74,7 +74,7 @@ export class NodemailerService implements IMailerService {
     }
 
     async sendMaintenanceSignatureEmail(to: string, maintenanceId: string, token: string): Promise<void> {
-        const signUrl = `http://localhost:3000/api/maintenances/accept?token=${token}`;
+        const signUrl = `${process.env.BACKEND_URL || 'http://localhost:3000'}/api/maintenances/accept?token=${token}`;
         
         console.log(`\n📧 [SIMULADOR DE EMAIL] Enviando correo a: ${to}`);
         console.log(`📧 Asunto: Requerido: Firma Acta de Mantenimiento Ikusi`);
@@ -99,6 +99,27 @@ export class NodemailerService implements IMailerService {
                 `
             });
             console.log(`✅ Correo real enviado a ${to}`);
+        }
+    }
+    async sendFinalPdfEmail(to: string, documentPath: string): Promise<void> {
+        console.log(`\n📧 [SIMULADOR DE EMAIL] Enviando correo a: ${to}`);
+        console.log(`📧 Asunto: Copia de Acta Firmada`);
+        console.log(`📎 Archivo adjunto: ${documentPath}`);
+        console.log(`--------------------------------------------------------\n`);
+
+        if (process.env.SMTP_USER) {
+            await this.transporter.sendMail({
+                from: '"Ikusi IT" <noreply@ikusi.com>',
+                to,
+                subject: 'Copia de Acta Firmada',
+                html: `
+                    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                        <h2 style="color: #333;">Acta Firmada</h2>
+                        <p>Adjuntamos la copia final de tu acta firmada en formato PDF.</p>
+                    </div>
+                `,
+                attachments: documentPath ? [{ filename: 'acta_firmada.pdf', path: \`./storage\${documentPath}\` }] : []
+            });
         }
     }
 }

@@ -114,4 +114,8 @@ export class Assignment {
         this.props.signatureMetadata = metadata;
         this.props.signatureToken = undefined;
     }
+
+    public get documentPath(): string | undefined {
+        return this.props.documentPath;
+    }
 }

@@ -89,4 +89,9 @@ export class WebexNotificationService implements IMailerService {
         const markdown = `**🔧 Firma Requerida: Mantenimiento Finalizado**\n\nHola, se ha completado el mantenimiento de uno de tus equipos. Por favor, revisa el acta adjunta y luego firma la conformidad:\n\n👉 [Aceptar Mantenimiento](${link})`;
         await this.sendMessage(to, markdown, documentPath);
     }
+
+    async sendFinalPdfEmail(to: string, documentPath: string): Promise<void> {
+        const markdown = `**✅ Copia de Acta Firmada**\n\nHola, adjuntamos la copia final en PDF de tu acta firmada. ¡Gracias!`;
+        await this.sendMessage(to, markdown, documentPath);
+    }
 }
