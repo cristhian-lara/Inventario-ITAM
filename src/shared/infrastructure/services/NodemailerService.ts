@@ -28,17 +28,24 @@ export class NodemailerService implements IMailerService {
                 to,
                 subject: 'Firma requerida para asignación de activo',
                 html: `
-                    <h1>Nueva Asignación de Activo</h1>
-                    <p>Se te ha asignado un nuevo equipo. Por favor, revisa y firma el acta haciendo clic en el siguiente enlace:</p>
-                    <a href="${link}" style="padding: 10px; background: #007bff; color: white; text-decoration: none; border-radius: 5px;">Aceptar Asignación</a>
+                    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #ddd; padding: 20px; border-radius: 8px;">
+                        <img src="https://www.ikusi.com/mx/wp-content/uploads/sites/2/2020/09/ikusi-velatia-logo.png" alt="Ikusi Logo" style="width: 150px; margin-bottom: 20px;">
+                        <h2 style="color: #333; border-bottom: 2px solid #e3000f; padding-bottom: 10px;">Nueva Asignación de Activo</h2>
+                        <p style="color: #555; font-size: 16px;">Hola,</p>
+                        <p style="color: #555; font-size: 16px;">Se te ha asignado un nuevo equipo por parte del área de TI. Por favor, revisa el acta adjunta y firma tu conformidad ingresando al siguiente enlace:</p>
+                        <div style="text-align: center; margin: 30px 0;">
+                            <a href="${link}" style="background-color: #e3000f; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; font-weight: bold; display: inline-block;">Firmar Asignación</a>
+                        </div>
+                        <p style="color: #888; font-size: 12px; text-align: center;">Este enlace es único y seguro.</p>
+                    </div>
                 `
             });
             console.log(`✅ Correo real enviado a ${to}`);
         }
     }
 
-    async sendReturnEmail(to: string, assignmentId: string, token: string): Promise<void> {
-        const link = `http://localhost:3000/api/assignments/${assignmentId}/confirm-return?token=${token}`;
+    async sendReturnEmail(to: string, assignmentId: string, token: string, documentPath?: string, overrideUrl?: string): Promise<void> {
+        const link = overrideUrl || `http://localhost:3000/api/assignments/${assignmentId}/confirm-return?token=${token}`;
         
         console.log(`\n📧 [SIMULADOR DE EMAIL] Enviando correo a: ${to}`);
         console.log(`📧 Asunto: Firma requerida para devolución de activo (Paz y Salvo)`);
@@ -50,9 +57,16 @@ export class NodemailerService implements IMailerService {
                 to,
                 subject: 'Firma requerida para devolución de activo',
                 html: `
-                    <h1>Paz y Salvo de Activo</h1>
-                    <p>Has devuelto tu equipo al área de TI. Por favor, revisa y firma el acta de Paz y Salvo haciendo clic en el siguiente enlace:</p>
-                    <a href="${link}" style="padding: 10px; background: #e0a800; color: white; text-decoration: none; border-radius: 5px;">Firmar Devolución</a>
+                    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #ddd; padding: 20px; border-radius: 8px;">
+                        <img src="https://www.ikusi.com/mx/wp-content/uploads/sites/2/2020/09/ikusi-velatia-logo.png" alt="Ikusi Logo" style="width: 150px; margin-bottom: 20px;">
+                        <h2 style="color: #333; border-bottom: 2px solid #e3000f; padding-bottom: 10px;">Paz y Salvo de Activo</h2>
+                        <p style="color: #555; font-size: 16px;">Hola,</p>
+                        <p style="color: #555; font-size: 16px;">Has devuelto un equipo al área de TI. Por favor, revisa y firma el acta de Paz y Salvo correspondiente ingresando al siguiente enlace:</p>
+                        <div style="text-align: center; margin: 30px 0;">
+                            <a href="${link}" style="background-color: #e3000f; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; font-weight: bold; display: inline-block;">Firmar Devolución</a>
+                        </div>
+                        <p style="color: #888; font-size: 12px; text-align: center;">Este enlace es único y seguro.</p>
+                    </div>
                 `
             });
             console.log(`✅ Correo real enviado a ${to}`);

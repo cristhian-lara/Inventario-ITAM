@@ -862,7 +862,7 @@ router.post('/batch-return', async (req, res) => {
             returnReason: reason || 'Fin de asignación'
         });
 
-        const approveUrl = `${process.env.FRONTEND_URL || 'http://localhost:5000'}/api/assignments/batch-accept-return?token=${token}`;
+        const approveUrl = `${process.env.BACKEND_URL || 'http://localhost:3000'}/api/assignments/batch-accept-return?token=${token}`;
         
         const mailOptions = {
             to: email,
@@ -874,7 +874,7 @@ router.post('/batch-return', async (req, res) => {
             documentPath
         };
 
-        await mailerService.sendReturnEmail(email, 'BATCH', token, documentPath);
+        await mailerService.sendReturnEmail(email, 'BATCH', token, documentPath, approveUrl);
 
         res.json({ message: 'Devolución múltiple iniciada', assignments });
     } catch (error: any) {

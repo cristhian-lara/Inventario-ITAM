@@ -490,7 +490,7 @@ export default function Collaborators() {
               </div>
               <div className="form-group">
                 <label>Correo Electrónico</label>
-                <input required className="glass-input" type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
+                <input required className="glass-input" type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} disabled={!!editingId} style={editingId ? { opacity: 0.6, cursor: 'not-allowed' } : {}} />
               </div>
               <div className="form-group">
                 <label>Fecha de Alta (Ingreso)</label>

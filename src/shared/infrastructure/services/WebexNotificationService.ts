@@ -76,8 +76,8 @@ export class WebexNotificationService implements IMailerService {
         await this.sendMessage(to, markdown, documentPath);
     }
 
-    async sendReturnEmail(to: string, assignmentId: string, token: string, documentPath?: string): Promise<void> {
-        const link = `http://localhost:3000/api/assignments/${assignmentId}/confirm-return?token=${token}`;
+    async sendReturnEmail(to: string, assignmentId: string, token: string, documentPath?: string, overrideUrl?: string): Promise<void> {
+        const link = overrideUrl || `http://localhost:3000/api/assignments/${assignmentId}/confirm-return?token=${token}`;
         const markdown = `**✅ Firma Requerida: Devolución de Activo (Paz y Salvo)**\n\nHola, TI ha registrado la devolución de tu equipo. Por favor, revisa el paz y salvo adjunto y luego firma haciendo clic en el siguiente enlace:\n\n👉 [Aceptar Paz y Salvo](${link})`;
         await this.sendMessage(to, markdown, documentPath);
     }
