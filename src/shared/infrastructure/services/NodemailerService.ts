@@ -16,7 +16,7 @@ export class NodemailerService implements IMailerService {
     }
 
     async sendAssignmentEmail(to: string, assignmentId: string, token: string): Promise<void> {
-        const link = `http://localhost:3000/api/assignments/${assignmentId}/accept?token=${token}`;
+        const link = `${process.env.BACKEND_URL || 'http://localhost:3000'}/api/assignments/${assignmentId}/accept?token=${token}`;
         
         console.log(`\n📧 [SIMULADOR DE EMAIL] Enviando correo a: ${to}`);
         console.log(`📧 Asunto: Firma requerida para asignación de activo`);
@@ -45,7 +45,7 @@ export class NodemailerService implements IMailerService {
     }
 
     async sendReturnEmail(to: string, assignmentId: string, token: string, documentPath?: string, overrideUrl?: string): Promise<void> {
-        const link = overrideUrl || `http://localhost:3000/api/assignments/${assignmentId}/confirm-return?token=${token}`;
+        const link = overrideUrl || `${process.env.BACKEND_URL || 'http://localhost:3000'}/api/assignments/${assignmentId}/confirm-return?token=${token}`;
         
         console.log(`\n📧 [SIMULADOR DE EMAIL] Enviando correo a: ${to}`);
         console.log(`📧 Asunto: Firma requerida para devolución de activo (Paz y Salvo)`);

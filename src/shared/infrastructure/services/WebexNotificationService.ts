@@ -15,8 +15,10 @@ export class WebexNotificationService implements IMailerService {
     }
 
     private async sendMessage(toEmail: string, markdownText: string, documentPath?: string): Promise<void> {
+        const normalizedEmail = toEmail.trim().toLowerCase();
+        
         if (!this.token) {
-            console.log(`\n💬 [SIMULADOR DE WEBEX] Enviando mensaje a: ${toEmail}`);
+            console.log(`\n💬 [SIMULADOR DE WEBEX] Enviando mensaje a: ${normalizedEmail}`);
             console.log(`💬 Mensaje: \n${markdownText}`);
             if (documentPath) console.log(`📎 Archivo adjunto: ${documentPath}\n`);
             return;
@@ -34,7 +36,7 @@ export class WebexNotificationService implements IMailerService {
             if (actualFilePath && fs.existsSync(actualFilePath)) {
                 // If there's a file, we MUST use multipart/form-data
                 const fd = new FormData();
-                fd.append('toPersonEmail', toEmail);
+                fd.append('toPersonEmail', normalizedEmail);
                 fd.append('markdown', markdownText);
                 
                 const fileBuffer = fs.readFileSync(actualFilePath);
@@ -48,7 +50,7 @@ export class WebexNotificationService implements IMailerService {
             } else {
                 headers['Content-Type'] = 'application/json';
                 requestBody = JSON.stringify({
-                    toPersonEmail: toEmail,
+                    toPersonEmail: normalizedEmail,
                     markdown: markdownText
                 });
             }
@@ -64,26 +66,26 @@ export class WebexNotificationService implements IMailerService {
                 throw new Error(`Error en Webex API (${response.status}): ${errorData}`);
             }
 
-            console.log(`✅ Mensaje de Webex enviado exitosamente a ${toEmail}`);
+            console.log(`✅ Mensaje de Webex enviado exitosamente a ${normalizedEmail}`);
         } catch (error) {
-            console.error(`❌ Fallo al enviar mensaje de Webex a ${toEmail}:`, error);
+            console.error(`❌ Fallo al enviar mensaje de Webex a ${normalizedEmail}:`, error);
         }
     }
 
     async sendAssignmentEmail(to: string, assignmentId: string, token: string, documentPath?: string): Promise<void> {
-        const link = `http://localhost:3000/api/assignments/${assignmentId}/accept?token=${token}`;
+        const link = `${process.env.BACKEND_URL || 'http://localhost:3000'}/api/assignments/${assignmentId}/accept?token=${token}`;
         const markdown = `**📋 Firma Requerida: Asignación de Activo**\n\nHola, el departamento de TI te ha asignado un nuevo equipo. Por favor, revisa el acta adjunta y luego firma haciendo clic en el siguiente enlace:\n\n👉 [Aceptar Asignación](${link})`;
         await this.sendMessage(to, markdown, documentPath);
     }
 
     async sendReturnEmail(to: string, assignmentId: string, token: string, documentPath?: string, overrideUrl?: string): Promise<void> {
-        const link = overrideUrl || `http://localhost:3000/api/assignments/${assignmentId}/confirm-return?token=${token}`;
+        const link = overrideUrl || `${process.env.BACKEND_URL || 'http://localhost:3000'}/api/assignments/${assignmentId}/confirm-return?token=${token}`;
         const markdown = `**✅ Firma Requerida: Devolución de Activo (Paz y Salvo)**\n\nHola, TI ha registrado la devolución de tu equipo. Por favor, revisa el paz y salvo adjunto y luego firma haciendo clic en el siguiente enlace:\n\n👉 [Aceptar Paz y Salvo](${link})`;
         await this.sendMessage(to, markdown, documentPath);
     }
 
     async sendMaintenanceSignatureEmail(to: string, maintenanceId: string, token: string, documentPath?: string): Promise<void> {
-        const link = `http://localhost:3000/api/maintenance/${maintenanceId}/sign?token=${token}`;
+        const link = `${process.env.BACKEND_URL || 'http://localhost:3000'}/api/maintenance/${maintenanceId}/sign?token=${token}`;
         const markdown = `**🔧 Firma Requerida: Mantenimiento Finalizado**\n\nHola, se ha completado el mantenimiento de uno de tus equipos. Por favor, revisa el acta adjunta y luego firma la conformidad:\n\n👉 [Aceptar Mantenimiento](${link})`;
         await this.sendMessage(to, markdown, documentPath);
     }
