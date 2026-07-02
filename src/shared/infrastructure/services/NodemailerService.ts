@@ -118,7 +118,7 @@ export class NodemailerService implements IMailerService {
                         <p>Adjuntamos la copia final de tu acta firmada en formato PDF.</p>
                     </div>
                 `,
-                attachments: documentPath ? [{ filename: 'acta_firmada.pdf', path: \`./storage\${documentPath}\` }] : []
+                attachments: documentPath ? [{ filename: 'acta_firmada.pdf', path: `./storage${documentPath}` }] : []
             });
         }
     }

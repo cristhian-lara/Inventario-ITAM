@@ -20,7 +20,8 @@ export class PdfKitService implements IDocumentService {
             try {
                 const doc = new PDFDocument({ margins: { top: 50, bottom: 180, left: 70, right: 50 }, size: 'A4', bufferPages: true });
                 const prefix = data.actType === 'RETURN' ? 'pazysalvo' : 'acta';
-                const fileName = `${prefix}-${data.assignmentId}.pdf`;
+                const safeName = data.collaboratorName ? data.collaboratorName.replace(/[^a-z0-9]/gi, '_') : 'Desconocido';
+                const fileName = `${prefix}-${safeName}-${data.assignmentId}.pdf`;
                 const filePath = path.join(this.storageDir, fileName);
                 
                 const stream = fs.createWriteStream(filePath);
@@ -90,7 +91,7 @@ export class PdfKitService implements IDocumentService {
                     prepareRow: () => doc.font('Helvetica').fontSize(8).fillColor('black')
                 });
 
-                if (data.otherAssignedAssets && data.otherAssignedAssets.length > 0) {
+                if (data.otherAssignedAssets && data.otherAssignedAssets.length > 0 && data.actType !== 'RETURN') {
                     doc.moveDown(1);
                     const tableOtrosActivos = {
                         title: 'Otros Activos Asignados al Colaborador',
@@ -152,7 +153,7 @@ Este documento cancela la responsiva firmada en el momento de la asignación ori
 
                 const range = doc.bufferedPageRange();
                 const cryptoType = data.actType === 'RETURN' ? 'Acta-Dev-Ikusi' : 'Acta-Asig-Ikusi';
-                const userNameNormalized = (data.collaboratorName || 'Usuario Asignado').replace(/ /g, '+');
+                const userNameNormalized = data.collaboratorName || 'Usuario Asignado';
                 const cryptoId = `${cryptoType}-${userNameNormalized}`;
                 const signedBy = data.isForcedSignature ? 'Firmada por IT (firma forzada)' : (data.signatureEmail || data.collaboratorEmail || 'N/A');
 
@@ -168,7 +169,6 @@ Este documento cancela la responsiva firmada en el momento de la asignación ori
                     doc.fontSize(9).fillColor('#000000').font('Helvetica');
                     doc.moveDown(1);
                     doc.text(`ID Asignación criptográfica: ${cryptoId}`, 70, doc.y);
-                    doc.text(`Firma IP registrada: ${data.ipAddress || 'N/A'}`, 70, doc.y);
                     doc.text(`Sede: ${data.sede || 'N/A'}`, 70, doc.y);
                     doc.text(`Firmada por: ${signedBy}`, 70, doc.y);
 
@@ -207,7 +207,8 @@ Este documento cancela la responsiva firmada en el momento de la asignación ori
             try {
                 // Initialize PDFDocument from pdfkit-table with bufferPages and larger bottom margin for footer
                 const doc = new PDFDocument({ margins: { top: 50, bottom: 120, left: 50, right: 50 }, size: 'A4', bufferPages: true });
-                const fileName = `acta_mantenimiento_${record.id}_${Date.now()}.pdf`;
+                const safeName = record.collaboratorInTurnName ? record.collaboratorInTurnName.replace(/[^a-z0-9]/gi, '_') : 'Desconocido';
+                const fileName = `acta_mantenimiento_${safeName}_${record.id}_${Date.now()}.pdf`;
                 const filePath = path.join(this.storageDir, fileName);
                 
                 const stream = fs.createWriteStream(filePath);
@@ -319,10 +320,9 @@ Este documento cancela la responsiva firmada en el momento de la asignación ori
                     
                     doc.fontSize(9).fillColor('#000000').font('Helvetica');
                     doc.moveDown(1);
-                    const userNameNormalized = (record.collaboratorInTurnName || 'Usuario Asignado').replace(/ /g, '+');
+                    const userNameNormalized = record.collaboratorInTurnName || 'Usuario Asignado';
                     const cryptoId = `Acta-Maint-Ikusi-${userNameNormalized}-${record.id}`;
                     doc.text(`ID Mantenimiento criptográfico: ${cryptoId}`, 70, doc.y);
-                    doc.text(`Firma IP registrada: ${ipAddress}`, 70, doc.y);
                     doc.text(`Sede: ${record.collaboratorLocation || 'Bogotá'}`, 70, doc.y);
                     const isForced = signatureBase64 && signatureBase64.startsWith('Firma forzada');
                     const signedByText = isForced 

@@ -23,9 +23,11 @@ app.get('/health', (req, res) => {
 app.use('/pdfs', express.static(path.join(__dirname, '../../storage/pdfs')));
 
 import authRoutes from './routes/auth.routes';
+import { documentRouter } from './routes/document.routes';
 
 // Registrar Rutas
 app.use('/api/auth', authRoutes);
+app.use('/api/documents', documentRouter);
 app.use('/api/catalog', catalogRoutes);
 app.use('/api/assignments', assignmentRoutes);
 app.use('/api/collaborators', collaboratorRouter);

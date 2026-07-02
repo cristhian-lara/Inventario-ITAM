@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { PackageSearch, Users, Activity, LogOut, Settings as SettingsIcon, Menu, X } from 'lucide-react';
+import { PackageSearch, Users, Activity, LogOut, Settings as SettingsIcon, Menu, X, FileText } from 'lucide-react';
 import { useAuth, Role } from '../context/AuthContext';
 import './TopNavbar.css';
 
@@ -15,7 +15,8 @@ export default function TopNavbar() {
     { path: '/settings', label: 'Administración', icon: <SettingsIcon size={20} />, roles: [Role.ADMINISTRADOR] },
     { path: '/collaborators', label: 'Colaboradores', icon: <Users size={20} />, roles: [Role.ADMINISTRADOR] },
     { path: '/assets', label: 'Catálogo', icon: <PackageSearch size={20} />, roles: [Role.ADMINISTRADOR] },
-    { path: '/maintenances', label: 'Mantenimiento', icon: <SettingsIcon size={20} />, roles: [Role.ADMINISTRADOR] }
+    { path: '/maintenances', label: 'Mantenimiento', icon: <SettingsIcon size={20} />, roles: [Role.ADMINISTRADOR] },
+    { path: '/actas', label: 'Actas', icon: <FileText size={20} />, roles: [Role.ADMINISTRADOR] }
   ];
 
   const navLinks = allNavLinks.filter(link => user && link.roles.includes(user.role as Role));

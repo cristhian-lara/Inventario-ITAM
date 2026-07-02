@@ -12,6 +12,7 @@ import { Role } from './context/AuthContext'
 
 import Maintenances from './pages/Maintenances'
 import MaintenanceSign from './pages/MaintenanceSign'
+import Actas from './pages/Actas'
 
 function App() {
   const location = useLocation();
@@ -34,6 +35,8 @@ function App() {
           
           <Route path="/maintenances" element={<ProtectedRoute allowedRoles={[Role.ADMINISTRADOR]}><Maintenances /></ProtectedRoute>} />
           <Route path="/maintenances/sign/:token" element={<MaintenanceSign />} />
+          
+          <Route path="/actas" element={<ProtectedRoute allowedRoles={[Role.ADMINISTRADOR]}><Actas /></ProtectedRoute>} />
           
           <Route path="/settings" element={<ProtectedRoute allowedRoles={[Role.ADMINISTRADOR]}><Settings /></ProtectedRoute>} />
         </Routes>

@@ -421,7 +421,7 @@ router.post('/force-accept-by-asset/:assetId', async (req, res) => {
 
         const documentPath = await documentService.generateAssignmentAct({
             otherAssignedAssets,
-            actType: 'ASSIGNMENT',
+            actType: 'RETURN',
             assignmentId: acceptedAssignment.id,
             collaboratorName: realColName,
             collaboratorEmail: realColEmail,
@@ -599,7 +599,6 @@ router.get('/:id/confirm-return', async (req, res) => {
                     <h1>¡Paz y Salvo Generado!</h1>
                     <p>El equipo ha sido devuelto satisfactoriamente. El activo vuelve a estar disponible en el inventario general.</p>
                     <div class="details">
-                        <strong>Dirección IP:</strong> ${ipAddress}<br>
                         <strong>Fecha:</strong> ${new Date().toLocaleDateString('es-CO')}
                     </div>
                     <a href="${process.env.BACKEND_URL || 'http://localhost:3000'}${documentPath}" target="_blank" class="btn">Descargar Paz y Salvo (PDF)</a>
@@ -657,7 +656,7 @@ router.get('/:id/accept', async (req, res) => {
 
         const documentPath = await documentService.generateAssignmentAct({
             otherAssignedAssets,
-            actType: 'ASSIGNMENT',
+            actType: 'RETURN',
             assignmentId: acceptedAssignment.id,
             collaboratorName: realColName,
             collaboratorEmail: realColEmail,
@@ -749,7 +748,6 @@ router.get('/:id/accept', async (req, res) => {
                     <h1>Asignación Aceptada</h1>
                     <p>El activo ha sido asignado a tu nombre. Tu firma digital ha sido registrada exitosamente en nuestro sistema.</p>
                     <div class="details">
-                        <strong>Dirección IP:</strong> ${ipAddress}<br>
                         <strong>Fecha:</strong> ${new Date().toLocaleDateString('es-CO')}
                     </div>
                     <a href="${process.env.BACKEND_URL || 'http://localhost:3000'}${documentPath}" target="_blank" class="btn">Descargar Acta Firmada (PDF)</a>
@@ -849,12 +847,26 @@ router.post('/batch-return', async (req, res) => {
             }
         }
 
+        let realDept = 'Sistemas';
+        if (collaborator && collaborator.department) {
+            try {
+                const dept = await departmentRepo.findById(Number(collaborator.department));
+                if (dept) realDept = dept.name;
+                else realDept = collaborator.department.toString();
+            } catch (e) {
+                realDept = collaborator.department.toString();
+            }
+        }
+        const ceco = collaborator && collaborator.dynamicAttributes ? collaborator.dynamicAttributes['CECOS'] || collaborator.dynamicAttributes['cecos'] || collaborator.dynamicAttributes['CECO'] || 'N/A' : 'N/A';
+
         const documentPath = await documentService.generateAssignmentAct({
             actType: 'RETURN',
             assignmentId: `BATCH-${Date.now()}`,
             collaboratorName: collaborator?.name || 'N/A',
             collaboratorEmail: email,
-            department: collaborator ? String(collaborator.department) : 'N/A',
+            department: realDept,
+            ceco: ceco,
+            sede: collaborator?.location || 'N/A',
             assets: assetsDetails,
             ipAddress: 'PENDIENTE DE FIRMA',
             timestamp: new Date(),
@@ -892,6 +904,7 @@ router.get('/batch-accept-return', async (req, res) => {
 
         const assignments = await assignmentUseCases.confirmBatchReturn(token, ipAddress, userAgent);
 
+        let documentPath = '';
         if (assignments.length > 0) {
             const firstAssignment = assignments[0];
             const collaborator = await collaboratorRepo.findById(firstAssignment.collaboratorId);
@@ -922,12 +935,26 @@ router.get('/batch-accept-return', async (req, res) => {
                 }
             }
 
-            const documentPath = await documentService.generateAssignmentAct({
+            let realDept = 'Sistemas';
+            if (collaborator && collaborator.department) {
+                try {
+                    const dept = await departmentRepo.findById(Number(collaborator.department));
+                    if (dept) realDept = dept.name;
+                    else realDept = collaborator.department.toString();
+                } catch (e) {
+                    realDept = collaborator.department.toString();
+                }
+            }
+            const ceco = collaborator && collaborator.dynamicAttributes ? collaborator.dynamicAttributes['CECOS'] || collaborator.dynamicAttributes['cecos'] || collaborator.dynamicAttributes['CECO'] || 'N/A' : 'N/A';
+
+            documentPath = await documentService.generateAssignmentAct({
                 actType: 'RETURN',
                 assignmentId: `BATCH-${Date.now()}`,
                 collaboratorName: collaborator?.name || 'N/A',
                 collaboratorEmail: collaborator?.email || 'N/A',
-                department: collaborator ? String(collaborator.department) : 'N/A',
+                department: realDept,
+                ceco: ceco,
+                sede: collaborator?.location || 'N/A',
                 assets: assetsDetails,
                 ipAddress,
                 timestamp: new Date(),
@@ -955,6 +982,8 @@ router.get('/batch-accept-return', async (req, res) => {
                     h1 { color: #111827; font-size: 24px; font-weight: 700; margin-bottom: 16px; }
                     p { color: #4b5563; font-size: 16px; line-height: 1.5; margin-bottom: 24px; }
                     .success-text { color: #10b981; font-weight: 600; }
+                    .btn { display: inline-block; padding: 12px 24px; background-color: #00a650; color: #fff; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px; transition: background-color 0.2s; }
+                    .btn:hover { background-color: #008f45; }
                 </style>
             </head>
             <body>
@@ -966,7 +995,7 @@ router.get('/batch-accept-return', async (req, res) => {
                     </div>
                     <h1>Devolución Completada</h1>
                     <p>Has confirmado exitosamente la devolución múltiple de los equipos.</p>
-                    <p class="success-text">El acta final con los detalles ha sido enviada a tu Webex.</p>
+                    ${documentPath ? `<a href="${process.env.BACKEND_URL || 'http://localhost:3000'}${documentPath}" target="_blank" class="btn">Descargar Acta (PDF)</a>` : ''}
                 </div>
             </body>
             </html>

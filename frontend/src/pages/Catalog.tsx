@@ -196,6 +196,7 @@ export default function Catalog() {
       });
       setTimeout(() => setSuccessMsg(''), 8000);
       setAssignModalAssetId(null);
+      setCollabSearchTerm('');
       queryClient.invalidateQueries({ queryKey: ['assets'] });
       queryClient.invalidateQueries({ queryKey: ['assignments'] });
     },
@@ -350,6 +351,7 @@ export default function Catalog() {
       startDate: new Date().toISOString().split('T')[0]
     });
     setAssignModalAssetId(assetId);
+    setCollabSearchTerm('');
   };
 
   const handleAssignSubmit = (e: React.FormEvent) => {

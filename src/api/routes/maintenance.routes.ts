@@ -182,7 +182,7 @@ router.get('/accept', async (req, res) => {
         res.send(`
             <div style="text-align:center; padding: 50px; font-family: sans-serif;">
                 <h1 style="color: green;">✅ Acta de Mantenimiento Aceptada</h1>
-                <p>El mantenimiento ha sido aceptado a conformidad. Tu firma electrónica ha sido registrada exitosamente con la IP <b>${ipAddress}</b>.</p>
+                <p>El mantenimiento ha sido aceptado a conformidad. Tu firma electrónica ha sido registrada exitosamente.</p>
                 <p>Se ha generado el Acta Física (PDF) inmutable.</p>
                 <a href="${process.env.BACKEND_URL || 'http://localhost:3000'}${pdfPath}" target="_blank" style="display:inline-block; margin-top:20px; padding:10px 20px; background:#00a650; color:white; text-decoration:none; border-radius:5px;">Ver Acta Firmada (PDF)</a>
             </div>
