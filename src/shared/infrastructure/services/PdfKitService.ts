@@ -81,7 +81,7 @@ export class PdfKitService implements IDocumentService {
                         marca: asset.assetBrand || 'Generico',
                         serial: asset.assetSerial || 'N/A',
                         modelo: asset.assetModel || 'Generico',
-                        fecha: data.timestamp.toLocaleDateString()
+                        fecha: data.timestamp.toLocaleDateString('es-CO', { timeZone: 'America/Bogota', year: 'numeric', month: '2-digit', day: '2-digit' })
                     }))
                 };
 
@@ -116,7 +116,7 @@ export class PdfKitService implements IDocumentService {
                 doc.addPage();
                 drawHeader();
                 
-                doc.fontSize(10).fillColor('#000000').text(data.timestamp.toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' }), { align: 'right' });
+                doc.fontSize(10).fillColor('#000000').text(data.timestamp.toLocaleDateString('es-CO', { timeZone: 'America/Bogota', year: 'numeric', month: 'long', day: 'numeric' }), { align: 'right' });
                 doc.moveDown(2);
 
                 doc.fontSize(11).font('Helvetica');
@@ -284,7 +284,7 @@ Este documento cancela la responsiva firmada en el momento de la asignación ori
                 doc.fontSize(24).fillColor('#00a650').text('IKUSI', 50, 50, { continued: true });
                 doc.fontSize(14).fillColor('#999999').text(' velatia');
                 
-                doc.fontSize(10).fillColor('#000000').text(new Date().toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' }), { align: 'right' });
+                doc.fontSize(10).fillColor('#000000').text(new Date().toLocaleDateString('es-CO', { timeZone: 'America/Bogota', year: 'numeric', month: 'long', day: 'numeric' }), { align: 'right' });
                 doc.moveDown(2);
 
                 doc.fontSize(11).font('Helvetica');

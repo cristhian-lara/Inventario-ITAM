@@ -350,6 +350,7 @@ router.post('/force-return-by-asset/:assetId', async (req, res) => {
             department: realDept,
             ceco: ceco,
             sede: sede,
+            returnReason: reason,
             assets: [{
             assetId: returnedAssignment.assetId,
             assetSerial: asset ? (asset.serial || 'N/A') : 'N/A',
@@ -422,13 +423,14 @@ router.post('/force-accept-by-asset/:assetId', async (req, res) => {
 
         const documentPath = await documentService.generateAssignmentAct({
             otherAssignedAssets,
-            actType: 'RETURN',
+            actType: 'ASSIGNMENT',
             assignmentId: acceptedAssignment.id,
             collaboratorName: realColName,
             collaboratorEmail: realColEmail,
             department: realDept,
             ceco: ceco,
             sede: sede,
+            returnReason: reason,
             assets: [{
             assetId: acceptedAssignment.assetId,
             assetSerial: asset ? (asset.serial || 'N/A') : 'N/A',
