@@ -91,7 +91,7 @@ export default function Collaborators() {
   const { data: assetsList = [] } = useQuery({
     queryKey: ['assets'],
     queryFn: async () => {
-      const response = await axios.get(`${API_URL}/api/assets`);
+      const response = await axios.get(`${API_URL}/api/catalog/assets`);
       return response.data;
     }
   });
