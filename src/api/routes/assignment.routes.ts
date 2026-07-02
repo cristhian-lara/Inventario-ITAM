@@ -46,7 +46,7 @@ async function getOtherAssignedAssets(collaboratorId: string, currentAssignmentI
     return otherAssignedAssets;
 }
 
-async function generateDraftPdf(assignment: any, actType: 'ASSIGNMENT' | 'RETURN'): Promise<string> {
+async function generateDraftPdf(assignment: any, actType: 'ASSIGNMENT' | 'RETURN', fallbackName?: string): Promise<string> {
     const asset = await catalogUseCases.getAssetById(assignment.assetId);
     const allCategories = await catalogUseCases.getAllCategories();
     const category = asset ? allCategories.find(c => c.id === asset.categoryId) : null;
@@ -55,7 +55,7 @@ async function generateDraftPdf(assignment: any, actType: 'ASSIGNMENT' | 'RETURN
     const collaborator = await collaboratorRepo.findById(assignment.collaboratorId);
     const ceco = collaborator && collaborator.dynamicAttributes ? collaborator.dynamicAttributes['CECOS'] || collaborator.dynamicAttributes['cecos'] || collaborator.dynamicAttributes['CECO'] || 'N/A' : 'N/A';
     const sede = collaborator ? collaborator.location : 'N/A';
-    const realColName = collaborator ? collaborator.name : assignment.collaboratorId;
+    const realColName = collaborator ? collaborator.name : (fallbackName || assignment.collaboratorId);
     const realColEmail = collaborator ? collaborator.email : 'test@ikusi.com';
     let realDept = 'Sistemas';
     if (collaborator && collaborator.department) {
@@ -103,7 +103,7 @@ async function generateDraftPdf(assignment: any, actType: 'ASSIGNMENT' | 'RETURN
 // 1. Iniciar Asignación
 router.post('/', async (req, res) => {
     try {
-        const { id, assetId, collaboratorId, collaboratorEmail, startDate } = req.body;
+        const { id, assetId, collaboratorId, collaboratorEmail, collaboratorName, startDate } = req.body;
         
         // Validación de Dominio: El activo debe existir y estar DISPONIBLE
         const asset = await catalogUseCases.getAssetById(assetId);
@@ -116,7 +116,7 @@ router.post('/', async (req, res) => {
 
         const { assignment, token } = await assignmentUseCases.createAssignment(id, assetId, collaboratorId, collaboratorEmail, startDate);
         
-        const documentPath = await generateDraftPdf(assignment, 'ASSIGNMENT');
+        const documentPath = await generateDraftPdf(assignment, 'ASSIGNMENT', collaboratorName);
         await mailerService.sendAssignmentEmail(collaboratorEmail, assignment.id, token, documentPath);
 
         res.status(201).json({
@@ -168,13 +168,14 @@ router.post('/:id/return', async (req, res) => {
 // Iniciar devolución por Asset ID
 router.post('/return-by-asset/:assetId', async (req, res) => {
     try {
+        const { collaboratorName } = req.body || {};
         const { email } = req.body || {};
         const existing = await assignmentRepo.findCurrentByAssetId(req.params.assetId);
         const collaborator = existing ? await collaboratorRepo.findById(existing.collaboratorId) : null;
         const realEmail = email || (collaborator ? collaborator.email : 'test@ikusi.com');
         const { assignment, token } = await assignmentUseCases.initiateReturnByAsset(req.params.assetId, realEmail);
         
-        const documentPath = await generateDraftPdf(assignment, 'RETURN');
+        const documentPath = await generateDraftPdf(assignment, 'RETURN', collaboratorName);
         await mailerService.sendReturnEmail(realEmail, assignment.id, token, documentPath);
         
         res.json(assignment);
@@ -310,11 +311,11 @@ router.post('/:id/force-return', async (req, res) => {
 
 router.post('/force-return-by-asset/:assetId', async (req, res) => {
     try {
+        const { email, collaboratorName } = req.body || {};
+        const reason = req.body?.reason || 'Firma forzada administrativa';
+        const ipAddress = `Firma forzada por administrador.\nMotivo: ${reason}`;
         const assignment = await assignmentRepo.findCurrentByAssetId(req.params.assetId);
         if (!assignment) throw new Error('No se encontró asignación activa o pendiente');
-        
-        const reason = req.body.reason || 'Firma forzada administrativa';
-        const ipAddress = `Firma forzada por administrador.\nMotivo: ${reason}`;
         const returnedAssignment = await assignmentUseCases.forceReturn(assignment.id, ipAddress);
         
         await catalogUseCases.changeAssetStatus(returnedAssignment.assetId, 'AVAILABLE');
@@ -325,7 +326,7 @@ router.post('/force-return-by-asset/:assetId', async (req, res) => {
         const collaborator = await collaboratorRepo.findById(returnedAssignment.collaboratorId);
         const ceco = collaborator && collaborator.dynamicAttributes ? collaborator.dynamicAttributes['CECOS'] || collaborator.dynamicAttributes['cecos'] || collaborator.dynamicAttributes['CECO'] || 'N/A' : 'N/A';
         const sede = collaborator ? collaborator.location : 'N/A';
-        const realColName = collaborator ? collaborator.name : returnedAssignment.collaboratorId;
+        const realColName = collaborator ? collaborator.name : (collaboratorName || returnedAssignment.collaboratorId);
         const realColEmail = collaborator ? collaborator.email : 'test@ikusi.com';
         let realDept = 'Sistemas';
         if (collaborator && collaborator.department) {
@@ -388,11 +389,11 @@ router.post('/force-return-by-asset/:assetId', async (req, res) => {
 // Aceptación Forzada (Administrativa)
 router.post('/force-accept-by-asset/:assetId', async (req, res) => {
     try {
+        const { email, collaboratorName } = req.body || {};
+        const reason = req.body?.reason || 'Firma forzada administrativa';
+        const ipAddress = `Firma forzada por administrador.\nMotivo: ${reason}`;
         const assignment = await assignmentRepo.findCurrentByAssetId(req.params.assetId);
         if (!assignment) throw new Error('No se encontró asignación para forzar aceptación');
-        
-        const reason = req.body.reason || 'Firma forzada administrativa';
-        const ipAddress = `Firma forzada por administrador.\nMotivo: ${reason}`;
         const acceptedAssignment = await assignmentUseCases.forceAccept(assignment.id, ipAddress);
         
         await catalogUseCases.changeAssetStatus(acceptedAssignment.assetId, 'IN_USE');
@@ -404,7 +405,7 @@ router.post('/force-accept-by-asset/:assetId', async (req, res) => {
         const collaborator = await collaboratorRepo.findById(acceptedAssignment.collaboratorId);
         const ceco = collaborator && collaborator.dynamicAttributes ? collaborator.dynamicAttributes['CECOS'] || collaborator.dynamicAttributes['cecos'] || collaborator.dynamicAttributes['CECO'] || 'N/A' : 'N/A';
         const sede = collaborator ? collaborator.location : 'N/A';
-        const realColName = collaborator ? collaborator.name : acceptedAssignment.collaboratorId;
+        const realColName = collaborator ? collaborator.name : (collaboratorName || acceptedAssignment.collaboratorId);
         const realColEmail = collaborator ? collaborator.email : 'test@ikusi.com';
         let realDept = 'Sistemas';
         if (collaborator && collaborator.department) {

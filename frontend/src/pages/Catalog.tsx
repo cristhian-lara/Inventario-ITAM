@@ -65,6 +65,7 @@ export default function Catalog() {
     assetId: '',
     collaboratorId: '',
     collaboratorEmail: '',
+    collaboratorName: '',
     startDate: new Date().toISOString().split('T')[0]
   });
 
@@ -159,9 +160,10 @@ export default function Catalog() {
 
   // MUTACIÓN PARA DEVOLVER
   const returnMutation = useMutation({
-    mutationFn: async (assetId: string) => {
-      const response = await axios.post(`${API_URL}/api/assignments/return-by-asset/${assetId}`, {
-        email: 'test@ikusi.com'
+    mutationFn: async (payload: { assetId: string, collaboratorName?: string }) => {
+      const response = await axios.post(`${API_URL}/api/assignments/return-by-asset/${payload.assetId}`, {
+        email: 'test@ikusi.com',
+        collaboratorName: payload.collaboratorName
       });
       return response.data;
     },
@@ -192,6 +194,7 @@ export default function Catalog() {
         assetId: '',
         collaboratorId: '',
         collaboratorEmail: '',
+        collaboratorName: '',
         startDate: new Date().toISOString().split('T')[0]
       });
       setTimeout(() => setSuccessMsg(''), 8000);
@@ -271,8 +274,8 @@ export default function Catalog() {
   });
 
   const forceAcceptMutation = useMutation({
-    mutationFn: async (data: { assetId: string, reason: string }) => {
-      const response = await axios.post(`${API_URL}/api/assignments/force-accept-by-asset/${data.assetId}`, { reason: data.reason });
+    mutationFn: async ({ assetId, reason, collaboratorName }: { assetId: string, reason: string, collaboratorName?: string }) => {
+      const response = await axios.post(`${API_URL}/api/assignments/force-accept-by-asset/${assetId}`, { reason, collaboratorName });
       return response.data;
     },
     onSuccess: (data) => {
@@ -292,8 +295,8 @@ export default function Catalog() {
   });
 
   const forceReturnMutation = useMutation({
-    mutationFn: async (data: { assetId: string, reason: string }) => {
-      const response = await axios.post(`${API_URL}/api/assignments/force-return-by-asset/${data.assetId}`, { reason: data.reason });
+    mutationFn: async ({ assetId, reason, collaboratorName }: { assetId: string, reason: string, collaboratorName?: string }) => {
+      const response = await axios.post(`${API_URL}/api/assignments/force-return-by-asset/${assetId}`, { reason, collaboratorName });
       return response.data;
     },
     onSuccess: (data) => {
@@ -313,8 +316,8 @@ export default function Catalog() {
   });
 
   const resendLinkMutation = useMutation({
-    mutationFn: async (assetId: string) => {
-      const response = await axios.post(`${API_URL}/api/assignments/resend-link-by-asset/${assetId}`);
+    mutationFn: async (payload: { assetId: string, collaboratorName?: string }) => {
+      const response = await axios.post(`${API_URL}/api/assignments/resend-link-by-asset/${payload.assetId}`, { collaboratorName: payload.collaboratorName });
       return response.data;
     },
     onSuccess: () => {
@@ -332,7 +335,11 @@ export default function Catalog() {
       title: 'Confirmar Devolución',
       message: `¿Estás seguro de que deseas iniciar el proceso de devolución para el activo ${assetId}? El colaborador recibirá un mensaje por Webex para firmar el Paz y Salvo.`,
       type: 'warning',
-      onConfirm: () => returnMutation.mutate(assetId)
+      onConfirm: () => {
+        const activeAssignment = getActiveAssignmentForAsset(assetId);
+        const collaboratorName = activeAssignment ? getCollaboratorName(activeAssignment.collaboratorId) : undefined;
+        returnMutation.mutate({ assetId, collaboratorName });
+      }
     });
   };
 
@@ -342,6 +349,7 @@ export default function Catalog() {
       assetId: assetId,
       collaboratorId: '',
       collaboratorEmail: '',
+      collaboratorName: '',
       startDate: new Date().toISOString().split('T')[0]
     });
     setAssignModalAssetId(assetId);
@@ -883,9 +891,9 @@ export default function Catalog() {
             <form onSubmit={(e) => {
               e.preventDefault();
               if (forceActionModal.type === 'accept') {
-                forceAcceptMutation.mutate({ assetId: forceActionModal.assetId, reason: forceReason });
+                forceAcceptMutation.mutate({ assetId: forceActionModal.assetId, reason: forceReason, collaboratorName: getCollaboratorName(getActiveAssignmentForAsset(forceActionModal.assetId)?.collaboratorId || '') });
               } else {
-                forceReturnMutation.mutate({ assetId: forceActionModal.assetId, reason: forceReason });
+                forceReturnMutation.mutate({ assetId: forceActionModal.assetId, reason: forceReason, collaboratorName: getCollaboratorName(getActiveAssignmentForAsset(forceActionModal.assetId)?.collaboratorId || '') });
               }
             }}>
               <div className="form-group">
@@ -967,7 +975,7 @@ export default function Catalog() {
                       setCollabSearchTerm(e.target.value);
                       setShowCollabDropdown(true);
                       if (!e.target.value) {
-                        setFormData({ ...formData, collaboratorEmail: '', collaboratorId: '' });
+                        setFormData({ ...formData, collaboratorEmail: '', collaboratorId: '', collaboratorName: '' });
                       }
                     }}
                     onFocus={() => setShowCollabDropdown(true)}
@@ -1013,7 +1021,8 @@ export default function Catalog() {
                               setFormData({
                                 ...formData,
                                 collaboratorEmail: c.email,
-                                collaboratorId: c.id
+                                collaboratorId: c.id,
+                                collaboratorName: c.name
                               });
                               setShowCollabDropdown(false);
                             }}
