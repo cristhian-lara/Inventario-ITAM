@@ -46,7 +46,17 @@ export default function Actas() {
   }
 
   const formatFilename = (filename: string) => {
-    // 1. Asignaciones
+    // 0. Nuevos formatos limpios (ej: "Paz y Salvo - Angie Lara - BATCH-123.pdf")
+    if (filename.startsWith('Acta de Asignacion -') || filename.startsWith('Paz y Salvo -') || filename.startsWith('Acta de Mantenimiento -')) {
+      const parts = filename.replace('.pdf', '').split(' - ');
+      if (parts.length >= 3) {
+        parts.pop(); // Removemos el ID del final
+        return parts.join(' - ');
+      }
+      return filename.replace('.pdf', '');
+    }
+
+    // 1. Asignaciones (antiguas)
     if (filename.startsWith('acta-')) {
       const match = filename.match(/^acta-(.+?)-assig-.*\.pdf$/);
       if (match && match[1]) {
@@ -55,7 +65,7 @@ export default function Actas() {
       return 'Acta de Asignación';
     }
     
-    // 2. Devoluciones (Paz y Salvo)
+    // 2. Devoluciones (Paz y Salvo) (antiguas)
     if (filename.startsWith('pazysalvo-')) {
       const match = filename.match(/^pazysalvo-(.+?)-(?:BATCH|assig)-.*\.pdf$/);
       if (match && match[1]) {
@@ -64,7 +74,7 @@ export default function Actas() {
       return 'Paz y Salvo';
     }
     
-    // 3. Mantenimientos
+    // 3. Mantenimientos (antiguas)
     if (filename.startsWith('acta_mantenimiento_')) {
       const match = filename.match(/^acta_mantenimiento_(.*?)_?(?:[a-zA-Z0-9\-]+)_(\d+)\.pdf$/);
       if (match && match[1]) {

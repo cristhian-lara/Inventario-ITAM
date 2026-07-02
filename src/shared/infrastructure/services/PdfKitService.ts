@@ -19,9 +19,9 @@ export class PdfKitService implements IDocumentService {
         return new Promise(async (resolve, reject) => {
             try {
                 const doc = new PDFDocument({ margins: { top: 50, bottom: 180, left: 70, right: 50 }, size: 'A4', bufferPages: true });
-                const prefix = data.actType === 'RETURN' ? 'pazysalvo' : 'acta';
-                const safeName = data.collaboratorName ? data.collaboratorName.replace(/[^a-z0-9]/gi, '_') : 'Desconocido';
-                const fileName = `${prefix}-${safeName}-${data.assignmentId}.pdf`;
+                const prefix = data.actType === 'RETURN' ? 'Paz y Salvo' : 'Acta de Asignacion';
+                const safeName = data.collaboratorName ? data.collaboratorName.replace(/[<>:"/\\|?*]+/g, '').trim() : 'Desconocido';
+                const fileName = `${prefix} - ${safeName} - ${data.assignmentId}.pdf`;
                 const filePath = path.join(this.storageDir, fileName);
                 
                 const stream = fs.createWriteStream(filePath);
@@ -171,6 +171,10 @@ Este documento cancela la responsiva firmada en el momento de la asignación ori
                     doc.text(`ID Asignación criptográfica: ${cryptoId}`, 70, doc.y);
                     doc.text(`Sede: ${data.sede || 'N/A'}`, 70, doc.y);
                     doc.text(`Firmada por: ${signedBy}`, 70, doc.y);
+                    
+                    if (data.ipAddress) {
+                        doc.text(`IP / Metadatos: ${data.ipAddress}`, 70, doc.y);
+                    }
 
                     doc.save();
                     doc.rotate(-90, { origin: [30, doc.page.height - 50] });
@@ -207,8 +211,8 @@ Este documento cancela la responsiva firmada en el momento de la asignación ori
             try {
                 // Initialize PDFDocument from pdfkit-table with bufferPages and larger bottom margin for footer
                 const doc = new PDFDocument({ margins: { top: 50, bottom: 120, left: 50, right: 50 }, size: 'A4', bufferPages: true });
-                const safeName = record.collaboratorInTurnName ? record.collaboratorInTurnName.replace(/[^a-z0-9]/gi, '_') : 'Desconocido';
-                const fileName = `acta_mantenimiento_${safeName}_${record.id}_${Date.now()}.pdf`;
+                const safeName = record.collaboratorInTurnName ? record.collaboratorInTurnName.replace(/[<>:"/\\|?*]+/g, '').trim() : 'Desconocido';
+                const fileName = `Acta de Mantenimiento - ${safeName} - ${record.id}.pdf`;
                 const filePath = path.join(this.storageDir, fileName);
                 
                 const stream = fs.createWriteStream(filePath);
@@ -329,6 +333,10 @@ Este documento cancela la responsiva firmada en el momento de la asignación ori
                         ? `${record.collaboratorInTurnName || 'Usuario Asignado'} (Firma Forzada por Administrador)` 
                         : (record.collaboratorInTurnName || 'Usuario Asignado');
                     doc.text(`Firmada por: ${signedByText}`, 70, doc.y);
+                    
+                    if (ipAddress) {
+                        doc.text(`IP / Metadatos: ${ipAddress}`, 70, doc.y);
+                    }
 
                     // Marca de agua lateral
                     doc.save();

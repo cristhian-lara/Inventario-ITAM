@@ -74,19 +74,19 @@ export class WebexNotificationService implements IMailerService {
 
     async sendAssignmentEmail(to: string, assignmentId: string, token: string, documentPath?: string): Promise<void> {
         const link = `${process.env.BACKEND_URL || 'http://localhost:3000'}/api/assignments/${assignmentId}/accept?token=${token}`;
-        const markdown = `**📋 Firma Requerida: Asignación de Activo**\n\nHola, el departamento de TI te ha asignado un nuevo equipo. Por favor, revisa el acta adjunta y luego firma haciendo clic en el siguiente enlace:\n\n👉 [Aceptar Asignación](${link})`;
+        const markdown = `**📋 Firma Requerida: Asignación de Activo**\n\nHola, el departamento de TI te ha asignado un nuevo equipo. Por favor, revisa el acta adjunta y luego firma haciendo clic en el siguiente enlace:\n\n👉 [Aceptar Asignación](${link})\n\n*⚠️ Importante: Para poder abrir el enlace y firmar el acta, recuerda que debes estar conectado a la red Wi-Fi de la oficina o tener activa tu sesión en la VPN (FortiClient).*`;
         await this.sendMessage(to, markdown, documentPath);
     }
 
     async sendReturnEmail(to: string, assignmentId: string, token: string, documentPath?: string, overrideUrl?: string): Promise<void> {
         const link = overrideUrl || `${process.env.BACKEND_URL || 'http://localhost:3000'}/api/assignments/${assignmentId}/confirm-return?token=${token}`;
-        const markdown = `**✅ Firma Requerida: Devolución de Activo (Paz y Salvo)**\n\nHola, TI ha registrado la devolución de tu equipo. Por favor, revisa el paz y salvo adjunto y luego firma haciendo clic en el siguiente enlace:\n\n👉 [Aceptar Paz y Salvo](${link})`;
+        const markdown = `**✅ Firma Requerida: Devolución de Activo (Paz y Salvo)**\n\nHola, TI ha registrado la devolución de tu equipo. Por favor, revisa el paz y salvo adjunto y luego firma haciendo clic en el siguiente enlace:\n\n👉 [Aceptar Paz y Salvo](${link})\n\n*⚠️ Importante: Para poder abrir el enlace y firmar el documento, recuerda que debes estar conectado a la red Wi-Fi de la oficina o tener activa tu sesión en la VPN (FortiClient).*`;
         await this.sendMessage(to, markdown, documentPath);
     }
 
     async sendMaintenanceSignatureEmail(to: string, maintenanceId: string, token: string, documentPath?: string): Promise<void> {
         const link = `${process.env.BACKEND_URL || 'http://localhost:3000'}/api/maintenance/${maintenanceId}/sign?token=${token}`;
-        const markdown = `**🔧 Firma Requerida: Mantenimiento Finalizado**\n\nHola, se ha completado el mantenimiento de uno de tus equipos. Por favor, revisa el acta adjunta y luego firma la conformidad:\n\n👉 [Aceptar Mantenimiento](${link})`;
+        const markdown = `**🔧 Firma Requerida: Mantenimiento Finalizado**\n\nHola, se ha completado el mantenimiento de uno de tus equipos. Por favor, revisa el acta adjunta y luego firma la conformidad:\n\n👉 [Aceptar Mantenimiento](${link})\n\n*⚠️ Importante: Para poder abrir el enlace y firmar el acta, recuerda que debes estar conectado a la red Wi-Fi de la oficina o tener activa tu sesión en la VPN (FortiClient).*`;
         await this.sendMessage(to, markdown, documentPath);
     }
 

@@ -328,18 +328,12 @@ export default function Catalog() {
   });
 
   const handleReturnClick = (assetId: string) => {
-    setReturnId(assetId);
-  };
-
-  const confirmReturn = () => {
-    if (returnId) {
-      confirm({
-        title: 'Confirmar Devolución',
-        message: '¿Estás seguro de que deseas iniciar el proceso de devolución para este activo?',
-        type: 'warning',
-        onConfirm: () => returnMutation.mutate(returnId)
-      });
-    }
+    confirm({
+      title: 'Confirmar Devolución',
+      message: `¿Estás seguro de que deseas iniciar el proceso de devolución para el activo ${assetId}? El colaborador recibirá un mensaje por Webex para firmar el Paz y Salvo.`,
+      type: 'warning',
+      onConfirm: () => returnMutation.mutate(assetId)
+    });
   };
 
   const handleAssignClick = (assetId: string) => {
@@ -916,34 +910,8 @@ export default function Catalog() {
         </div>
       )}
 
-      {/* MODAL CONFIRMACIÓN DEVOLUCIÓN */}
-      {returnId && (
-        <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(4px)' }}>
-          <div className="glass-panel" style={{ padding: '30px', maxWidth: '400px', textAlign: 'center' }}>
-            <AlertTriangle size={48} color="#eab308" style={{ marginBottom: '20px' }} />
-            <h3>¿Iniciar Devolución?</h3>
-            <p style={{ margin: '15px 0', color: 'var(--text-muted)' }}>
-              Se iniciará el proceso de devolución para el activo <b>{returnId}</b>. El colaborador recibirá un correo para firmar el Paz y Salvo.
-            </p>
-            <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginTop: '20px' }}>
-              <button
-                onClick={() => setReturnId(null)}
-                className="btn-glass"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={confirmReturn}
-                disabled={returnMutation.isPending}
-                className="btn-danger"
-                style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
-              >
-                {returnMutation.isPending ? 'Procesando...' : <><RefreshCw size={16} /> Confirmar</>}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* MODAL CONFIRMACIÓN DEVOLUCIÓN ELIMINADO PARA USAR EL GLOBAL */}
+
 
       {/* MODAL ASIGNACIÓN RÁPIDA */}
       {assignModalAssetId && (
