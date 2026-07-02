@@ -31,11 +31,14 @@ documentRouter.get('/', (req, res) => {
                 date: stats.mtime.toISOString(),
             };
 
-            if (file.startsWith('acta-')) {
+            // Formato nuevo: "Acta de Asignacion - Nombre - ID.pdf"
+            if (file.startsWith('Acta de Asignacion -') || file.startsWith('acta-')) {
                 result.assignments.push(fileData);
-            } else if (file.startsWith('pazysalvo-')) {
+            // Formato nuevo: "Paz y Salvo - Nombre - ID.pdf"
+            } else if (file.startsWith('Paz y Salvo -') || file.startsWith('pazysalvo-')) {
                 result.returns.push(fileData);
-            } else if (file.startsWith('acta_mantenimiento_')) {
+            // Formato nuevo: "Acta de Mantenimiento - Nombre - ID.pdf"
+            } else if (file.startsWith('Acta de Mantenimiento -') || file.startsWith('acta_mantenimiento_')) {
                 result.maintenances.push(fileData);
             }
         }
