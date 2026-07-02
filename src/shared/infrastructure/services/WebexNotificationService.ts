@@ -1,4 +1,5 @@
 import { IMailerService } from '../../contracts/IMailerService';
+import { NotificationError } from '../../contracts/NotificationError';
 
 import * as fs from 'fs';
 import * as path from 'path';
@@ -14,6 +15,23 @@ export class WebexNotificationService implements IMailerService {
         }
     }
 
+    /**
+     * Consulta la API de People de Webex para saber si la cuenta existe.
+     * Devuelve null si no se pudo determinar (error de red, permisos, etc.).
+     */
+    private async accountExists(email: string): Promise<boolean | null> {
+        try {
+            const resp = await fetch(`https://webexapis.com/v1/people?email=${encodeURIComponent(email)}`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+            if (!resp.ok) return null;
+            const data: any = await resp.json();
+            return Array.isArray(data.items) && data.items.length > 0;
+        } catch {
+            return null;
+        }
+    }
+
     private async sendMessage(toEmail: string, markdownText: string, documentPath?: string): Promise<void> {
         const normalizedEmail = toEmail.trim().toLowerCase();
         
@@ -24,11 +42,12 @@ export class WebexNotificationService implements IMailerService {
             return;
         }
 
+        let requestBody: BodyInit;
+        const headers: Record<string, string> = {
+            'Authorization': `Bearer ${this.token}`
+        };
+
         try {
-            let requestBody: BodyInit;
-            const headers: Record<string, string> = {
-                'Authorization': `Bearer ${this.token}`
-            };
 
             const isRelativeUrl = documentPath && documentPath.startsWith('/pdfs/');
             const actualFilePath = isRelativeUrl && documentPath ? path.join(process.cwd(), 'storage', documentPath) : documentPath;
@@ -63,12 +82,32 @@ export class WebexNotificationService implements IMailerService {
 
             if (!response.ok) {
                 const errorData = await response.text();
-                throw new Error(`Error en Webex API (${response.status}): ${errorData}`);
+
+                // Un 400/404 al enviar suele significar destinatario inexistente,
+                // pero Webex responde con un genérico "invalid parameter", así que
+                // lo confirmamos consultando la API de People.
+                if (response.status === 400 || response.status === 404) {
+                    const exists = await this.accountExists(normalizedEmail);
+                    const looksNotFound = /not found|could not be found|failed to find|verify the email|invalid email/i.test(errorData);
+                    if (exists === false || (exists === null && looksNotFound)) {
+                        throw new NotificationError(
+                            `La cuenta de Webex ${normalizedEmail} no existe.`,
+                            'ACCOUNT_NOT_FOUND'
+                        );
+                    }
+                }
+                throw new NotificationError(`Error en Webex API (${response.status}): ${errorData}`, 'SEND_FAILED');
             }
 
             console.log(`✅ Mensaje de Webex enviado exitosamente a ${normalizedEmail}`);
-        } catch (error) {
-            console.error(`❌ Fallo al enviar mensaje de Webex a ${normalizedEmail}:`, error);
+        } catch (error: any) {
+            console.error(`❌ Fallo al enviar mensaje de Webex a ${normalizedEmail}:`, error.message || error);
+            if (error instanceof NotificationError) throw error;
+            // Fallo de red/transporte (sin conexión, DNS, timeout, etc.)
+            throw new NotificationError(
+                `No se pudo contactar la API de Webex: ${error.message || error}`,
+                'SEND_FAILED'
+            );
         }
     }
 

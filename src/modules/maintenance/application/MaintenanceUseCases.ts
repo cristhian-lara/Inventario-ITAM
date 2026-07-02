@@ -1,6 +1,7 @@
 import { IMaintenanceRepository } from '../domain/IMaintenanceRepository';
 import { MaintenanceRecord } from '../domain/MaintenanceRecord';
 import { MaintenanceStatus, MaintenanceType } from '../domain/MaintenanceTypes';
+import { NotificationError, NotificationResult } from '../../../shared/contracts/NotificationError';
 
 // Definimos un contrato para consultar si un activo está asignado (así no acoplamos directamente al repositorio de asignaciones)
 export interface IAssetAssignmentService {
@@ -69,12 +70,30 @@ export class MaintenanceUseCases {
         return record;
     }
 
-    async completeMaintenance(id: string, notes?: string): Promise<MaintenanceRecord> {
+    /**
+     * Intenta notificar sin romper el flujo: el token de firma ya está generado
+     * y persistido, así que un fallo de Webex (cuenta inexistente, sin red/VPN)
+     * solo se reporta — el enlace sigue vigente para reenviarlo después.
+     */
+    private async trySendSignatureNotification(email: string, maintenanceId: string, token: string): Promise<NotificationResult> {
+        if (!this.mailerService) return { sent: false, accountNotFound: false, error: 'Servicio de notificaciones no configurado' };
+        try {
+            await this.mailerService.sendMaintenanceSignatureEmail(email, maintenanceId, token);
+            return { sent: true, accountNotFound: false };
+        } catch (error: any) {
+            const accountNotFound = error instanceof NotificationError && error.reason === 'ACCOUNT_NOT_FOUND';
+            console.error(`❌ Notificación de mantenimiento ${maintenanceId} no enviada:`, error.message);
+            return { sent: false, accountNotFound, error: error.message };
+        }
+    }
+
+    async completeMaintenance(id: string, notes?: string): Promise<{ record: MaintenanceRecord; notification: NotificationResult | null }> {
         const record = await this.repo.findById(id);
         if (!record) throw new Error('Mantenimiento no encontrado');
 
         const nextPreventive = record.completeMaintenance(new Date(), notes);
-        
+        let notification: NotificationResult | null = null;
+
         // Si hay un usuario en turno, generamos token de firma para el acta
         if (record.collaboratorInTurnId) {
             const assignment = await this.assignmentService.getActiveAssignmentForAsset(record.assetId);
@@ -84,23 +103,20 @@ export class MaintenanceUseCases {
                 const token = record.generateSignatureToken((maintId) => {
                     return jwt.sign({ maintenanceId: maintId }, secret, { expiresIn: '24h' });
                 });
-                
-                // MailerService: we can invoke the mailer via DI
-                if (this.mailerService) {
-                    this.mailerService.sendMaintenanceSignatureEmail(assignment.collaboratorEmail, id, token);
-                }
+
+                notification = await this.trySendSignatureNotification(assignment.collaboratorEmail, id, token);
             }
         }
 
         await this.repo.save(record);
-        
+
         // Guardamos el próximo programado.
         await this.repo.save(nextPreventive);
 
-        return record;
+        return { record, notification };
     }
 
-    async requestSignature(id: string): Promise<MaintenanceRecord> {
+    async requestSignature(id: string): Promise<{ record: MaintenanceRecord; notification: NotificationResult }> {
         const record = await this.repo.findById(id);
         if (!record) throw new Error('Mantenimiento no encontrado');
         if (record.status !== 'COMPLETED') throw new Error('El mantenimiento no está completado');
@@ -115,14 +131,12 @@ export class MaintenanceUseCases {
         const token = record.generateSignatureToken((maintId) => {
             return jwt.sign({ maintenanceId: maintId }, secret, { expiresIn: '24h' });
         });
-        
+
         await this.repo.save(record);
 
-        if (this.mailerService) {
-            await this.mailerService.sendMaintenanceSignatureEmail(assignment.collaboratorEmail, id, token);
-        }
+        const notification = await this.trySendSignatureNotification(assignment.collaboratorEmail, id, token);
 
-        return record;
+        return { record, notification };
     }
 
     async signMaintenanceAct(id: string, token: string, ipAddress: string, userAgent: string): Promise<MaintenanceRecord> {

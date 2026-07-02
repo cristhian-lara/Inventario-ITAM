@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { AssignmentUseCases } from '../../modules/assignment/application/AssignmentUseCases';
 import { PostgresAssignmentRepository } from '../../modules/assignment/infrastructure/PostgresAssignmentRepository';
 import { WebexNotificationService } from '../../shared/infrastructure/services/WebexNotificationService';
+import { NotificationError, NotificationResult } from '../../shared/contracts/NotificationError';
 import { PdfKitService } from '../../shared/infrastructure/services/PdfKitService';
 import express from 'express';
 import { CatalogUseCases } from '../../modules/catalog/application/CatalogUseCases';
@@ -23,6 +24,34 @@ const catalogUseCases = new CatalogUseCases(catalogRepo);
 
 const collaboratorRepo = new PostgresCollaboratorRepository();
 const departmentRepo = new PostgresDepartmentRepository();
+
+/**
+ * Envía una notificación de Webex sin romper el flujo: el token de firma ya
+ * está persistido antes de llamar aquí, por lo que un fallo de envío (cuenta
+ * inexistente, usuario sin red, API caída) NO invalida el enlace — solo se
+ * reporta al frontend para que el administrador decida (reenviar, corregir, etc.).
+ */
+async function trySendNotification(send: () => Promise<void>): Promise<NotificationResult> {
+    try {
+        await send();
+        return { sent: true, accountNotFound: false };
+    } catch (error: any) {
+        const accountNotFound = error instanceof NotificationError && error.reason === 'ACCOUNT_NOT_FOUND';
+        console.error(`❌ Notificación de Webex no enviada${accountNotFound ? ' (cuenta no encontrada)' : ''}: ${error.message}`);
+        return { sent: false, accountNotFound, error: error.message };
+    }
+}
+
+/**
+ * Mensaje estándar para el frontend según el resultado del envío.
+ */
+function notificationMessage(result: NotificationResult, email: string, successMsg: string): string {
+    if (result.sent) return successMsg;
+    if (result.accountNotFound) {
+        return `La cuenta de Webex "${email}" no existe. El proceso quedó registrado y el enlace de firma sigue vigente: usa "Reenviar enlace" cuando el destinatario sea correcto.`;
+    }
+    return 'El proceso quedó registrado, pero la notificación de Webex no pudo enviarse. El enlace de firma sigue vigente: usa "Reenviar enlace" para intentarlo de nuevo.';
+}
 
 async function getOtherAssignedAssets(collaboratorId: string, currentAssignmentId: string) {
     const allAssignments = await assignmentRepo.findAllActive();
@@ -115,14 +144,22 @@ router.post('/', async (req, res) => {
         }
 
         const { assignment, token } = await assignmentUseCases.createAssignment(id, assetId, collaboratorId, collaboratorEmail, startDate);
-        
+
         const documentPath = await generateDraftPdf(assignment, 'ASSIGNMENT', collaboratorName);
-        await mailerService.sendAssignmentEmail(collaboratorEmail, assignment.id, token, documentPath);
+
+        // La asignación y su token ya quedaron persistidos (PENDING_ACCEPTANCE).
+        // Un fallo en Webex no invalida el enlace de firma.
+        const notification = await trySendNotification(() =>
+            mailerService.sendAssignmentEmail(collaboratorEmail, assignment.id, token, documentPath)
+        );
 
         res.status(201).json({
-            message: 'Asignación iniciada y correo enviado exitosamente.',
+            message: notificationMessage(notification, collaboratorEmail, 'Asignación iniciada y notificación de Webex enviada exitosamente.'),
             assignmentId: assignment.id,
-            status: assignment.status
+            status: assignment.status,
+            notificationSent: notification.sent,
+            accountNotFound: notification.accountNotFound,
+            notificationError: notification.error
         });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -155,11 +192,20 @@ router.post('/:id/return', async (req, res) => {
         const collaborator = existing ? await collaboratorRepo.findById(existing.collaboratorId) : null;
         const realEmail = email || (collaborator ? collaborator.email : 'test@ikusi.com');
         const { assignment, token } = await assignmentUseCases.initiateReturn(req.params.id, realEmail);
-        
+
         const documentPath = await generateDraftPdf(assignment, 'RETURN');
-        await mailerService.sendReturnEmail(realEmail, assignment.id, token, documentPath);
-        
-        res.json(assignment);
+        const notification = await trySendNotification(() =>
+            mailerService.sendReturnEmail(realEmail, assignment.id, token, documentPath)
+        );
+
+        res.json({
+            assignmentId: assignment.id,
+            status: assignment.status,
+            message: notificationMessage(notification, realEmail, 'Devolución iniciada y notificación de Webex enviada exitosamente.'),
+            notificationSent: notification.sent,
+            accountNotFound: notification.accountNotFound,
+            notificationError: notification.error
+        });
     } catch (error: any) {
         res.status(400).json({ error: error.message });
     }
@@ -176,9 +222,18 @@ router.post('/return-by-asset/:assetId', async (req, res) => {
         const { assignment, token } = await assignmentUseCases.initiateReturnByAsset(req.params.assetId, realEmail);
         
         const documentPath = await generateDraftPdf(assignment, 'RETURN', collaboratorName);
-        await mailerService.sendReturnEmail(realEmail, assignment.id, token, documentPath);
-        
-        res.json(assignment);
+        const notification = await trySendNotification(() =>
+            mailerService.sendReturnEmail(realEmail, assignment.id, token, documentPath)
+        );
+
+        res.json({
+            assignmentId: assignment.id,
+            status: assignment.status,
+            message: notificationMessage(notification, realEmail, 'Devolución iniciada y notificación de Webex enviada exitosamente.'),
+            notificationSent: notification.sent,
+            accountNotFound: notification.accountNotFound,
+            notificationError: notification.error
+        });
     } catch (error: any) {
         res.status(400).json({ error: error.message });
     }
@@ -192,17 +247,21 @@ router.post('/:id/resend-link', async (req, res) => {
         const collaborator = existing ? await collaboratorRepo.findById(existing.collaboratorId) : null;
         const realEmail = email || (collaborator ? collaborator.email : 'test@ikusi.com');
         const { assignment, token } = await assignmentUseCases.resendLink(req.params.id, realEmail);
-        
+
         const actType = assignment.status === 'PENDING_ACCEPTANCE' ? 'ASSIGNMENT' : 'RETURN';
         const documentPath = await generateDraftPdf(assignment, actType);
-        
-        if (actType === 'ASSIGNMENT') {
-            await mailerService.sendAssignmentEmail(realEmail, assignment.id, token, documentPath);
-        } else {
-            await mailerService.sendReturnEmail(realEmail, assignment.id, token, documentPath);
-        }
 
-        res.json({ message: 'Enlace reenviado exitosamente' });
+        const notification = await trySendNotification(() => actType === 'ASSIGNMENT'
+            ? mailerService.sendAssignmentEmail(realEmail, assignment.id, token, documentPath)
+            : mailerService.sendReturnEmail(realEmail, assignment.id, token, documentPath)
+        );
+
+        res.json({
+            message: notificationMessage(notification, realEmail, 'Enlace reenviado exitosamente por Webex.'),
+            notificationSent: notification.sent,
+            accountNotFound: notification.accountNotFound,
+            notificationError: notification.error
+        });
     } catch (error: any) {
         res.status(400).json({ error: error.message });
     }
@@ -216,17 +275,21 @@ router.post('/resend-link-by-asset/:assetId', async (req, res) => {
         const collaborator = await collaboratorRepo.findById(existing.collaboratorId);
         const realEmail = email || (collaborator ? collaborator.email : 'test@ikusi.com');
         const { assignment, token } = await assignmentUseCases.resendLink(existing.id, realEmail);
-        
+
         const actType = assignment.status === 'PENDING_ACCEPTANCE' ? 'ASSIGNMENT' : 'RETURN';
         const documentPath = await generateDraftPdf(assignment, actType);
-        
-        if (actType === 'ASSIGNMENT') {
-            await mailerService.sendAssignmentEmail(realEmail, assignment.id, token, documentPath);
-        } else {
-            await mailerService.sendReturnEmail(realEmail, assignment.id, token, documentPath);
-        }
 
-        res.json({ message: 'Enlace reenviado exitosamente' });
+        const notification = await trySendNotification(() => actType === 'ASSIGNMENT'
+            ? mailerService.sendAssignmentEmail(realEmail, assignment.id, token, documentPath)
+            : mailerService.sendReturnEmail(realEmail, assignment.id, token, documentPath)
+        );
+
+        res.json({
+            message: notificationMessage(notification, realEmail, 'Enlace reenviado exitosamente por Webex.'),
+            notificationSent: notification.sent,
+            accountNotFound: notification.accountNotFound,
+            notificationError: notification.error
+        });
     } catch (error: any) {
         res.status(400).json({ error: error.message });
     }
@@ -659,7 +722,7 @@ router.get('/:id/accept', async (req, res) => {
 
         const documentPath = await documentService.generateAssignmentAct({
             otherAssignedAssets,
-            actType: 'RETURN',
+            actType: 'ASSIGNMENT',
             assignmentId: acceptedAssignment.id,
             collaboratorName: realColName,
             collaboratorEmail: realColEmail,
@@ -878,20 +941,18 @@ router.post('/batch-return', async (req, res) => {
         });
 
         const approveUrl = `${process.env.BACKEND_URL || 'http://localhost:3000'}/api/assignments/batch-accept-return?token=${token}`;
-        
-        const mailOptions = {
-            to: email,
-            subject: 'Revisión y Firma de Acta de Devolución Múltiple',
-            html: `<p>Hola ${collaborator?.name || 'Colaborador'},</p>
-                   <p>Se ha iniciado un proceso de devolución múltiple para los activos a tu cargo.</p>
-                   <p>Por favor, revisa el documento adjunto. Si todo es correcto, haz clic en el siguiente enlace para confirmar la devolución:</p>
-                   <p><a href="${approveUrl}">Confirmar Devolución</a></p>`,
-            documentPath
-        };
 
-        await mailerService.sendReturnEmail(email, 'BATCH', token, documentPath, approveUrl);
+        const notification = await trySendNotification(() =>
+            mailerService.sendReturnEmail(email, 'BATCH', token, documentPath, approveUrl)
+        );
 
-        res.json({ message: 'Devolución múltiple iniciada', assignments });
+        res.json({
+            message: notificationMessage(notification, email, 'Devolución múltiple iniciada y notificación de Webex enviada exitosamente.'),
+            assignments,
+            notificationSent: notification.sent,
+            accountNotFound: notification.accountNotFound,
+            notificationError: notification.error
+        });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
@@ -965,7 +1026,8 @@ router.get('/batch-accept-return', async (req, res) => {
             });
 
             if (process.env.EMAIL_PROVIDER === 'webex' && collaborator?.email) {
-                await mailerService.sendFinalPdfEmail(collaborator.email, documentPath);
+                // Copia de cortesía: si Webex falla aquí no debe romper la confirmación de firma.
+                await trySendNotification(() => mailerService.sendFinalPdfEmail(collaborator.email, documentPath));
             }
         }
 

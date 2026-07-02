@@ -5,6 +5,7 @@ import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveCo
 import { Link } from 'react-router-dom';
 import ActionMenu from '../components/ActionMenu';
 import { useConfirm } from '../context/ConfirmContext';
+import { showWebexFailureModal } from '../utils/notificationNotice';
 import './Maintenances.css';
 import { API_URL } from '../config';
 
@@ -43,7 +44,7 @@ const Maintenances: React.FC = () => {
   const [filterYear, setFilterYear] = useState('all');
   const [filterMonth, setFilterMonth] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
-  const [viewMode, setViewMode] = useState<'general' | 'auditoria' | 'balance'>('general');
+  const [viewMode, setViewMode] = useState<'general' | 'auditoria' | 'balance' | 'preventive'>('general');
   const [coverageFilter, setCoverageFilter] = useState<'all' | 'completed' | 'scheduled' | 'pending'>('all');
   const { confirm } = useConfirm();
 
@@ -161,7 +162,12 @@ const Maintenances: React.FC = () => {
       }
       return res.json();
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['maintenances'] }); setShowModal(false); },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['maintenances'] });
+      setShowModal(false);
+      // notificationSent === null → no había colaborador en turno que notificar
+      showWebexFailureModal(confirm, data);
+    },
     onError: (error: Error) => { setErrorMsg(error.message); }
   });
 
@@ -176,10 +182,12 @@ const Maintenances: React.FC = () => {
       }
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ['maintenances'] });
-      setSuccessMsg('Firma solicitada correctamente. Se ha enviado un correo al colaborador con el enlace mágico.');
-      setTimeout(() => setSuccessMsg(''), 4000);
+      if (!showWebexFailureModal(confirm, data)) {
+        setSuccessMsg(data?.message || 'Firma solicitada correctamente. Se envió la notificación por Webex al colaborador.');
+        setTimeout(() => setSuccessMsg(''), 4000);
+      }
     },
     onError: (error: Error) => { 
       setErrorToast(error.message); 

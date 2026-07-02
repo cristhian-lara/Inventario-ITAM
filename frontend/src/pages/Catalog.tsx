@@ -5,6 +5,7 @@ import ActionMenu from '../components/ActionMenu';
 import axios from 'axios';
 import { Plus, Search, Tag, Cpu, HardDrive, Wifi, PlusCircle, MonitorSmartphone, RefreshCw, CheckCircle2, AlertCircle, AlertTriangle, UserCheck, Send, Upload, Trash2 } from 'lucide-react';
 import { useConfirm } from '../context/ConfirmContext';
+import { showWebexFailureModal } from '../utils/notificationNotice';
 import './Catalog.css';
 import { API_URL } from '../config';
 
@@ -158,18 +159,23 @@ export default function Catalog() {
     }
   });
 
+  const getCollaboratorName = (collaboratorId: string) => {
+    return collaborators?.find((c: any) => c.id === collaboratorId)?.name;
+  };
+
   // MUTACIÓN PARA DEVOLVER
   const returnMutation = useMutation({
     mutationFn: async (payload: { assetId: string, collaboratorName?: string }) => {
       const response = await axios.post(`${API_URL}/api/assignments/return-by-asset/${payload.assetId}`, {
-        email: 'test@ikusi.com',
         collaboratorName: payload.collaboratorName
       });
       return response.data;
     },
-    onSuccess: () => {
-      setSuccessMsg('¡Proceso de devolución iniciado! Revisa la consola del servidor para el link de firma.');
-      setTimeout(() => setSuccessMsg(''), 8000);
+    onSuccess: (data: any) => {
+      if (!showWebexFailureModal(confirm, data)) {
+        setSuccessMsg(data?.message || '¡Proceso de devolución iniciado! Se envió la notificación de firma por Webex.');
+        setTimeout(() => setSuccessMsg(''), 8000);
+      }
       setReturnId(null);
       queryClient.invalidateQueries({ queryKey: ['assets'] });
       queryClient.invalidateQueries({ queryKey: ['assignments'] });
@@ -187,8 +193,11 @@ export default function Catalog() {
       const response = await axios.post(`${API_URL}/api/assignments`, newAssignment);
       return response.data;
     },
-    onSuccess: () => {
-      setSuccessMsg('¡Asignación iniciada! Revisa la consola del servidor para el link mágico.');
+    onSuccess: (data: any) => {
+      if (!showWebexFailureModal(confirm, data)) {
+        setSuccessMsg(data?.message || '¡Asignación iniciada! Se envió la notificación de firma por Webex.');
+        setTimeout(() => setSuccessMsg(''), 8000);
+      }
       setFormData({
         id: `assig-${Math.floor(Math.random() * 1000)}`,
         assetId: '',
@@ -197,7 +206,6 @@ export default function Catalog() {
         collaboratorName: '',
         startDate: new Date().toISOString().split('T')[0]
       });
-      setTimeout(() => setSuccessMsg(''), 8000);
       setAssignModalAssetId(null);
       setCollabSearchTerm('');
       queryClient.invalidateQueries({ queryKey: ['assets'] });
@@ -320,9 +328,28 @@ export default function Catalog() {
       const response = await axios.post(`${API_URL}/api/assignments/resend-link-by-asset/${payload.assetId}`, { collaboratorName: payload.collaboratorName });
       return response.data;
     },
+    onSuccess: (data: any) => {
+      if (!showWebexFailureModal(confirm, data)) {
+        setSuccessMsg(data?.message || 'Enlace de firma reenviado al colaborador por Webex.');
+        setTimeout(() => setSuccessMsg(''), 8000);
+      }
+    },
+    onError: (err: any) => {
+      setErrorMsg(err.response?.data?.error || err.message);
+      setTimeout(() => setErrorMsg(''), 8000);
+    }
+  });
+
+  // MUTACIÓN PARA DAR DE BAJA (RETIRAR)
+  const retireMutation = useMutation({
+    mutationFn: async (assetId: string) => {
+      const response = await axios.put(`${API_URL}/api/catalog/assets/${assetId}/status`, { status: 'RETIRED', reason: 'Baja administrativa desde catálogo' });
+      return response.data;
+    },
     onSuccess: () => {
-      setSuccessMsg('Enlace de firma reenviado al colaborador.');
+      setSuccessMsg('Activo dado de baja correctamente.');
       setTimeout(() => setSuccessMsg(''), 8000);
+      queryClient.invalidateQueries({ queryKey: ['assets'] });
     },
     onError: (err: any) => {
       setErrorMsg(err.response?.data?.error || err.message);
@@ -776,7 +803,7 @@ export default function Catalog() {
                                     title: 'Reenviar Enlace',
                                     message: '¿Estás seguro de reenviar el enlace de firma al colaborador?',
                                     type: 'info',
-                                    onConfirm: () => resendLinkMutation.mutate(asset.id)
+                                    onConfirm: () => resendLinkMutation.mutate({ assetId: asset.id })
                                   });
                                 }}
                                 disabled={resendLinkMutation.isPending}
@@ -830,7 +857,7 @@ export default function Catalog() {
                                       title: 'Reenviar Enlace',
                                       message: '¿Estás seguro de reenviar el enlace de firma al colaborador?',
                                       type: 'info',
-                                      onConfirm: () => resendLinkMutation.mutate(asset.id)
+                                      onConfirm: () => resendLinkMutation.mutate({ assetId: asset.id })
                                     });
                                   }}
                                   disabled={resendLinkMutation.isPending}
@@ -937,6 +964,7 @@ export default function Catalog() {
                   assetId: '',
                   collaboratorId: '',
                   collaboratorEmail: '',
+                  collaboratorName: '',
                   startDate: new Date().toISOString().split('T')[0]
                 });
               }}

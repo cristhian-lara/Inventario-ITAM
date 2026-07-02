@@ -82,8 +82,14 @@ router.post('/:id/start', async (req, res) => {
 router.post('/:id/complete', async (req, res) => {
     try {
         const { notes } = req.body;
-        const result = await useCases.completeMaintenance(req.params.id, notes);
-        res.json(serializeRecord(result));
+        const { record, notification } = await useCases.completeMaintenance(req.params.id, notes);
+        res.json({
+            ...serializeRecord(record),
+            // notification es null cuando no había colaborador en turno que notificar
+            notificationSent: notification ? notification.sent : null,
+            accountNotFound: notification ? notification.accountNotFound : false,
+            notificationError: notification?.error
+        });
     } catch (error: any) {
         res.status(400).json({ error: error.message });
     }
@@ -92,8 +98,18 @@ router.post('/:id/complete', async (req, res) => {
 // 3.5 Solicitar firma manualmente
 router.post('/:id/request-signature', async (req, res) => {
     try {
-        const result = await useCases.requestSignature(req.params.id);
-        res.json({ message: 'Solicitud de firma enviada al colaborador.', record: serializeRecord(result) });
+        const { record, notification } = await useCases.requestSignature(req.params.id);
+        res.json({
+            message: notification.sent
+                ? 'Solicitud de firma enviada al colaborador por Webex.'
+                : (notification.accountNotFound
+                    ? 'La cuenta de Webex del colaborador no existe. El enlace de firma sigue vigente: usa "Solicitar firma" de nuevo cuando el destinatario sea correcto.'
+                    : 'No se pudo enviar la notificación de Webex, pero el enlace de firma sigue vigente. Intenta reenviar más tarde.'),
+            record: serializeRecord(record),
+            notificationSent: notification.sent,
+            accountNotFound: notification.accountNotFound,
+            notificationError: notification.error
+        });
     } catch (error: any) {
         res.status(400).json({ error: error.message });
     }

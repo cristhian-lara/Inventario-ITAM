@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { Plus, Search, UserCheck, UserX, UserPlus, Edit2, Upload, Eye, Crown } from 'lucide-react';
 import { useConfirm } from '../context/ConfirmContext';
+import { showWebexFailureModal } from '../utils/notificationNotice';
 import './Collaborators.css';
 import { API_URL } from '../config';
 
@@ -122,7 +123,7 @@ export default function Collaborators() {
     if (selectedAssignmentIds.length === 0 || !selectedCollabForReturn) return;
     setIsBatchReturning(true);
     try {
-        await axios.post(`${API_URL}/api/assignments/batch-return`, {
+        const response = await axios.post(`${API_URL}/api/assignments/batch-return`, {
             assignmentIds: selectedAssignmentIds,
             email: selectedCollabForReturn.email,
             reason: returnReason
@@ -130,12 +131,14 @@ export default function Collaborators() {
         setBatchReturnModalOpen(false);
         queryClient.invalidateQueries({ queryKey: ['collaborators'] });
         queryClient.invalidateQueries({ queryKey: ['assignments'] });
-        confirm({
-            title: 'Éxito',
-            message: 'El acta de devolución múltiple ha sido enviada al colaborador.',
-            type: 'success',
-            onConfirm: () => {}
-        });
+        if (!showWebexFailureModal(confirm, response.data)) {
+            confirm({
+                title: 'Éxito',
+                message: 'El acta de devolución múltiple ha sido enviada al colaborador por Webex.',
+                type: 'success',
+                onConfirm: () => {}
+            });
+        }
     } catch (error: any) {
         confirm({
             title: 'Error',
