@@ -173,6 +173,10 @@
   gap: 4px;
   padding: 16px 12px;
   flex: 1;
+  /* En pantallas bajas los links pueden exceder la altura: scroll interno
+     para que el pie con "cerrar sesión" nunca quede fuera de vista. */
+  overflow-y: auto;
+  min-height: 0;
 }
 
 .mobile-nav-link {
@@ -206,9 +210,11 @@
 
 /* ── Responsive breakpoints ──────────────────────── */
 @media (max-width: 768px) {
+  /* Solo se ocultan los iconos de la barra superior: los botones del drawer
+     (cerrar sesión y cerrar menú) deben seguir visibles en móvil. */
   .navbar-center,
-  .user-profile,
-  .btn-icon:not(.btn-hamburger) {
+  .top-navbar .user-profile,
+  .top-navbar .btn-icon:not(.btn-hamburger) {
     display: none;
   }
 

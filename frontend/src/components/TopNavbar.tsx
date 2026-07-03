@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { PackageSearch, Users, Activity, LogOut, Settings as SettingsIcon, Menu, X, FileText } from 'lucide-react';
 import { useAuth, Role } from '../context/AuthContext';
+import { APP_VERSION } from '../version';
 import './TopNavbar.css';
 
 export default function TopNavbar() {
@@ -15,8 +16,8 @@ export default function TopNavbar() {
     { path: '/settings', label: 'Administración', icon: <SettingsIcon size={20} />, roles: [Role.ADMINISTRADOR] },
     { path: '/collaborators', label: 'Colaboradores', icon: <Users size={20} />, roles: [Role.ADMINISTRADOR] },
     { path: '/assets', label: 'Catálogo', icon: <PackageSearch size={20} />, roles: [Role.ADMINISTRADOR] },
-    { path: '/maintenances', label: 'Mantenimiento', icon: <SettingsIcon size={20} />, roles: [Role.ADMINISTRADOR] },
-    { path: '/actas', label: 'Actas', icon: <FileText size={20} />, roles: [Role.ADMINISTRADOR] }
+    { path: '/maintenances', label: 'Mantenimiento', icon: <SettingsIcon size={20} />, roles: [Role.ADMINISTRADOR, Role.VISUALIZADOR] },
+    { path: '/actas', label: 'Actas', icon: <FileText size={20} />, roles: [Role.ADMINISTRADOR, Role.VISUALIZADOR] }
   ];
 
   const navLinks = allNavLinks.filter(link => user && link.roles.includes(user.role as Role));
@@ -35,6 +36,12 @@ export default function TopNavbar() {
           <Link to="/" className="navbar-logo" onClick={closeMenu}>
             <span className="logo-icon">I</span>
             <span className="logo-text">Ikusi<span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>ITAM</span></span>
+            <span
+              title="Versión del sistema — detalle de cambios en Administración"
+              style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', border: '1px solid var(--border-glass)', borderRadius: '10px', padding: '1px 8px', marginLeft: '8px', alignSelf: 'center' }}
+            >
+              v{APP_VERSION}
+            </span>
           </Link>
         </div>
 

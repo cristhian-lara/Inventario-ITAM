@@ -1,5 +1,12 @@
 export interface AssignmentDocumentData {
     actType: 'ASSIGNMENT' | 'RETURN';
+    /**
+     * Solo aplica cuando actType === 'RETURN':
+     * - 'PAZ_Y_SALVO': el colaborador devuelve TODOS sus activos (no le queda ninguno).
+     * - 'DEVOLUCION': devolución parcial (le queda al menos un activo asignado).
+     * Si se omite, se asume PAZ_Y_SALVO (comportamiento histórico).
+     */
+    returnMode?: 'PAZ_Y_SALVO' | 'DEVOLUCION';
     assignmentId: string;
     collaboratorName: string;
     collaboratorEmail: string;
@@ -19,6 +26,8 @@ export interface AssignmentDocumentData {
         assetRam: string;
         assetStorage: string;
         requiresPlacaIkusi?: boolean;
+        /** Fecha en que se registró la asignación del activo (startDate). Si se omite, se usa data.timestamp. */
+        assignmentDate?: Date | string;
     }[];
     ipAddress: string;
     timestamp: Date;

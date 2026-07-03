@@ -27,12 +27,18 @@ export class AssignmentUseCases {
             }
         }
 
+        // Un string 'YYYY-MM-DD' se parsea como medianoche UTC, que en Bogotá (UTC-5)
+        // corresponde al día ANTERIOR. Se ancla a mediodía local para conservar el día elegido.
+        const parsedStartDate = startDate
+            ? (/^\d{4}-\d{2}-\d{2}$/.test(startDate) ? new Date(`${startDate}T12:00:00`) : new Date(startDate))
+            : new Date();
+
         const assignment = new Assignment({
             id,
             assetId,
             collaboratorId,
             status: 'PENDING_ACCEPTANCE',
-            startDate: startDate ? new Date(startDate) : new Date()
+            startDate: parsedStartDate
         });
 
         // La función inyectada para generar el token usa JWT real

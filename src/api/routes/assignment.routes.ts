@@ -53,6 +53,19 @@ function notificationMessage(result: NotificationResult, email: string, successM
     return 'El proceso quedó registrado, pero la notificación de Webex no pudo enviarse. El enlace de firma sigue vigente: usa "Reenviar enlace" para intentarlo de nuevo.';
 }
 
+/**
+ * Determina el tipo de acta de devolución:
+ * - PAZ_Y_SALVO: al colaborador no le queda ningún activo tras devolver los indicados.
+ * - DEVOLUCION: devolución parcial (conserva al menos un activo asignado o en proceso).
+ */
+async function resolveReturnMode(collaboratorId: string, excludeAssignmentIds: string[]): Promise<'PAZ_Y_SALVO' | 'DEVOLUCION'> {
+    const allActive = await assignmentRepo.findAllActive();
+    const remaining = allActive.filter(a =>
+        a.collaboratorId === collaboratorId && !excludeAssignmentIds.includes(a.id)
+    );
+    return remaining.length === 0 ? 'PAZ_Y_SALVO' : 'DEVOLUCION';
+}
+
 async function getOtherAssignedAssets(collaboratorId: string, currentAssignmentId: string) {
     const allAssignments = await assignmentRepo.findAllActive();
     const otherAssignments = allAssignments.filter(a => a.collaboratorId === collaboratorId && a.id !== currentAssignmentId && a.status === 'ACCEPTED');
@@ -98,10 +111,14 @@ async function generateDraftPdf(assignment: any, actType: 'ASSIGNMENT' | 'RETURN
     }
 
     const otherAssignedAssets = await getOtherAssignedAssets(assignment.collaboratorId, assignment.id);
+    const returnMode = actType === 'RETURN'
+        ? await resolveReturnMode(assignment.collaboratorId, [assignment.id])
+        : undefined;
 
     return await documentService.generateAssignmentAct({
         otherAssignedAssets,
         actType,
+        returnMode,
         assignmentId: assignment.id,
         collaboratorName: realColName,
         collaboratorEmail: realColEmail,
@@ -110,6 +127,7 @@ async function generateDraftPdf(assignment: any, actType: 'ASSIGNMENT' | 'RETURN
         sede: sede,
         assets: [{
             assetId: assignment.assetId,
+            assignmentDate: assignment.startDate,
             assetSerial: asset ? (asset.serial || 'N/A') : 'N/A',
             assetType: category ? category.name : 'Laptop',
             assetBrand: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.marca || asset.dynamicAttributes.Marca || asset.dynamicAttributes.brand || asset.dynamicAttributes.Brand) || 'Generico' : 'Generico',
@@ -326,10 +344,12 @@ router.post('/:id/force-return', async (req, res) => {
         }
 
         const otherAssignedAssets = await getOtherAssignedAssets(returnedAssignment.collaboratorId, returnedAssignment.id);
+        const returnMode = await resolveReturnMode(returnedAssignment.collaboratorId, [returnedAssignment.id]);
 
         const documentPath = await documentService.generateAssignmentAct({
             otherAssignedAssets,
             actType: 'RETURN',
+            returnMode,
             assignmentId: returnedAssignment.id,
             collaboratorName: realColName,
             collaboratorEmail: realColEmail,
@@ -338,6 +358,7 @@ router.post('/:id/force-return', async (req, res) => {
             sede: sede,
             assets: [{
             assetId: returnedAssignment.assetId,
+            assignmentDate: returnedAssignment.startDate,
             assetSerial: asset ? (asset.serial || 'N/A') : 'N/A',
             assetType: category ? category.name : 'Laptop',
             assetBrand: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.marca || asset.dynamicAttributes.Marca || asset.dynamicAttributes.brand || asset.dynamicAttributes.Brand) || 'Generico' : 'Generico',
@@ -403,10 +424,12 @@ router.post('/force-return-by-asset/:assetId', async (req, res) => {
         }
 
         const otherAssignedAssets = await getOtherAssignedAssets(returnedAssignment.collaboratorId, returnedAssignment.id);
+        const returnMode = await resolveReturnMode(returnedAssignment.collaboratorId, [returnedAssignment.id]);
 
         const documentPath = await documentService.generateAssignmentAct({
             otherAssignedAssets,
             actType: 'RETURN',
+            returnMode,
             assignmentId: returnedAssignment.id,
             collaboratorName: realColName,
             collaboratorEmail: realColEmail,
@@ -416,6 +439,7 @@ router.post('/force-return-by-asset/:assetId', async (req, res) => {
             returnReason: reason,
             assets: [{
             assetId: returnedAssignment.assetId,
+            assignmentDate: returnedAssignment.startDate,
             assetSerial: asset ? (asset.serial || 'N/A') : 'N/A',
             assetType: category ? category.name : 'Laptop',
             assetBrand: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.marca || asset.dynamicAttributes.Marca || asset.dynamicAttributes.brand || asset.dynamicAttributes.Brand) || 'Generico' : 'Generico',
@@ -496,6 +520,7 @@ router.post('/force-accept-by-asset/:assetId', async (req, res) => {
             returnReason: reason,
             assets: [{
             assetId: acceptedAssignment.assetId,
+            assignmentDate: acceptedAssignment.startDate,
             assetSerial: asset ? (asset.serial || 'N/A') : 'N/A',
             assetType: category ? category.name : 'Laptop',
             assetBrand: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.marca || asset.dynamicAttributes.Marca || asset.dynamicAttributes.brand || asset.dynamicAttributes.Brand) || 'Generico' : 'Generico',
@@ -570,10 +595,12 @@ router.get('/:id/confirm-return', async (req, res) => {
         }
 
         const otherAssignedAssets = await getOtherAssignedAssets(returnedAssignment.collaboratorId, returnedAssignment.id);
+        const returnMode = await resolveReturnMode(returnedAssignment.collaboratorId, [returnedAssignment.id]);
 
         const documentPath = await documentService.generateAssignmentAct({
             otherAssignedAssets,
             actType: 'RETURN',
+            returnMode,
             assignmentId: returnedAssignment.id,
             collaboratorName: realColName,
             collaboratorEmail: realColEmail,
@@ -582,6 +609,7 @@ router.get('/:id/confirm-return', async (req, res) => {
             sede: sede,
             assets: [{
             assetId: returnedAssignment.assetId,
+            assignmentDate: returnedAssignment.startDate,
             assetSerial: asset ? (asset.serial || 'N/A') : 'N/A',
             assetType: category ? category.name : 'Laptop',
             assetBrand: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.marca || asset.dynamicAttributes.Marca || asset.dynamicAttributes.brand || asset.dynamicAttributes.Brand) || 'Generico' : 'Generico',
@@ -731,6 +759,7 @@ router.get('/:id/accept', async (req, res) => {
             sede: sede,
             assets: [{
             assetId: acceptedAssignment.assetId,
+            assignmentDate: acceptedAssignment.startDate,
             assetSerial: asset ? (asset.serial || 'N/A') : 'N/A',
             assetType: category ? category.name : 'Laptop',
             assetBrand: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.marca || asset.dynamicAttributes.Marca || asset.dynamicAttributes.brand || asset.dynamicAttributes.Brand) || 'Generico' : 'Generico',
@@ -898,6 +927,7 @@ router.post('/batch-return', async (req, res) => {
                 
                 assetsDetails.push({
                     assetId: assign.assetId,
+                    assignmentDate: assign.startDate,
                     assetSerial: asset ? (asset.serial || 'N/A') : 'N/A',
                     assetType: category ? category.name : 'Laptop',
                     assetBrand: asset?.dynamicAttributes?.marca || asset?.dynamicAttributes?.Marca || 'Generico',
@@ -927,6 +957,7 @@ router.post('/batch-return', async (req, res) => {
 
         const documentPath = await documentService.generateAssignmentAct({
             actType: 'RETURN',
+            returnMode: await resolveReturnMode(firstAssignment.collaboratorId, assignmentIds),
             assignmentId: `BATCH-${Date.now()}`,
             collaboratorName: collaborator?.name || 'N/A',
             collaboratorEmail: email,
@@ -981,6 +1012,7 @@ router.get('/batch-accept-return', async (req, res) => {
                 
                 assetsDetails.push({
                     assetId: assign.assetId,
+                    assignmentDate: assign.startDate,
                     assetSerial: asset ? (asset.serial || 'N/A') : 'N/A',
                     assetType: category ? category.name : 'Laptop',
                     assetBrand: asset?.dynamicAttributes?.marca || asset?.dynamicAttributes?.Marca || 'Generico',
@@ -1013,6 +1045,7 @@ router.get('/batch-accept-return', async (req, res) => {
 
             documentPath = await documentService.generateAssignmentAct({
                 actType: 'RETURN',
+                returnMode: await resolveReturnMode(firstAssignment.collaboratorId, assignments.map(a => a.id)),
                 assignmentId: `BATCH-${Date.now()}`,
                 collaboratorName: collaborator?.name || 'N/A',
                 collaboratorEmail: collaborator?.email || 'N/A',

@@ -33,10 +33,10 @@ function App() {
           <Route path="/collaborators" element={<ProtectedRoute allowedRoles={[Role.ADMINISTRADOR]}><Collaborators /></ProtectedRoute>} />
           <Route path="/collaborators/:id" element={<ProtectedRoute allowedRoles={[Role.ADMINISTRADOR]}><CollaboratorProfile /></ProtectedRoute>} />
           
-          <Route path="/maintenances" element={<ProtectedRoute allowedRoles={[Role.ADMINISTRADOR]}><Maintenances /></ProtectedRoute>} />
+          <Route path="/maintenances" element={<ProtectedRoute allowedRoles={[Role.ADMINISTRADOR, Role.VISUALIZADOR]}><Maintenances /></ProtectedRoute>} />
           <Route path="/maintenances/sign/:token" element={<MaintenanceSign />} />
           
-          <Route path="/actas" element={<ProtectedRoute allowedRoles={[Role.ADMINISTRADOR]}><Actas /></ProtectedRoute>} />
+          <Route path="/actas" element={<ProtectedRoute allowedRoles={[Role.ADMINISTRADOR, Role.VISUALIZADOR]}><Actas /></ProtectedRoute>} />
           
           <Route path="/settings" element={<ProtectedRoute allowedRoles={[Role.ADMINISTRADOR]}><Settings /></ProtectedRoute>} />
         </Routes>

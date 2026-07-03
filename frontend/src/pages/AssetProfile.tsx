@@ -36,7 +36,20 @@ interface Asset {
     purchaseDate?: string;
     warrantyMonths?: number;
     depreciationYears?: number;
+    purchasePrice?: number;
 }
+
+// Formatea fechas evitando el corrimiento de un día: si el valor es tipo
+// 'YYYY-MM-DD' (sin hora), new Date() lo interpreta como medianoche UTC,
+// que en Bogotá (UTC-5) cae en el día anterior.
+const formatDateSafe = (value: string): string => {
+    const datePart = value.split('T')[0];
+    if (/^\d{4}-\d{2}-\d{2}$/.test(datePart) && !value.includes('T')) {
+        const [y, m, d] = datePart.split('-');
+        return `${d}/${m}/${y}`;
+    }
+    return new Date(value).toLocaleDateString('es-CO');
+};
 
 interface Category {
     id: number;
@@ -364,25 +377,28 @@ export default function AssetProfile() {
                             </div>
                         )}
 
-                        {asset.purchasePrice && (
-                            <div className="asset-detail-item">
-                                <Tag size={16} color="var(--ikusi-green)" style={{ flexShrink: 0, marginTop: '2px' }} />
-                                <div className="asset-detail-block">
-                                    <span className="detail-label">Valor de Compra</span>
-                                    <span className="detail-value">{new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP' }).format(asset.purchasePrice)}</span>
+                        {/* Valor de compra: mismo fallback que el cálculo de depreciación
+                            (algunos activos importados lo tienen en los atributos dinámicos) */}
+                        {(() => {
+                            let precio = asset.purchasePrice || 0;
+                            if (!precio) {
+                                const pKey = Object.keys(specs).find(k => k.toUpperCase().includes('PRECIO'));
+                                if (pKey && specs[pKey]) precio = parseFloat(String(specs[pKey]).replace(/[^0-9.-]+/g, ''));
+                            }
+                            return (
+                                <div className="asset-detail-item">
+                                    <Tag size={16} color="var(--ikusi-green)" style={{ flexShrink: 0, marginTop: '2px' }} />
+                                    <div className="asset-detail-block">
+                                        <span className="detail-label">Valor de Compra</span>
+                                        <span className="detail-value" style={!precio ? { color: 'var(--text-muted)', fontStyle: 'italic' } : undefined}>
+                                            {precio
+                                                ? new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP' }).format(precio)
+                                                : 'No registrado'}
+                                        </span>
+                                    </div>
                                 </div>
-                            </div>
-                        )}
-
-                        {asset.depreciationYears && (
-                            <div className="asset-detail-item">
-                                <Activity size={16} color="var(--ikusi-green)" style={{ flexShrink: 0, marginTop: '2px' }} />
-                                <div className="asset-detail-block">
-                                    <span className="detail-label">Depreciación</span>
-                                    <span className="detail-value">{asset.depreciationYears} años</span>
-                                </div>
-                            </div>
-                        )}
+                            );
+                        })()}
 
                         {/* Stats de auditoría */}
                         <div style={{ marginTop: '8px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', textAlign: 'center' }}>
@@ -662,12 +678,12 @@ export default function AssetProfile() {
                                         <div className="assignment-dates">
                                             <div className="assignment-date-row">
                                                 <Calendar size={13} color="var(--ikusi-green)" />
-                                                <span>Desde: <strong>{new Date(a.startDate).toLocaleDateString('es-CO')}</strong></span>
+                                                <span>Desde: <strong>{formatDateSafe(a.startDate)}</strong></span>
                                             </div>
                                             {a.endDate ? (
                                                 <div className="assignment-date-row assignment-status-returned">
                                                     <Clock size={13} />
-                                                    <span>Hasta: {new Date(a.endDate).toLocaleDateString('es-CO')}</span>
+                                                    <span>Hasta: {formatDateSafe(a.endDate)}</span>
                                                 </div>
                                             ) : (
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: 'var(--ikusi-green)', fontWeight: 600 }}>

@@ -15,13 +15,32 @@ export class PdfKitService implements IDocumentService {
         }
     }
 
+    /**
+     * Formatea una fecha como dd/mm/yyyy en zona Bogotá.
+     * Si recibe un string tipo 'YYYY-MM-DD' (fecha sin hora) lo formatea
+     * directamente sin pasar por Date, para evitar el corrimiento de un día
+     * que produce el parseo UTC de medianoche en zonas UTC-5.
+     */
+    private formatDateOnly(value: Date | string): string {
+        if (typeof value === 'string') {
+            const datePart = value.split('T')[0];
+            const [y, m, d] = datePart.split('-');
+            if (y && m && d) return `${d}/${m}/${y}`;
+        }
+        return new Date(value).toLocaleDateString('es-CO', { timeZone: 'America/Bogota', year: 'numeric', month: '2-digit', day: '2-digit' });
+    }
+
     async generateAssignmentAct(data: AssignmentDocumentData): Promise<string> {
         return new Promise(async (resolve, reject) => {
             try {
                 const doc = new PDFDocument({ margins: { top: 50, bottom: 180, left: 70, right: 50 }, size: 'A4', bufferPages: true });
-                const prefix = data.actType === 'RETURN' ? 'Paz y Salvo' : 'Acta de Asignacion';
+                // Nomenclatura: "Asignación Nombre Apellido", "Devolución Nombre Apellido" (parcial)
+                // o "Paz y Salvo Nombre Apellido" (devuelve todos sus activos).
+                const prefix = data.actType === 'RETURN'
+                    ? (data.returnMode === 'DEVOLUCION' ? 'Devolución' : 'Paz y Salvo')
+                    : 'Asignación';
                 const safeName = data.collaboratorName ? data.collaboratorName.replace(/[<>:"/\\|?*]+/g, '').trim() : 'Desconocido';
-                const fileName = `${prefix} - ${safeName} - ${data.assignmentId}.pdf`;
+                const fileName = `${prefix} ${safeName} - ${data.assignmentId}.pdf`;
                 const filePath = path.join(this.storageDir, fileName);
                 
                 const stream = fs.createWriteStream(filePath);
@@ -81,7 +100,8 @@ export class PdfKitService implements IDocumentService {
                         marca: asset.assetBrand || 'Generico',
                         serial: asset.assetSerial || 'N/A',
                         modelo: asset.assetModel || 'Generico',
-                        fecha: data.timestamp.toLocaleDateString('es-CO', { timeZone: 'America/Bogota', year: 'numeric', month: '2-digit', day: '2-digit' })
+                        // Fecha real de la asignación registrada; el timestamp de firma solo como último recurso
+                        fecha: this.formatDateOnly(asset.assignmentDate ?? data.timestamp)
                     }))
                 };
 
@@ -212,7 +232,7 @@ Este documento cancela la responsiva firmada en el momento de la asignación ori
                 // Initialize PDFDocument from pdfkit-table with bufferPages and larger bottom margin for footer
                 const doc = new PDFDocument({ margins: { top: 50, bottom: 120, left: 50, right: 50 }, size: 'A4', bufferPages: true });
                 const safeName = record.collaboratorInTurnName ? record.collaboratorInTurnName.replace(/[<>:"/\\|?*]+/g, '').trim() : 'Desconocido';
-                const fileName = `Acta de Mantenimiento - ${safeName} - ${record.id}.pdf`;
+                const fileName = `Mantenimiento ${safeName} - ${record.id}.pdf`;
                 const filePath = path.join(this.storageDir, fileName);
                 
                 const stream = fs.createWriteStream(filePath);

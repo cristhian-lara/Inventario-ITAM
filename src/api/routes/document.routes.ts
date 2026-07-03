@@ -31,14 +31,14 @@ documentRouter.get('/', (req, res) => {
                 date: stats.mtime.toISOString(),
             };
 
-            // Formato nuevo: "Acta de Asignacion - Nombre - ID.pdf"
-            if (file.startsWith('Acta de Asignacion -') || file.startsWith('acta-')) {
+            // Formato actual: "Asignación Nombre - ID.pdf" | Anteriores: "Acta de Asignacion - ...", "acta-..."
+            if (file.startsWith('Asignación ') || file.startsWith('Asignacion ') || file.startsWith('Acta de Asignacion -') || file.startsWith('acta-')) {
                 result.assignments.push(fileData);
-            // Formato nuevo: "Paz y Salvo - Nombre - ID.pdf"
-            } else if (file.startsWith('Paz y Salvo -') || file.startsWith('pazysalvo-')) {
+            // Formato actual: "Devolución Nombre - ID.pdf" (parcial) o "Paz y Salvo Nombre - ID.pdf" (total)
+            } else if (file.startsWith('Devolución ') || file.startsWith('Devolucion ') || file.startsWith('Paz y Salvo') || file.startsWith('pazysalvo-')) {
                 result.returns.push(fileData);
-            // Formato nuevo: "Acta de Mantenimiento - Nombre - ID.pdf"
-            } else if (file.startsWith('Acta de Mantenimiento -') || file.startsWith('acta_mantenimiento_')) {
+            // Formato actual: "Mantenimiento Nombre - ID.pdf" | Anteriores: "Acta de Mantenimiento - ...", "acta_mantenimiento_..."
+            } else if (file.startsWith('Mantenimiento ') || file.startsWith('Acta de Mantenimiento -') || file.startsWith('acta_mantenimiento_')) {
                 result.maintenances.push(fileData);
             }
         }

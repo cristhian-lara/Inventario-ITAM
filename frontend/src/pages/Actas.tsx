@@ -46,7 +46,18 @@ export default function Actas() {
   }
 
   const formatFilename = (filename: string) => {
-    // 0. Nuevos formatos limpios (ej: "Paz y Salvo - Angie Lara - BATCH-123.pdf")
+    // 0a. Formato actual: "Asignación Nombre - ID.pdf", "Devolución Nombre - ID.pdf",
+    //     "Paz y Salvo Nombre - ID.pdf", "Mantenimiento Nombre - ID.pdf"
+    if (/^(Asignación|Asignacion|Devolución|Devolucion|Paz y Salvo|Mantenimiento) /.test(filename)) {
+      const parts = filename.replace('.pdf', '').split(' - ');
+      if (parts.length >= 2) {
+        parts.pop(); // Removemos el ID del final
+        return parts.join(' - ');
+      }
+      return filename.replace('.pdf', '');
+    }
+
+    // 0b. Formatos anteriores (ej: "Paz y Salvo - Angie Lara - BATCH-123.pdf")
     if (filename.startsWith('Acta de Asignacion -') || filename.startsWith('Paz y Salvo -') || filename.startsWith('Acta de Mantenimiento -')) {
       const parts = filename.replace('.pdf', '').split(' - ');
       if (parts.length >= 3) {

@@ -25,7 +25,7 @@ export class CatalogUseCases {
         return updatedCategory;
     }
 
-    async createAsset(id: string, categoryId: number, serial: string, dynamicAttributes: Record<string, any>, purchaseDate?: Date, warrantyMonths?: number, depreciationYears?: number): Promise<Asset> {
+    async createAsset(id: string, categoryId: number, serial: string, dynamicAttributes: Record<string, any>, purchaseDate?: Date, warrantyMonths?: number, depreciationYears?: number, purchasePrice?: number): Promise<Asset> {
         const category = await this.repository.getCategoryById(categoryId);
         if (!category) {
             throw new Error(`La categoría con ID ${categoryId} no existe.`);
@@ -48,7 +48,8 @@ export class CatalogUseCases {
             dynamicAttributes,
             purchaseDate,
             warrantyMonths,
-            depreciationYears
+            depreciationYears,
+            purchasePrice
         }, category);
 
         await this.repository.saveAsset(asset);

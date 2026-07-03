@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import ReactDOM from 'react-dom';
 import { MoreVertical } from 'lucide-react';
 import './ActionMenu.css';
@@ -48,6 +48,25 @@ export default function ActionMenu({ children }: ActionMenuProps) {
     }
     setIsOpen(prev => !prev);
   };
+
+  // Si el menú no cabe hacia abajo (final de la página), se despliega hacia arriba.
+  // useLayoutEffect corre antes del pintado, así que no hay parpadeo.
+  useLayoutEffect(() => {
+    if (isOpen && dropdownRef.current && triggerRef.current) {
+      const menuHeight = dropdownRef.current.offsetHeight;
+      const rect = triggerRef.current.getBoundingClientRect();
+      const overflowsBottom = rect.bottom + 4 + menuHeight > window.innerHeight;
+      const fitsAbove = rect.top - menuHeight - 4 > 0;
+      if (overflowsBottom && fitsAbove) {
+        setDropdownStyle({
+          position: 'fixed',
+          top: rect.top - menuHeight - 4,
+          right: window.innerWidth - rect.right,
+          zIndex: 9999,
+        });
+      }
+    }
+  }, [isOpen]);
 
   return (
     <div className="action-menu-container">

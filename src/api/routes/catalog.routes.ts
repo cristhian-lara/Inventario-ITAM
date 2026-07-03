@@ -84,7 +84,8 @@ router.post('/assets', async (req, res) => {
             dynamicAttributes,
             purchaseDate ? new Date(`${purchaseDate.split('T')[0]}T12:00:00`) : undefined,
             warrantyMonths,
-            depreciationYears
+            depreciationYears,
+            purchasePrice !== undefined && purchasePrice !== null && purchasePrice !== '' ? Number(purchasePrice) : undefined
         );
         res.status(201).json({
             id: asset.id,

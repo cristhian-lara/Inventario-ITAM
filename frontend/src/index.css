@@ -188,6 +188,16 @@ body {
 
   .main-content {
     padding: 20px 16px;
+    /* Evita que contenido ancho genere scroll horizontal a nivel de página:
+       cada tabla scrollea dentro de su propio contenedor (.table-responsive) */
+    overflow-x: hidden;
+  }
+
+  /* Las tablas anchas scrollean dentro de su contenedor con altura acotada,
+     así la barra horizontal queda a la vista sin bajar toda la página */
+  .table-responsive {
+    max-height: 70vh;
+    overflow-y: auto;
   }
 
   .form-row,

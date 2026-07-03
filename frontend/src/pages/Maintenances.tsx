@@ -5,6 +5,7 @@ import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveCo
 import { Link } from 'react-router-dom';
 import ActionMenu from '../components/ActionMenu';
 import { useConfirm } from '../context/ConfirmContext';
+import { useAuth, Role } from '../context/AuthContext';
 import { showWebexFailureModal } from '../utils/notificationNotice';
 import './Maintenances.css';
 import { API_URL } from '../config';
@@ -47,6 +48,9 @@ const Maintenances: React.FC = () => {
   const [viewMode, setViewMode] = useState<'general' | 'auditoria' | 'balance' | 'preventive'>('general');
   const [coverageFilter, setCoverageFilter] = useState<'all' | 'completed' | 'scheduled' | 'pending'>('all');
   const { confirm } = useConfirm();
+  const { user } = useAuth();
+  // Rol VISUALIZADOR (auditores): solo lectura y filtros — sin programar ni ejecutar acciones
+  const isAdmin = user?.role === Role.ADMINISTRADOR;
 
   const [showModal, setShowModal] = useState(false);
   const [modalMode, setModalMode] = useState<'create' | 'start' | 'complete' | 'view' | 'forceSign'>('create');
@@ -463,7 +467,7 @@ const Maintenances: React.FC = () => {
         </div>
         <div className="header-actions" style={{ display: 'flex', gap: '10px' }}>
           <button className="btn-glass" onClick={exportToCSV}>Exportar CSV</button>
-          <button className="btn-primary" onClick={() => openModal('create')}><Plus size={18} /> Programar</button>
+          {isAdmin && <button className="btn-primary" onClick={() => openModal('create')}><Plus size={18} /> Programar</button>}
         </div>
       </header>
 
@@ -745,7 +749,7 @@ const Maintenances: React.FC = () => {
                         </td>
                         <td>
                           {m?.isDummy ? (
-                            <button className="btn-action" style={{ borderColor: '#3b82f6', color: '#3b82f6' }} title="Programar Mantenimiento" onClick={() => {
+                            isAdmin && <button className="btn-action" style={{ borderColor: '#3b82f6', color: '#3b82f6' }} title="Programar Mantenimiento" onClick={() => {
                                const asset = assets?.find(a => a.id === m?.assetId);
                                const displayName = asset ? `${asset.id} - ${asset.dynamicAttributes?.HOSTNAME || asset.dynamicAttributes?.Hostname || asset.dynamicAttributes?.hostname || 'Sin Hostname'}` : m.assetId;
                                setFormData({ ...formData, assetId: m.assetId });
@@ -759,17 +763,17 @@ const Maintenances: React.FC = () => {
                               <button className="btn-action" style={{ borderColor: '#8b5cf6', color: '#8b5cf6' }} title="Ver Historial" onClick={() => openModal('view', m)}>
                                 <Clock size={16} />
                               </button>
-                              {m.status === 'SCHEDULED' && (
+                              {isAdmin && m.status === 'SCHEDULED' && (
                                 <button className="btn-action" style={{ borderColor: '#eab308', color: '#eab308' }} title="Iniciar Mantenimiento" onClick={() => openModal('start', m)}>
                                   <Wrench size={16} />
                                 </button>
                               )}
-                              {m.status === 'IN_PROGRESS' && (
+                              {isAdmin && m.status === 'IN_PROGRESS' && (
                                 <button className="btn-action" style={{ borderColor: '#22c55e', color: '#22c55e' }} title="Completar Mantenimiento" onClick={() => openModal('complete', m)}>
                                   <CheckCircle size={16} />
                                 </button>
                               )}
-                              {m?.status === 'COMPLETED' && !m?.signedAt && !m?.pdfUrl && (
+                              {isAdmin && m?.status === 'COMPLETED' && !m?.signedAt && !m?.pdfUrl && (
                                 <button 
                                   className="btn-action" 
                                   style={{ borderColor: '#ec4899', color: '#ec4899', opacity: forceSignMutation.isPending ? 0.5 : 1 }} 
@@ -780,15 +784,15 @@ const Maintenances: React.FC = () => {
                                   <Edit3 size={16} />
                                 </button>
                               )}
-                              {m?.status === 'COMPLETED' && (
-                                <button 
-                                  className="btn-action" 
-                                  style={{ 
-                                    borderColor: (m?.signedAt || m?.pdfUrl) ? '#94a3b8' : '#3b82f6', 
-                                    color: (m?.signedAt || m?.pdfUrl) ? '#94a3b8' : '#3b82f6', 
+                              {isAdmin && m?.status === 'COMPLETED' && (
+                                <button
+                                  className="btn-action"
+                                  style={{
+                                    borderColor: (m?.signedAt || m?.pdfUrl) ? '#94a3b8' : '#3b82f6',
+                                    color: (m?.signedAt || m?.pdfUrl) ? '#94a3b8' : '#3b82f6',
                                     opacity: (requestSignatureMutation.isPending || m?.signedAt || m?.pdfUrl) ? 0.5 : 1,
                                     cursor: (m?.signedAt || m?.pdfUrl) ? 'not-allowed' : 'pointer'
-                                  }} 
+                                  }}
                                   title={(m?.signedAt || m?.pdfUrl) ? "Mantenimiento ya firmado" : "Solicitar firma de mantenimiento"} 
                                   onClick={() => {
                                     if (m?.signedAt || m?.pdfUrl) return;
