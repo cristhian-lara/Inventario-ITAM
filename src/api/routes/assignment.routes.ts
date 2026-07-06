@@ -88,7 +88,12 @@ async function getOtherAssignedAssets(collaboratorId: string, currentAssignmentI
     return otherAssignedAssets;
 }
 
-async function generateDraftPdf(assignment: any, actType: 'ASSIGNMENT' | 'RETURN', fallbackName?: string): Promise<string> {
+async function generateDraftPdf(
+    assignment: any,
+    actType: 'ASSIGNMENT' | 'RETURN',
+    fallbackName?: string,
+    overrides?: { ipAddress?: string; isForcedSignature?: boolean; adminApproval?: { approvedBy: string; approvedAt: Date | string; note?: string } }
+): Promise<string> {
     const asset = await catalogUseCases.getAssetById(assignment.assetId);
     const allCategories = await catalogUseCases.getAllCategories();
     const category = asset ? allCategories.find(c => c.id === asset.categoryId) : null;
@@ -140,10 +145,11 @@ async function generateDraftPdf(assignment: any, actType: 'ASSIGNMENT' | 'RETURN
             assetStorage: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.storage || asset.dynamicAttributes.Storage || asset.dynamicAttributes.Almacenamiento || asset.dynamicAttributes.Disco) || 'N/A' : 'N/A',
             requiresPlacaIkusi: typeof requiresPlaca !== 'undefined' ? requiresPlaca : true
         }],
-        ipAddress: 'PENDIENTE DE FIRMA',
+        ipAddress: overrides?.ipAddress ?? 'PENDIENTE DE FIRMA',
         timestamp: new Date(),
-        isForcedSignature: false,
-        signatureEmail: realColEmail
+        isForcedSignature: overrides?.isForcedSignature ?? false,
+        signatureEmail: realColEmail,
+        adminApproval: overrides?.adminApproval
     });
 }
 
@@ -251,6 +257,45 @@ router.post('/return-by-asset/:assetId', async (req, res) => {
             notificationSent: notification.sent,
             accountNotFound: notification.accountNotFound,
             notificationError: notification.error
+        });
+    } catch (error: any) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Visto bueno del administrador sobre una devolución firmada
+router.post('/:id/approve-return', async (req, res) => {
+    try {
+        const { note } = req.body || {};
+        const approvedBy = (req as any).user?.username || 'Administrador TI';
+
+        const assignment = await assignmentUseCases.approveReturn(req.params.id, approvedBy, note);
+
+        // Regenerar el acta de devolución incluyendo el visto bueno.
+        // Se conserva la evidencia de firma original (metadata almacenada).
+        const collaborator = await collaboratorRepo.findById(assignment.collaboratorId);
+        const signedIp = assignment.signatureMetadata?.ipAddress || 'Firma registrada';
+        const wasForced = typeof signedIp === 'string' && signedIp.includes('Firma forzada');
+        const documentPath = await generateDraftPdf(assignment, 'RETURN', collaborator?.name, {
+            ipAddress: signedIp,
+            isForcedSignature: wasForced,
+            adminApproval: assignment.adminApproval
+        });
+        await assignmentUseCases.updateDocumentPath(assignment.id, documentPath);
+
+        await collaboratorRepo.saveHistory(new CollaboratorHistory(
+            uuidv4(),
+            assignment.collaboratorId,
+            'ASSET_RETURNED' as any,
+            new Date(),
+            `Visto bueno de TI sobre la devolución del activo ${assignment.assetId} (por ${approvedBy})${note ? `: ${note}` : ''}`
+        ));
+
+        res.json({
+            message: 'Visto bueno registrado y acta actualizada.',
+            assignmentId: assignment.id,
+            adminApproval: assignment.adminApproval,
+            documentPath
         });
     } catch (error: any) {
         res.status(400).json({ error: error.message });
@@ -894,7 +939,8 @@ router.get('/asset/:assetId/history', async (req, res) => {
                 status: a.status,
                 startDate: a.start_date,
                 endDate: a.end_date,
-                documentPath: a.document_path || null
+                documentPath: a.document_path || null,
+                adminApproval: a.admin_approval || null
             };
         }));
 

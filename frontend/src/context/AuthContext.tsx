@@ -1,4 +1,24 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import axios from 'axios';
+
+// El backend valida el token en cada petición (apiGuard): se adjunta globalmente.
+const storedToken = localStorage.getItem('token');
+if (storedToken) {
+    axios.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
+}
+
+// Sesión expirada o token inválido (401): se limpia la sesión y se vuelve al login.
+axios.interceptors.response.use(
+    response => response,
+    error => {
+        if (error.response?.status === 401 && !window.location.pathname.startsWith('/login')) {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.href = '/login';
+        }
+        return Promise.reject(error);
+    }
+);
 
 export enum Role {
     ADMINISTRADOR = 'ADMINISTRADOR',
@@ -33,6 +53,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setUser(newUser);
         localStorage.setItem('token', newToken);
         localStorage.setItem('user', JSON.stringify(newUser));
+        axios.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
     };
 
     const logout = () => {
@@ -40,6 +61,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setUser(null);
         localStorage.removeItem('token');
         localStorage.removeItem('user');
+        delete axios.defaults.headers.common['Authorization'];
     };
 
     return (

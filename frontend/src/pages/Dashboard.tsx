@@ -36,7 +36,7 @@ const STATUS_LABELS: Record<string, string> = {
   AVAILABLE: 'Disponible',
   IN_USE: 'En Uso',
   PENDING_ACCEPTANCE: 'Pend. Firma',
-  RETIRED: 'Retirado',
+  RETIRED: 'Baja',
   MAINTENANCE: 'Mantenimiento',
 };
 

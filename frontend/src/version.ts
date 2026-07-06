@@ -8,7 +8,7 @@
  *
  * Al publicar cambios: incrementa APP_VERSION y agrega una entrada al inicio de CHANGELOG.
  */
-export const APP_VERSION = '1.1.0';
+export const APP_VERSION = '1.2.0';
 
 export interface ChangelogEntry {
     version: string;
@@ -17,6 +17,17 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+    {
+        version: '1.2.0',
+        date: '2026-07-06',
+        changes: [
+            'Seguridad: el API valida sesión y rol en el backend (escrituras solo para administradores).',
+            'Seguridad: secreto JWT fuerte, CORS con lista de orígenes, rate limit en login y sesiones expiradas redirigen al login.',
+            'Recordatorio de mantenimiento por Webex disparado por el administrador (botón campana en Mantenimientos).',
+            'Visto bueno del administrador en devoluciones con nota; queda impreso en el acta y visible en la hoja de vida.',
+            'Flujo de baja de activos: motivo, autorización, referencia del reporte de borrado Blancco y notas; bloqueada si el activo está asignado o en mantenimiento.',
+        ],
+    },
     {
         version: '1.1.0',
         date: '2026-07-02',

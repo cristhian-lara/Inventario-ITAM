@@ -28,4 +28,8 @@ export class AssignmentOrmEntity {
 
     @Column({ nullable: true })
     document_path?: string;
+
+    /** Visto bueno del administrador tras la devolución: { approvedBy, approvedAt, note } */
+    @Column({ type: 'jsonb', nullable: true })
+    admin_approval?: any;
 }

@@ -35,6 +35,12 @@ export interface AssignmentDocumentData {
     returnReason?: string;
     isForcedSignature?: boolean;
     signatureEmail?: string;
+    /** Visto bueno del administrador (solo devoluciones): se imprime en el acta. */
+    adminApproval?: {
+        approvedBy: string;
+        approvedAt: Date | string;
+        note?: string;
+    };
     otherAssignedAssets?: {
         placa: string;
         host: string;

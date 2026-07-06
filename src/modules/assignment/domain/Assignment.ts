@@ -6,6 +6,12 @@ export interface SignatureMetadata {
     timestamp: Date;
 }
 
+export interface AdminApproval {
+    approvedBy: string;
+    approvedAt: Date | string;
+    note?: string;
+}
+
 export interface AssignmentProps {
     id: string;
     assetId: string;
@@ -16,6 +22,7 @@ export interface AssignmentProps {
     documentPath?: string;
     signatureToken?: string;
     signatureMetadata?: SignatureMetadata;
+    adminApproval?: AdminApproval;
 }
 
 export class Assignment {
@@ -36,6 +43,26 @@ export class Assignment {
     get endDate(): Date | undefined { return this.props.endDate; }
     get signatureToken(): string | undefined { return this.props.signatureToken; }
     get signatureMetadata(): SignatureMetadata | undefined { return this.props.signatureMetadata; }
+    get adminApproval(): AdminApproval | undefined { return this.props.adminApproval; }
+
+    /**
+     * Visto bueno del administrador sobre una devolución ya firmada:
+     * certifica el estado del equipo recibido y que el colaborador
+     * no tiene cuentas pendientes con TI.
+     */
+    public approveReturn(approvedBy: string, note?: string): void {
+        if (this.props.status !== 'RETURNED') {
+            throw new Error('Solo se puede dar visto bueno a devoluciones completadas.');
+        }
+        if (this.props.adminApproval) {
+            throw new Error('Esta devolución ya tiene visto bueno del administrador.');
+        }
+        this.props.adminApproval = {
+            approvedBy,
+            approvedAt: new Date(),
+            note
+        };
+    }
 
     /**
      * Genera un token y lo asocia a la asignación.

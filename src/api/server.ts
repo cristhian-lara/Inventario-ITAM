@@ -12,7 +12,19 @@ import path from 'path';
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(cors());
+// No exponer la tecnología del servidor
+app.disable('x-powered-by');
+
+// CORS con lista de orígenes permitidos (configurable por env).
+// Las peticiones sin cabecera Origin (curl, enlaces de firma, misma-origin vía proxy) se permiten.
+const allowedOrigins = (process.env.CORS_ORIGINS || 'http://localhost:5173,http://127.0.0.1:5173,http://192.168.2.58:5173')
+    .split(',').map(o => o.trim()).filter(Boolean);
+app.use(cors({
+    origin: (origin, callback) => {
+        if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+        callback(new Error('Origen no permitido por CORS'));
+    }
+}));
 app.use(express.json());
 
 app.get('/health', (req, res) => {
@@ -24,6 +36,11 @@ app.use('/pdfs', express.static(path.join(__dirname, '../../storage/pdfs')));
 
 import authRoutes from './routes/auth.routes';
 import { documentRouter } from './routes/document.routes';
+import { apiGuard } from './middlewares/apiGuard.middleware';
+
+// Guard global: autenticación para todo /api y escritura solo para ADMINISTRADOR
+// (los enlaces públicos de firma están exentos dentro del guard)
+app.use('/api', apiGuard);
 
 // Registrar Rutas
 app.use('/api/auth', authRoutes);

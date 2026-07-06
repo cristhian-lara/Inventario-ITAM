@@ -129,6 +129,19 @@ export class WebexNotificationService implements IMailerService {
         await this.sendMessage(to, markdown, documentPath);
     }
 
+    /**
+     * Recordatorio de mantenimiento próximo, disparado manualmente por el administrador.
+     */
+    async sendMaintenanceReminder(to: string, info: { assetId: string; hostname?: string; type: string; scheduledDate: Date | string; reason?: string }): Promise<void> {
+        const dateStr = typeof info.scheduledDate === 'string'
+            ? info.scheduledDate.split('T')[0].split('-').reverse().join('/')
+            : info.scheduledDate.toLocaleDateString('es-CO', { timeZone: 'America/Bogota' });
+        const typeStr = info.type === 'PREVENTIVE' ? 'Preventivo' : 'Correctivo';
+        const equipo = info.hostname ? `${info.assetId} (${info.hostname})` : info.assetId;
+        const markdown = `**🔔 Recordatorio: Mantenimiento Programado**\n\nHola, el departamento de TI te recuerda que tu equipo **${equipo}** tiene un mantenimiento **${typeStr}** programado para el **${dateStr}**.${info.reason ? `\n\n📋 Motivo: ${info.reason}` : ''}\n\nPor favor, ten el equipo disponible en la fecha indicada y respalda tu información importante con anticipación.`;
+        await this.sendMessage(to, markdown);
+    }
+
     async sendFinalPdfEmail(to: string, documentPath: string): Promise<void> {
         const markdown = `**✅ Copia de Acta Firmada**\n\nHola, adjuntamos la copia final en PDF de tu acta firmada. ¡Gracias!`;
         await this.sendMessage(to, markdown, documentPath);

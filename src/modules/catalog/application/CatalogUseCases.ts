@@ -56,6 +56,19 @@ export class CatalogUseCases {
         return asset;
     }
 
+    /**
+     * Baja definitiva de un activo con trazabilidad de auditoría
+     * (motivo, autorizado por, referencia del borrado Blancco).
+     */
+    async decommissionAsset(assetId: string, info: { reason: string; authorizedBy: string; blanccoReportId?: string; notes?: string }): Promise<Asset> {
+        const asset = await this.repository.getAssetById(assetId);
+        if (!asset) throw new Error(`El activo con ID ${assetId} no existe.`);
+
+        asset.decommission(info);
+        await this.repository.saveAsset(asset);
+        return asset;
+    }
+
     async getAllAssets(): Promise<Asset[]> {
         return this.repository.getAllAssets();
     }

@@ -131,6 +131,25 @@ router.put('/assets/:id', async (req, res) => {
     }
 });
 
+// Baja definitiva del activo (con referencia al borrado seguro en Blancco)
+router.post('/assets/:id/decommission', async (req, res) => {
+    try {
+        const { reason, blanccoReportId, notes } = req.body || {};
+        const authorizedBy = (req as any).user?.username || 'Administrador TI';
+
+        const asset = await catalogUseCases.decommissionAsset(req.params.id, { reason, authorizedBy, blanccoReportId, notes });
+
+        res.json({
+            message: 'Activo dado de baja correctamente.',
+            id: asset.id,
+            status: asset.status,
+            disposal: asset.disposal
+        });
+    } catch (error: any) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
 router.put('/assets/:id/status', async (req, res) => {
     try {
         const { status, reason } = req.body;
@@ -156,7 +175,8 @@ router.get('/assets', async (req, res) => {
         purchaseDate: a.purchaseDate,
         warrantyMonths: a.warrantyMonths,
         depreciationYears: a.depreciationYears,
-        purchasePrice: a.purchasePrice
+        purchasePrice: a.purchasePrice,
+        disposal: a.disposal
     })));
 });
 

@@ -17,7 +17,8 @@ export class PostgresAssignmentRepository implements IAssignmentRepository {
             end_date: assignment.endDate,
             signature_token: assignment.signatureToken,
             signature_metadata: assignment.signatureMetadata,
-            document_path: assignment.documentPath || undefined
+            document_path: assignment.documentPath || undefined,
+            admin_approval: assignment.adminApproval
         });
         await this.repo.save(ormEntity);
     }
@@ -35,7 +36,8 @@ export class PostgresAssignmentRepository implements IAssignmentRepository {
             endDate: ormEntity.end_date,
             signatureToken: ormEntity.signature_token,
             signatureMetadata: ormEntity.signature_metadata,
-            documentPath: ormEntity.document_path
+            documentPath: ormEntity.document_path,
+            adminApproval: ormEntity.admin_approval
         });
     }
 
@@ -52,7 +54,8 @@ export class PostgresAssignmentRepository implements IAssignmentRepository {
             endDate: ormEntity.end_date,
             signatureToken: ormEntity.signature_token,
             signatureMetadata: ormEntity.signature_metadata,
-            documentPath: ormEntity.document_path
+            documentPath: ormEntity.document_path,
+            adminApproval: ormEntity.admin_approval
         }));
     }
 
@@ -69,7 +72,8 @@ export class PostgresAssignmentRepository implements IAssignmentRepository {
             endDate: ormEntity.end_date,
             signatureToken: ormEntity.signature_token,
             signatureMetadata: ormEntity.signature_metadata,
-            documentPath: ormEntity.document_path
+            documentPath: ormEntity.document_path,
+            adminApproval: ormEntity.admin_approval
         });
     }
 
@@ -90,7 +94,8 @@ export class PostgresAssignmentRepository implements IAssignmentRepository {
             endDate: ormEntity.end_date,
             signatureToken: ormEntity.signature_token,
             signatureMetadata: ormEntity.signature_metadata,
-            documentPath: ormEntity.document_path
+            documentPath: ormEntity.document_path,
+            adminApproval: ormEntity.admin_approval
         });
     }
 }

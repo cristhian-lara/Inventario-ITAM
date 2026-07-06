@@ -81,6 +81,18 @@ export class AssignmentUseCases {
         return assignment;
     }
 
+    /**
+     * Visto bueno del administrador sobre una devolución firmada.
+     */
+    async approveReturn(assignmentId: string, approvedBy: string, note?: string): Promise<Assignment> {
+        const assignment = await this.repository.findById(assignmentId);
+        if (!assignment) throw new Error('Asignación no encontrada');
+
+        assignment.approveReturn(approvedBy, note);
+        await this.repository.save(assignment);
+        return assignment;
+    }
+
     async updateDocumentPath(assignmentId: string, path: string): Promise<void> {
         const assignment = await this.repository.findById(assignmentId);
         if (assignment) {

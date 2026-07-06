@@ -2,6 +2,15 @@ import { Category } from './Category';
 
 export type AssetStatus = 'AVAILABLE' | 'IN_USE' | 'IN_MAINTENANCE' | 'PENDING_INSPECTION' | 'RETIRED';
 
+export interface DisposalInfo {
+    reason: string;
+    disposalDate: Date | string;
+    authorizedBy: string;
+    /** Referencia del reporte de borrado seguro en Blancco */
+    blanccoReportId?: string;
+    notes?: string;
+}
+
 export interface AssetProps {
     id: string;
     categoryId: number;
@@ -12,6 +21,7 @@ export interface AssetProps {
     warrantyMonths?: number;
     depreciationYears?: number;
     purchasePrice?: number;
+    disposal?: DisposalInfo;
 }
 
 export class Asset {
@@ -38,6 +48,35 @@ export class Asset {
     get warrantyMonths(): number | undefined { return this.props.warrantyMonths; }
     get depreciationYears(): number | undefined { return this.props.depreciationYears; }
     get purchasePrice(): number | undefined { return this.props.purchasePrice; }
+    get disposal(): DisposalInfo | undefined { return this.props.disposal; }
+
+    /**
+     * Baja definitiva del activo: requiere motivo y quién autoriza.
+     * El borrado seguro de discos se realiza en Blancco; aquí se guarda
+     * la referencia del reporte para trazabilidad de auditoría.
+     */
+    public decommission(info: { reason: string; authorizedBy: string; blanccoReportId?: string; notes?: string }): void {
+        if (this.props.status === 'RETIRED') {
+            throw new Error('El activo ya se encuentra dado de baja.');
+        }
+        if (this.props.status === 'IN_USE' || this.props.status === 'PENDING_INSPECTION') {
+            throw new Error('No se puede dar de baja un activo asignado o en proceso de firma. Primero gestiona su devolución.');
+        }
+        if (this.props.status === 'IN_MAINTENANCE') {
+            throw new Error('No se puede dar de baja un activo en mantenimiento. Primero finaliza la intervención.');
+        }
+        if (!info.reason || !info.reason.trim()) {
+            throw new Error('El motivo de la baja es obligatorio.');
+        }
+        this.props.status = 'RETIRED';
+        this.props.disposal = {
+            reason: info.reason.trim(),
+            disposalDate: new Date(),
+            authorizedBy: info.authorizedBy,
+            blanccoReportId: info.blanccoReportId?.trim() || undefined,
+            notes: info.notes?.trim() || undefined
+        };
+    }
 
     public updateAttributes(newAttributes: Record<string, any>, category: Category): void {
         this.validateAgainstCategory(category, newAttributes);

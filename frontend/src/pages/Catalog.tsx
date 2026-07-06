@@ -46,6 +46,8 @@ export default function Catalog() {
   const [searchTerm, setSearchTerm] = useState('');
   const [retireModalAssetId, setRetireModalAssetId] = useState<string | null>(null);
   const [retireReason, setRetireReason] = useState('');
+  const [retireBlanccoId, setRetireBlanccoId] = useState('');
+  const [retireNotes, setRetireNotes] = useState('');
   
   // Modal de firma forzada (asignaciones)
   const [forceActionModal, setForceActionModal] = useState<{ type: 'accept' | 'return', assetId: string } | null>(null);
@@ -266,8 +268,8 @@ export default function Catalog() {
   });
 
   const retireAssetMutation = useMutation({
-    mutationFn: async ({ id, reason }: { id: string, reason: string }) => {
-      const response = await axios.put(`${API_URL}/api/catalog/assets/${id}/status`, { status: 'RETIRED', reason });
+    mutationFn: async ({ id, reason, blanccoReportId, notes }: { id: string, reason: string, blanccoReportId?: string, notes?: string }) => {
+      const response = await axios.post(`${API_URL}/api/catalog/assets/${id}/decommission`, { reason, blanccoReportId, notes });
       return response.data;
     },
     onSuccess: () => {
@@ -333,23 +335,6 @@ export default function Catalog() {
         setSuccessMsg(data?.message || 'Enlace de firma reenviado al colaborador por Webex.');
         setTimeout(() => setSuccessMsg(''), 8000);
       }
-    },
-    onError: (err: any) => {
-      setErrorMsg(err.response?.data?.error || err.message);
-      setTimeout(() => setErrorMsg(''), 8000);
-    }
-  });
-
-  // MUTACIÓN PARA DAR DE BAJA (RETIRAR)
-  const retireMutation = useMutation({
-    mutationFn: async (assetId: string) => {
-      const response = await axios.put(`${API_URL}/api/catalog/assets/${assetId}/status`, { status: 'RETIRED', reason: 'Baja administrativa desde catálogo' });
-      return response.data;
-    },
-    onSuccess: () => {
-      setSuccessMsg('Activo dado de baja correctamente.');
-      setTimeout(() => setSuccessMsg(''), 8000);
-      queryClient.invalidateQueries({ queryKey: ['assets'] });
     },
     onError: (err: any) => {
       setErrorMsg(err.response?.data?.error || err.message);
@@ -604,7 +589,7 @@ export default function Catalog() {
             <option value="IN_USE">En Uso</option>
             <option value="PENDING_ACCEPTANCE">⏳ Pendiente de Firma</option>
             <option value="MAINTENANCE">En Mantenimiento</option>
-            <option value="RETIRED">Retirado / Baja</option>
+            <option value="RETIRED">Baja</option>
           </select>
           {(filterCategory !== 'all' || filterStatus !== 'all' || searchTerm !== '' || filterRisk) && (
             <button
@@ -877,12 +862,10 @@ export default function Catalog() {
                           style={{ borderColor: '#ef4444', color: '#ef4444' }}
                           title="Dar de Baja"
                           onClick={() => {
-                            confirm({
-                              title: 'Dar de Baja',
-                              message: '¿Estás seguro de dar de baja este activo? Esta acción no se puede deshacer.',
-                              type: 'danger',
-                              onConfirm: () => retireMutation.mutate(asset.id)
-                            });
+                            setRetireReason('');
+                            setRetireBlanccoId('');
+                            setRetireNotes('');
+                            setRetireModalAssetId(asset.id);
                           }}
                         >
                           <Trash2 size={16} />
@@ -1265,14 +1248,47 @@ export default function Catalog() {
               ¿Estás seguro de que deseas dar de baja el activo <b>{retireModalAssetId}</b> definitivamente? Esta acción es irreversible.
             </p>
             <div className="form-group" style={{ textAlign: 'left' }}>
-              <label>Por favor, indica el motivo por el cual se da de baja este activo:</label>
+              <label>Motivo de la baja *</label>
+              <select
+                className="glass-input"
+                value={['Obsolescencia', 'Daño irreparable', 'Robo / Pérdida', 'Fin de vida útil'].includes(retireReason) ? retireReason : (retireReason ? 'Otro' : '')}
+                onChange={(e) => setRetireReason(e.target.value === 'Otro' ? 'Otro: ' : e.target.value)}
+                style={{ marginBottom: '10px' }}
+              >
+                <option value="">Seleccione un motivo...</option>
+                <option value="Obsolescencia">Obsolescencia</option>
+                <option value="Daño irreparable">Daño irreparable</option>
+                <option value="Robo / Pérdida">Robo / Pérdida</option>
+                <option value="Fin de vida útil">Fin de vida útil</option>
+                <option value="Otro">Otro (especifique)</option>
+              </select>
+              {(retireReason.startsWith('Otro') || !['Obsolescencia', 'Daño irreparable', 'Robo / Pérdida', 'Fin de vida útil', ''].includes(retireReason)) && (
+                <input
+                  type="text"
+                  className="glass-input"
+                  value={retireReason.replace(/^Otro: ?/, '')}
+                  onChange={(e) => setRetireReason(`Otro: ${e.target.value}`)}
+                  placeholder="Describe el motivo..."
+                  style={{ marginBottom: '10px' }}
+                  autoFocus
+                />
+              )}
+              <label>ID del reporte de borrado (Blancco)</label>
+              <input
+                type="text"
+                className="glass-input"
+                value={retireBlanccoId}
+                onChange={(e) => setRetireBlanccoId(e.target.value)}
+                placeholder="Ej. BL-2026-00123 (déjalo vacío si no aplica, ej. robo)"
+                style={{ marginBottom: '10px' }}
+              />
+              <label>Notas adicionales</label>
               <textarea
                 className="glass-input"
-                value={retireReason}
-                onChange={(e) => setRetireReason(e.target.value)}
-                style={{ minHeight: '80px', resize: 'vertical' }}
-                autoFocus
-                placeholder="Ej. Equipo dañado sin reparación..."
+                value={retireNotes}
+                onChange={(e) => setRetireNotes(e.target.value)}
+                style={{ minHeight: '60px', resize: 'vertical' }}
+                placeholder="Ej. Acta de robo #123, disposición final con proveedor certificado..."
               />
             </div>
             <div style={{ display: 'flex', gap: '10px', marginTop: '24px', justifyContent: 'center' }}>
@@ -1285,14 +1301,19 @@ export default function Catalog() {
               </button>
               <button
                 className="btn-primary"
-                style={{ background: '#ef4444', borderColor: '#ef4444', opacity: retireReason.trim() ? 1 : 0.5, padding: '10px 20px' }}
+                style={{ background: '#ef4444', borderColor: '#ef4444', opacity: retireReason.trim() && retireReason !== 'Otro: ' ? 1 : 0.5, padding: '10px 20px' }}
                 onClick={() => {
-                  if (retireReason.trim()) {
-                    retireAssetMutation.mutate({ id: retireModalAssetId, reason: retireReason.trim() });
+                  if (retireReason.trim() && retireReason !== 'Otro: ') {
+                    retireAssetMutation.mutate({
+                      id: retireModalAssetId,
+                      reason: retireReason.trim(),
+                      blanccoReportId: retireBlanccoId.trim() || undefined,
+                      notes: retireNotes.trim() || undefined
+                    });
                     setRetireModalAssetId(null);
                   }
                 }}
-                disabled={!retireReason.trim() || retireAssetMutation.isPending}
+                disabled={!retireReason.trim() || retireReason === 'Otro: ' || retireAssetMutation.isPending}
               >
                 {retireAssetMutation.isPending ? 'Procesando...' : 'Confirmar Baja'}
               </button>

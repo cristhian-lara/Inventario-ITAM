@@ -115,6 +115,54 @@ router.post('/:id/request-signature', async (req, res) => {
     }
 });
 
+// 3.6 Notificar mantenimiento próximo por Webex (disparado por el administrador)
+router.post('/:id/notify', async (req, res) => {
+    try {
+        const record = await repo.findById(req.params.id);
+        if (!record) return res.status(404).json({ error: 'Mantenimiento no encontrado' });
+        if (record.status !== 'SCHEDULED') {
+            return res.status(400).json({ error: 'Solo se pueden notificar mantenimientos en estado Programado.' });
+        }
+
+        const assignment = await assignmentAdapter.getActiveAssignmentForAsset(record.assetId);
+        if (!assignment || !assignment.collaboratorEmail) {
+            return res.status(400).json({ error: 'El activo no tiene un colaborador asignado a quien notificar.' });
+        }
+
+        const { PostgresCatalogRepository } = require('../../modules/catalog/infrastructure/PostgresCatalogRepository');
+        const catalogRepo = new PostgresCatalogRepository(AppDataSource);
+        const asset = await catalogRepo.getAssetById(record.assetId);
+        const hostname = asset?.dynamicAttributes?.hostname || asset?.dynamicAttributes?.Hostname || asset?.dynamicAttributes?.HOSTNAME;
+
+        try {
+            await mailerService.sendMaintenanceReminder(assignment.collaboratorEmail, {
+                assetId: record.assetId,
+                hostname,
+                type: record.type,
+                scheduledDate: record.scheduledDate,
+                reason: record.reason
+            });
+            res.json({
+                message: `Recordatorio enviado por Webex a ${assignment.collaboratorName}.`,
+                notificationSent: true,
+                accountNotFound: false
+            });
+        } catch (error: any) {
+            const accountNotFound = error?.reason === 'ACCOUNT_NOT_FOUND';
+            res.json({
+                message: accountNotFound
+                    ? `La cuenta de Webex de ${assignment.collaboratorName} no existe. Verifica el correo del colaborador.`
+                    : 'No se pudo enviar el recordatorio por Webex. Intenta de nuevo más tarde.',
+                notificationSent: false,
+                accountNotFound,
+                notificationError: error.message
+            });
+        }
+    } catch (error: any) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
 // 4. Obtener todos (opcional filtro)
 router.get('/', async (req, res) => {
     try {

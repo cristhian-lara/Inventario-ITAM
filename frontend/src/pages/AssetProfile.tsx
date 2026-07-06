@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useConfirm } from '../context/ConfirmContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import {
@@ -37,6 +38,13 @@ interface Asset {
     warrantyMonths?: number;
     depreciationYears?: number;
     purchasePrice?: number;
+    disposal?: {
+        reason: string;
+        disposalDate: string;
+        authorizedBy: string;
+        blanccoReportId?: string;
+        notes?: string;
+    };
 }
 
 // Formatea fechas evitando el corrimiento de un día: si el valor es tipo
@@ -92,6 +100,11 @@ interface AssignmentHistory {
     startDate: string;
     endDate?: string;
     documentPath?: string;
+    adminApproval?: {
+        approvedBy: string;
+        approvedAt: string;
+        note?: string;
+    } | null;
 }
 
 // ─── Helper Functions ────────────────────────────────────────────────────────
@@ -101,7 +114,7 @@ const statusLabel = (s: string) => {
         AVAILABLE: 'Disponible',
         IN_USE: 'En Uso',
         IN_MAINTENANCE: 'En Mantenimiento',
-        RETIRED: 'Retirado',
+        RETIRED: 'Baja',
         LOST: 'Perdido',
     };
     return map[s] || s;
@@ -189,9 +202,13 @@ export default function AssetProfile() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const queryClient = useQueryClient();
+    const { confirm } = useConfirm();
 
     const [showUpgradeModal, setShowUpgradeModal] = useState(false);
     const [showDepreciationModal, setShowDepreciationModal] = useState(false);
+    // Visto bueno de devolución: id de la asignación a aprobar + nota del administrador
+    const [approvalTarget, setApprovalTarget] = useState<string | null>(null);
+    const [approvalNote, setApprovalNote] = useState('');
     const [upgradeForm, setUpgradeForm] = useState({
         component: '',
         old_value: '',
@@ -267,6 +284,22 @@ export default function AssetProfile() {
                 performed_by: '',
                 notes: ''
             });
+        }
+    });
+
+    const approveReturnMutation = useMutation({
+        mutationFn: async ({ assignmentId, note }: { assignmentId: string; note: string }) => {
+            const response = await axios.post(`${API_URL}/api/assignments/${assignmentId}/approve-return`, { note });
+            return response.data;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['asset-assignment-history', id] });
+            setApprovalTarget(null);
+            setApprovalNote('');
+            confirm({ title: 'Visto Bueno Registrado', message: 'La devolución fue aprobada y el acta se actualizó con el visto bueno de TI.', type: 'success', confirmText: 'Entendido', hideCancel: true, onConfirm: () => {} });
+        },
+        onError: (err: any) => {
+            confirm({ title: 'Error', message: err.response?.data?.error || err.message, type: 'danger', confirmText: 'Entendido', hideCancel: true, onConfirm: () => {} });
         }
     });
 
@@ -399,6 +432,26 @@ export default function AssetProfile() {
                                 </div>
                             );
                         })()}
+
+                        {/* Información de la baja (activos retirados) */}
+                        {asset.status === 'RETIRED' && asset.disposal && (
+                            <div style={{ marginTop: '10px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '10px', padding: '12px 14px', textAlign: 'left' }}>
+                                <div style={{ fontSize: '11px', fontWeight: 700, color: '#dc2626', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: '8px' }}>
+                                    Información de la Baja
+                                </div>
+                                <div style={{ fontSize: '12px', color: '#7f1d1d', lineHeight: 1.7 }}>
+                                    <div><strong>Motivo:</strong> {asset.disposal.reason}</div>
+                                    <div><strong>Fecha:</strong> {formatDateSafe(asset.disposal.disposalDate)}</div>
+                                    <div><strong>Autorizada por:</strong> {asset.disposal.authorizedBy}</div>
+                                    {asset.disposal.blanccoReportId && (
+                                        <div><strong>Reporte Blancco:</strong> {asset.disposal.blanccoReportId}</div>
+                                    )}
+                                    {asset.disposal.notes && (
+                                        <div><strong>Notas:</strong> {asset.disposal.notes}</div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
 
                         {/* Stats de auditoría */}
                         <div style={{ marginTop: '8px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', textAlign: 'center' }}>
@@ -671,6 +724,24 @@ export default function AssetProfile() {
                                                             <FileText size={12} /> Ver Acta
                                                         </a>
                                                     )}
+                                                    {a.status === 'RETURNED' && a.adminApproval && (
+                                                        <span
+                                                            className="badge-ap badge-type-preventive"
+                                                            title={`Aprobado por ${a.adminApproval.approvedBy}${a.adminApproval.note ? ` — ${a.adminApproval.note}` : ''}`}
+                                                        >
+                                                            ✔ Visto bueno TI
+                                                        </span>
+                                                    )}
+                                                    {a.status === 'RETURNED' && !a.adminApproval && (
+                                                        <button
+                                                            className="btn-action"
+                                                            style={{ borderColor: '#f59e0b', color: '#f59e0b', fontSize: '11px', padding: '2px 10px' }}
+                                                            title="Aprobar la devolución y certificar que el colaborador no tiene cuentas pendientes con TI"
+                                                            onClick={() => { setApprovalTarget(a.id); setApprovalNote(''); }}
+                                                        >
+                                                            Dar Visto Bueno
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>
@@ -699,6 +770,42 @@ export default function AssetProfile() {
 
                 </div>
             </div>
+
+            {/* ─── Modal: Visto Bueno de Devolución ─── */}
+            {approvalTarget && (
+                <div className="ap-modal-overlay" onClick={() => setApprovalTarget(null)}>
+                    <div className="ap-modal glass-panel" onClick={e => e.stopPropagation()}>
+                        <button className="ap-modal-close" onClick={() => setApprovalTarget(null)}>✕</button>
+                        <h3 className="ap-modal-title">
+                            <CheckCircle size={20} color="var(--ikusi-green)" />
+                            Visto Bueno de Devolución
+                        </h3>
+                        <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '16px' }}>
+                            Al aprobar, certificas la recepción del equipo y que el colaborador no tiene cuentas pendientes con el área de TI.
+                            El acta de devolución se actualizará con tu visto bueno.
+                        </p>
+                        <div className="ap-form-group" style={{ marginBottom: '20px' }}>
+                            <label>Observaciones (estado del equipo, novedades, etc.)</label>
+                            <textarea
+                                className="glass-input"
+                                rows={4}
+                                style={{ width: '100%', resize: 'vertical' }}
+                                placeholder="Ej. Equipo recibido en buen estado, con cargador y maletín."
+                                value={approvalNote}
+                                onChange={e => setApprovalNote(e.target.value)}
+                            />
+                        </div>
+                        <button
+                            className="btn-primary"
+                            style={{ width: '100%' }}
+                            disabled={approveReturnMutation.isPending}
+                            onClick={() => approveReturnMutation.mutate({ assignmentId: approvalTarget, note: approvalNote })}
+                        >
+                            {approveReturnMutation.isPending ? 'Registrando...' : 'Aprobar Devolución'}
+                        </button>
+                    </div>
+                </div>
+            )}
 
             {/* ─── Modal: Registrar Upgrade de Hardware ─── */}
             {showUpgradeModal && (

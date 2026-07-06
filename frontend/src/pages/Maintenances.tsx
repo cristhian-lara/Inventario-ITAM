@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Settings, Wrench, CheckCircle, AlertTriangle, Calendar, Plus, Clock, X, Mail, Edit3, Search, Server } from 'lucide-react';
+import { Settings, Wrench, CheckCircle, AlertTriangle, Calendar, Plus, Clock, X, Mail, Edit3, Search, Server, Bell } from 'lucide-react';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, Legend } from 'recharts';
 import { Link } from 'react-router-dom';
 import ActionMenu from '../components/ActionMenu';
 import { useConfirm } from '../context/ConfirmContext';
 import { useAuth, Role } from '../context/AuthContext';
 import { showWebexFailureModal } from '../utils/notificationNotice';
+import { authHeaders } from '../utils/authHeaders';
 import './Maintenances.css';
 import { API_URL } from '../config';
 
@@ -72,7 +73,7 @@ const Maintenances: React.FC = () => {
   const { data: maintenances, isLoading } = useQuery<MaintenanceRecord[]>({
     queryKey: ['maintenances'],
     queryFn: async () => {
-      const res = await fetch(`${API_URL}/api/maintenances`);
+      const res = await fetch(`${API_URL}/api/maintenances`, { headers: authHeaders() });
       if (!res.ok) throw new Error('Error cargando mantenimientos');
       return res.json();
     }
@@ -87,18 +88,18 @@ const Maintenances: React.FC = () => {
   const { data: assets } = useQuery<any[]>({
     queryKey: ['assets_list'],
     queryFn: async () => {
-      const res = await fetch(`${API_URL}/api/catalog/assets`);
+      const res = await fetch(`${API_URL}/api/catalog/assets`, { headers: authHeaders() });
       if (!res.ok) return [];
       return res.json();
     }
   });
 
-  const { data: categories } = useQuery<any[]>({ queryKey: ['categories'], queryFn: async () => { const res = await fetch(`${API_URL}/api/catalog/categories`); if (!res.ok) return []; return res.json(); } });
+  const { data: categories } = useQuery<any[]>({ queryKey: ['categories'], queryFn: async () => { const res = await fetch(`${API_URL}/api/catalog/categories`, { headers: authHeaders() }); if (!res.ok) return []; return res.json(); } });
 
   const { data: assignments } = useQuery<any[]>({
     queryKey: ['assignments'],
     queryFn: async () => {
-      const res = await fetch(`${API_URL}/api/assignments`);
+      const res = await fetch(`${API_URL}/api/assignments`, { headers: authHeaders() });
       if (!res.ok) return [];
       return res.json();
     }
@@ -107,7 +108,7 @@ const Maintenances: React.FC = () => {
   const { data: collaborators } = useQuery<any[]>({
     queryKey: ['collaborators'],
     queryFn: async () => {
-      const res = await fetch(`${API_URL}/api/collaborators`);
+      const res = await fetch(`${API_URL}/api/collaborators`, { headers: authHeaders() });
       if (!res.ok) return [];
       return res.json();
     }
@@ -128,7 +129,7 @@ const Maintenances: React.FC = () => {
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
       const res = await fetch(`${API_URL}/api/maintenances`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data)
+        method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify(data)
       });
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
@@ -143,7 +144,7 @@ const Maintenances: React.FC = () => {
   const startMutation = useMutation({
     mutationFn: async (data: { id: string, startNote: string }) => {
       const res = await fetch(`${API_URL}/api/maintenances/${data.id}/start`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ startNote: data.startNote })
+        method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify({ startNote: data.startNote })
       });
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
@@ -158,7 +159,7 @@ const Maintenances: React.FC = () => {
   const completeMutation = useMutation({
     mutationFn: async (data: { id: string, notes: string }) => {
       const res = await fetch(`${API_URL}/api/maintenances/${data.id}/complete`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ notes: data.notes })
+        method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify({ notes: data.notes })
       });
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
@@ -178,7 +179,7 @@ const Maintenances: React.FC = () => {
   const requestSignatureMutation = useMutation({
     mutationFn: async (id: string) => {
       const res = await fetch(`${API_URL}/api/maintenances/${id}/request-signature`, {
-        method: 'POST'
+        method: 'POST', headers: authHeaders()
       });
       if (!res.ok) {
         const error = await res.json().catch(()=>({}));
@@ -199,11 +200,34 @@ const Maintenances: React.FC = () => {
     }
   });
 
+  const notifyMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`${API_URL}/api/maintenances/${id}/notify`, {
+        method: 'POST', headers: authHeaders()
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || 'Error al enviar el recordatorio');
+      }
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      if (!showWebexFailureModal(confirm, data)) {
+        setSuccessMsg(data?.message || 'Recordatorio de mantenimiento enviado por Webex.');
+        setTimeout(() => setSuccessMsg(''), 4000);
+      }
+    },
+    onError: (error: Error) => {
+      setErrorToast(error.message);
+      setTimeout(() => setErrorToast(''), 4000);
+    }
+  });
+
   const forceSignMutation = useMutation({
     mutationFn: async (data: { id: string, reason: string }) => {
       const res = await fetch(`${API_URL}/api/maintenances/${data.id}/force-sign`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ reason: data.reason })
       });
       if (!res.ok) {
@@ -766,6 +790,24 @@ const Maintenances: React.FC = () => {
                               {isAdmin && m.status === 'SCHEDULED' && (
                                 <button className="btn-action" style={{ borderColor: '#eab308', color: '#eab308' }} title="Iniciar Mantenimiento" onClick={() => openModal('start', m)}>
                                   <Wrench size={16} />
+                                </button>
+                              )}
+                              {isAdmin && m.status === 'SCHEDULED' && (
+                                <button
+                                  className="btn-action"
+                                  style={{ borderColor: '#06b6d4', color: '#06b6d4', opacity: notifyMutation.isPending ? 0.5 : 1 }}
+                                  title="Enviar recordatorio por Webex al colaborador"
+                                  disabled={notifyMutation.isPending}
+                                  onClick={() => {
+                                    confirm({
+                                      title: 'Enviar Recordatorio',
+                                      message: `¿Enviar un recordatorio por Webex al colaborador sobre el mantenimiento programado del equipo ${m.assetId}?`,
+                                      type: 'info',
+                                      onConfirm: () => notifyMutation.mutate(m.id)
+                                    });
+                                  }}
+                                >
+                                  <Bell size={16} />
                                 </button>
                               )}
                               {isAdmin && m.status === 'IN_PROGRESS' && (

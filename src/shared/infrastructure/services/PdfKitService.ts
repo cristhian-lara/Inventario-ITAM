@@ -171,6 +171,21 @@ Este documento cancela la responsiva firmada en el momento de la asignación ori
                 const legalText = customText || (data.actType === 'RETURN' ? legalTextReturn : legalTextAssignment);
                 doc.text(legalText, { align: 'justify', lineGap: 5 });
 
+                // Visto bueno del administrador (devoluciones aprobadas por TI)
+                if (data.actType === 'RETURN' && data.adminApproval) {
+                    const approvedDate = this.formatDateOnly(data.adminApproval.approvedAt);
+                    doc.moveDown(1.5);
+                    doc.fontSize(11).font('Helvetica-Bold').fillColor('#00a650').text('VISTO BUENO DEL ÁREA DE TI', { align: 'left' });
+                    doc.moveDown(0.3);
+                    doc.fontSize(10).font('Helvetica').fillColor('#000000');
+                    doc.text(`El área de TI certifica la recepción del equipo relacionado en este documento y declara que el colaborador no tiene cuentas pendientes con el departamento de Tecnología de la Información.`, { align: 'justify', lineGap: 4 });
+                    doc.moveDown(0.5);
+                    doc.text(`Aprobado por: ${data.adminApproval.approvedBy}    Fecha: ${approvedDate}`);
+                    if (data.adminApproval.note) {
+                        doc.text(`Observaciones: ${data.adminApproval.note}`, { align: 'justify', lineGap: 4 });
+                    }
+                }
+
                 const range = doc.bufferedPageRange();
                 const cryptoType = data.actType === 'RETURN' ? 'Acta-Dev-Ikusi' : 'Acta-Asig-Ikusi';
                 const userNameNormalized = data.collaboratorName || 'Usuario Asignado';

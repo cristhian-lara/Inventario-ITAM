@@ -30,6 +30,10 @@ export class AssetOrmEntity {
     @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
     purchase_price?: number;
 
+    /** Datos de la baja: { reason, disposalDate, authorizedBy, blanccoReportId, notes } */
+    @Column({ type: 'jsonb', nullable: true })
+    disposal?: any;
+
     @ManyToOne(() => CategoryOrmEntity)
     @JoinColumn({ name: 'category_id' })
     category!: CategoryOrmEntity;
