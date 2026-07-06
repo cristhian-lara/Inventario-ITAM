@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
-import { Plus, Settings as SettingsIcon, Building, Briefcase, Tag, CheckCircle2, AlertCircle, Trash2, Database, Edit, X, FileText, Save, Info } from 'lucide-react';
-import { APP_VERSION, CHANGELOG } from '../version';
+import { Plus, Settings as SettingsIcon, Building, Briefcase, Tag, CheckCircle2, AlertCircle, Trash2, Database, Edit, X, FileText, Save } from 'lucide-react';
 import { useConfirm } from '../context/ConfirmContext';
 import './Settings.css';
 import { API_URL } from '../config';
@@ -364,12 +363,6 @@ export default function Settings() {
           >
             <FileText size={18} /> Plantillas de Actas
           </button>
-          <button
-            className={`settings-tab ${activeTab2 === 'about' ? 'active' : ''}`}
-            onClick={() => setActiveTab2('about')}
-          >
-            <Info size={18} /> Acerca del Sistema
-          </button>
 
                   </div>
 
@@ -563,34 +556,6 @@ export default function Settings() {
                 </div>
               </div>
             )}
-          </div>
-        )}
-
-        {activeTab2 === 'about' && (
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-              <h3 style={{ margin: 0 }}>Acerca del Sistema</h3>
-              <span style={{ fontSize: '14px', fontWeight: 700, color: 'var(--ikusi-green)', border: '1px solid var(--border-glass)', borderRadius: '12px', padding: '4px 14px' }}>
-                Versión actual: v{APP_VERSION}
-              </span>
-            </div>
-            <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '20px' }}>
-              Historial de versiones y cambios del sistema IkusiITAM.
-            </p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              {CHANGELOG.map(entry => (
-                <div key={entry.version} style={{ background: 'rgba(255,255,255,0.02)', padding: '20px', borderRadius: '12px', border: '1px dashed var(--border-glass)' }}>
-                  <h4 style={{ margin: '0 0 4px 0', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Info size={18} color="var(--ikusi-green)" />
-                    v{entry.version}
-                    <span style={{ fontSize: '12px', fontWeight: 400, color: 'var(--text-muted)' }}>— {entry.date}</span>
-                  </h4>
-                  <ul style={{ margin: '10px 0 0 0', paddingLeft: '22px', fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.8 }}>
-                    {entry.changes.map((c, i) => <li key={i}>{c}</li>)}
-                  </ul>
-                </div>
-              ))}
-            </div>
           </div>
         )}
 

@@ -37,7 +37,7 @@ export default function TopNavbar() {
             <span className="logo-icon">I</span>
             <span className="logo-text">Ikusi<span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>ITAM</span></span>
             <span
-              title="Versión del sistema — detalle de cambios en Administración"
+              title="Versión del sistema"
               style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', border: '1px solid var(--border-glass)', borderRadius: '10px', padding: '1px 8px', marginLeft: '8px', alignSelf: 'center' }}
             >
               v{APP_VERSION}
