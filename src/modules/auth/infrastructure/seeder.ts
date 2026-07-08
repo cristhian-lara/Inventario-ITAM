@@ -9,34 +9,22 @@ const seed = async () => {
         const userRepository = AppDataSource.getRepository(UserEntity);
         const hasher = new BcryptPasswordHasher();
 
-        // Check if admin exists
+        // Super Administrador inicial del sistema
         let admin = await userRepository.findOne({ where: { username: 'admin' } });
         if (!admin) {
             const passwordHash = await hasher.hash('admin123');
             admin = userRepository.create({
                 username: 'admin',
                 passwordHash,
-                role: Role.ADMINISTRADOR
+                role: Role.SUPER_ADMIN,
+                fullName: 'Super Administrador',
+                email: 'admin@pendiente.local',
+                isActive: true,
             });
             await userRepository.save(admin);
-            console.log('✅ Admin user created (admin / admin123)');
+            console.log('✅ Super Admin user created (admin / admin123)');
         } else {
             console.log('ℹ️ Admin user already exists');
-        }
-
-        // Check if visualizador exists
-        let viewer = await userRepository.findOne({ where: { username: 'viewer' } });
-        if (!viewer) {
-            const passwordHash = await hasher.hash('viewer123');
-            viewer = userRepository.create({
-                username: 'viewer',
-                passwordHash,
-                role: Role.VISUALIZADOR
-            });
-            await userRepository.save(viewer);
-            console.log('✅ Viewer user created (viewer / viewer123)');
-        } else {
-            console.log('ℹ️ Viewer user already exists');
         }
 
         process.exit(0);

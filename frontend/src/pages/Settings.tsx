@@ -3,12 +3,15 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { Plus, Settings as SettingsIcon, Building, Briefcase, Tag, CheckCircle2, AlertCircle, Trash2, Database, Edit, X, FileText, Save } from 'lucide-react';
 import { useConfirm } from '../context/ConfirmContext';
+import { usePermission } from '../context/AuthContext';
 import './Settings.css';
 import { API_URL } from '../config';
 
 export default function Settings() {
   const queryClient = useQueryClient();
   const { confirm } = useConfirm();
+  // Permisos RBAC del módulo Configuración
+  const settingsPerms = usePermission('settings');
   
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
@@ -371,6 +374,7 @@ export default function Settings() {
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
                 <h3 style={{ margin: 0 }}>Categorías Existentes</h3>
+                {settingsPerms.create && (
                 <button className="btn-primary" onClick={() => {
                   setEditingCatId(null);
                   setNewCatName('');
@@ -380,6 +384,7 @@ export default function Settings() {
                 }}>
                   <Plus size={16} /> Nueva Categoría
                 </button>
+                )}
               </div>
               {loadingCat ? <p>Cargando...</p> : (
                 <div className="list-grid">
@@ -390,13 +395,15 @@ export default function Settings() {
                     </div>
                   ) : categories?.map((cat: any) => (
                     <div key={cat.id} className="list-card" style={{ position: 'relative' }}>
-                      <button 
+                      {settingsPerms.edit && (
+                      <button
                         onClick={() => handleEditCategory(cat)}
                         style={{ position: 'absolute', top: '10px', right: '10px', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '18px' }}
                         title="Editar Categoría"
                       >
                         ✏️
                       </button>
+                      )}
                       <h4>{cat.name}</h4>
                       <p className="list-id">ID: {cat.id}</p>
                       <div className="list-tags">
@@ -417,6 +424,7 @@ export default function Settings() {
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
                 <h3 style={{ margin: 0 }}>Departamentos Existentes</h3>
+                {settingsPerms.create && (
                 <button className="btn-primary" onClick={() => {
                   setEditingDepId(null);
                   setNewDepName('');
@@ -425,6 +433,7 @@ export default function Settings() {
                 }}>
                   <Plus size={16} /> Nuevo Departamento
                 </button>
+                )}
               </div>
               {loadingDep ? <p>Cargando...</p> : (
                 <div className="list-grid">
@@ -435,7 +444,8 @@ export default function Settings() {
                     </div>
                   ) : departments?.map((dep: any) => (
                     <div key={dep.id} className="list-card" style={{ position: 'relative' }}>
-                      <button 
+                      {settingsPerms.edit && (
+                      <button
                         onClick={() => {
                           setEditingDepId(dep.id);
                           setNewDepName(dep.name);
@@ -447,6 +457,7 @@ export default function Settings() {
                       >
                         ✏️
                       </button>
+                      )}
                       <h4>{dep.name}</h4>
                       <p className="list-id">ID: {dep.id}</p>
                       <p className="list-desc">{dep.description || 'Sin descripción'}</p>
@@ -460,6 +471,7 @@ export default function Settings() {
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
               <h3 style={{ margin: 0 }}>CECOS Existentes</h3>
+              {settingsPerms.create && (
               <button className="btn-primary" onClick={() => {
                 setEditingCecosId(null);
                 setNewCecosId(''); setNewCecosName(''); setNewCecosDesc('');
@@ -467,6 +479,7 @@ export default function Settings() {
               }}>
                 <Plus size={18} /> Nuevo CECOS
               </button>
+              )}
             </div>
             
             {loadingCecos ? (
@@ -480,13 +493,15 @@ export default function Settings() {
                   </div>
                 ) : cecosList?.map((c: any) => (
                   <div key={c.id} className="list-card" style={{ position: 'relative' }}>
-                    <button 
+                    {settingsPerms.edit && (
+                    <button
                       onClick={() => handleEditCecos(c)}
                       style={{ position: 'absolute', top: '10px', right: '10px', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '18px' }}
                       title="Editar CECOS"
                     >
                       ✏️
                     </button>
+                    )}
                     <h4>{c.name}</h4>
                     <p className="list-id">ID: {c.id}</p>
                     <p className="list-desc">{c.description || 'Sin descripción'}</p>
@@ -501,9 +516,11 @@ export default function Settings() {
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
               <h3 style={{ margin: 0 }}>Plantillas de Actas</h3>
+              {settingsPerms.edit && (
               <button className="btn-primary" onClick={handleSaveTemplates} disabled={updateSettingsMutation.isPending}>
                 <Save size={18} /> Guardar Cambios
               </button>
+              )}
             </div>
             
             {loadingSettings ? (
@@ -517,8 +534,9 @@ export default function Settings() {
                   </h4>
                   <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '12px' }}>Este texto legal aparecerá en la página final del PDF de asignación.</p>
                   <textarea 
-                    className="glass-input" 
-                    rows={8} 
+                    className="glass-input"
+                    rows={8}
+                    readOnly={!settingsPerms.edit}
                     style={{ width: '100%', resize: 'vertical' }}
                     value={actaAsignacion}
                     onChange={(e) => setActaAsignacion(e.target.value)}
@@ -532,8 +550,9 @@ export default function Settings() {
                   </h4>
                   <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '12px' }}>Este texto legal aparecerá en la página final del PDF de devolución.</p>
                   <textarea 
-                    className="glass-input" 
-                    rows={8} 
+                    className="glass-input"
+                    rows={8}
+                    readOnly={!settingsPerms.edit}
                     style={{ width: '100%', resize: 'vertical' }}
                     value={actaDevolucion}
                     onChange={(e) => setActaDevolucion(e.target.value)}
@@ -547,8 +566,9 @@ export default function Settings() {
                   </h4>
                   <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '12px' }}>Este texto legal aparecerá en la página final del PDF de mantenimiento.</p>
                   <textarea 
-                    className="glass-input" 
-                    rows={8} 
+                    className="glass-input"
+                    rows={8}
+                    readOnly={!settingsPerms.edit}
                     style={{ width: '100%', resize: 'vertical' }}
                     value={actaMantenimiento}
                     onChange={(e) => setActaMantenimiento(e.target.value)}

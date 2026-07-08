@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import axios from 'axios';
+import { API_URL } from '../config';
 
 // El backend valida el token en cada petición (apiGuard): se adjunta globalmente.
 const storedToken = localStorage.getItem('token');
@@ -21,15 +22,29 @@ axios.interceptors.response.use(
 );
 
 export enum Role {
+    SUPER_ADMIN = 'SUPER_ADMIN',
     ADMINISTRADOR = 'ADMINISTRADOR',
-    VISUALIZADOR = 'VISUALIZADOR'
+    ESTANDAR = 'ESTANDAR'
 }
+
+export interface PermissionFlags {
+    read: boolean;
+    create: boolean;
+    edit: boolean;
+    delete: boolean;
+}
+
+export type PermissionsMap = Record<string, PermissionFlags>;
 
 interface User {
     id: string;
     username: string;
+    fullName?: string;
     role: Role;
+    permissions?: PermissionsMap;
 }
+
+const NO_ACCESS: PermissionFlags = { read: false, create: false, edit: false, delete: false };
 
 interface AuthContextType {
     user: User | null;
@@ -37,6 +52,8 @@ interface AuthContextType {
     login: (token: string, user: User) => void;
     logout: () => void;
     isAuthenticated: boolean;
+    /** Flags del módulo (sin acceso si no hay permiso registrado). */
+    can: (moduleKey: string) => PermissionFlags;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -47,6 +64,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return storedUser ? JSON.parse(storedUser) : null;
     });
     const [token, setToken] = useState<string | null>(() => localStorage.getItem('token'));
+
+    // Permisos frescos desde BD al cargar la app: los cambios hechos por el
+    // administrador surten efecto sin necesidad de reloguearse.
+    useEffect(() => {
+        if (!token) return;
+        axios.get(`${API_URL}/api/auth/me`)
+            .then(res => {
+                setUser(res.data);
+                localStorage.setItem('user', JSON.stringify(res.data));
+            })
+            .catch(() => { /* 401 lo maneja el interceptor global */ });
+    }, [token]);
 
     const login = (newToken: string, newUser: User) => {
         setToken(newToken);
@@ -64,8 +93,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         delete axios.defaults.headers.common['Authorization'];
     };
 
+    const can = (moduleKey: string): PermissionFlags => {
+        if (!user) return NO_ACCESS;
+        if (user.role === Role.SUPER_ADMIN) return { read: true, create: true, edit: true, delete: true };
+        return user.permissions?.[moduleKey] || NO_ACCESS;
+    };
+
     return (
-        <AuthContext.Provider value={{ user, token, login, logout, isAuthenticated: !!token }}>
+        <AuthContext.Provider value={{ user, token, login, logout, isAuthenticated: !!token, can }}>
             {children}
         </AuthContext.Provider>
     );
@@ -77,4 +112,10 @@ export const useAuth = () => {
         throw new Error('useAuth debe ser usado dentro de un AuthProvider');
     }
     return context;
+};
+
+/** Permisos del usuario actual sobre un módulo: { read, create, edit, delete }. */
+export const usePermission = (moduleKey: string): PermissionFlags => {
+    const { can } = useAuth();
+    return can(moduleKey);
 };

@@ -1,14 +1,15 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import { useAuth, Role } from '../context/AuthContext';
+import { useAuth } from '../context/AuthContext';
 
 interface ProtectedRouteProps {
     children: JSX.Element;
-    allowedRoles?: Role[];
+    /** Clave del módulo RBAC requerido (con lectura basta). Sin prop = solo exige sesión. */
+    module?: string;
 }
 
-const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles }) => {
-    const { isAuthenticated, user } = useAuth();
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, module }) => {
+    const { isAuthenticated, can } = useAuth();
     const location = useLocation();
 
     if (!isAuthenticated) {
@@ -16,8 +17,8 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles 
         return <Navigate to="/login" state={{ from: location }} replace />;
     }
 
-    if (allowedRoles && user && !allowedRoles.includes(user.role)) {
-        // Redirigir al dashboard general si no tiene el rol adecuado
+    if (module && !can(module).read) {
+        // Sin permiso sobre el módulo (también cubre URLs escritas a mano)
         return <Navigate to="/" replace />;
     }
 

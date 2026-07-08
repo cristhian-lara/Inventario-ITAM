@@ -4,6 +4,8 @@ import { LoginUseCase } from '../../modules/auth/application/LoginUseCase';
 import { PostgresUserRepository } from '../../modules/auth/infrastructure/repositories/PostgresUserRepository';
 import { BcryptPasswordHasher } from '../../modules/auth/infrastructure/services/BcryptPasswordHasher';
 import { JwtTokenService } from '../../modules/auth/infrastructure/services/JwtTokenService';
+import { PostgresPermissionRepository } from '../../modules/auth/infrastructure/repositories/PostgresPermissionRepository';
+import { UserManagementUseCases } from '../../modules/auth/application/UserManagementUseCases';
 
 const authRouter = Router();
 
@@ -33,10 +35,15 @@ const loginRateLimit = (req: any, res: any, next: any) => {
 const userRepository = new PostgresUserRepository();
 const passwordHasher = new BcryptPasswordHasher();
 const tokenService = new JwtTokenService();
+const permissionRepository = new PostgresPermissionRepository();
 
-const loginUseCase = new LoginUseCase(userRepository, passwordHasher, tokenService);
-const authController = new AuthController(loginUseCase);
+const loginUseCase = new LoginUseCase(userRepository, passwordHasher, tokenService, permissionRepository);
+const userManagement = new UserManagementUseCases(userRepository, permissionRepository, passwordHasher);
+const authController = new AuthController(loginUseCase, userManagement, userRepository, permissionRepository);
 
 authRouter.post('/login', loginRateLimit, (req, res) => authController.login(req, res));
+// El apiGuard exige sesión activa para estos dos (entradas authOnly del mapa de permisos)
+authRouter.get('/me', (req, res) => authController.me(req as any, res));
+authRouter.post('/change-password', (req, res) => authController.changePassword(req as any, res));
 
 export default authRouter;

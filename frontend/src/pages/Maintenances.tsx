@@ -5,7 +5,7 @@ import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveCo
 import { Link } from 'react-router-dom';
 import ActionMenu from '../components/ActionMenu';
 import { useConfirm } from '../context/ConfirmContext';
-import { useAuth, Role } from '../context/AuthContext';
+import { usePermission } from '../context/AuthContext';
 import { showWebexFailureModal } from '../utils/notificationNotice';
 import { authHeaders } from '../utils/authHeaders';
 import './Maintenances.css';
@@ -49,9 +49,10 @@ const Maintenances: React.FC = () => {
   const [viewMode, setViewMode] = useState<'general' | 'auditoria' | 'balance' | 'preventive'>('general');
   const [coverageFilter, setCoverageFilter] = useState<'all' | 'completed' | 'scheduled' | 'pending'>('all');
   const { confirm } = useConfirm();
-  const { user } = useAuth();
-  // Rol VISUALIZADOR (auditores): solo lectura y filtros — sin programar ni ejecutar acciones
-  const isAdmin = user?.role === Role.ADMINISTRADOR;
+  // Permisos RBAC del módulo Mantenimientos: crear = programar; editar = ejecutar acciones de estado
+  const maintPerms = usePermission('maintenances');
+  const canCreate = maintPerms.create;
+  const isAdmin = maintPerms.edit;
 
   const [showModal, setShowModal] = useState(false);
   const [modalMode, setModalMode] = useState<'create' | 'start' | 'complete' | 'view' | 'forceSign'>('create');
@@ -491,7 +492,7 @@ const Maintenances: React.FC = () => {
         </div>
         <div className="header-actions" style={{ display: 'flex', gap: '10px' }}>
           <button className="btn-glass" onClick={exportToCSV}>Exportar CSV</button>
-          {isAdmin && <button className="btn-primary" onClick={() => openModal('create')}><Plus size={18} /> Programar</button>}
+          {canCreate && <button className="btn-primary" onClick={() => openModal('create')}><Plus size={18} /> Programar</button>}
         </div>
       </header>
 
@@ -773,7 +774,7 @@ const Maintenances: React.FC = () => {
                         </td>
                         <td>
                           {m?.isDummy ? (
-                            isAdmin && <button className="btn-action" style={{ borderColor: '#3b82f6', color: '#3b82f6' }} title="Programar Mantenimiento" onClick={() => {
+                            canCreate && <button className="btn-action" style={{ borderColor: '#3b82f6', color: '#3b82f6' }} title="Programar Mantenimiento" onClick={() => {
                                const asset = assets?.find(a => a.id === m?.assetId);
                                const displayName = asset ? `${asset.id} - ${asset.dynamicAttributes?.HOSTNAME || asset.dynamicAttributes?.Hostname || asset.dynamicAttributes?.hostname || 'Sin Hostname'}` : m.assetId;
                                setFormData({ ...formData, assetId: m.assetId });

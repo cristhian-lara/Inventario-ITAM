@@ -9,11 +9,11 @@ import AssetProfile from './pages/AssetProfile'
 import Login from './pages/Login'
 import ProtectedRoute from './components/ProtectedRoute'
 import InactivityHandler from './components/InactivityHandler'
-import { Role } from './context/AuthContext'
 
 import Maintenances from './pages/Maintenances'
 import MaintenanceSign from './pages/MaintenanceSign'
 import Actas from './pages/Actas'
+import Users from './pages/Users'
 
 function App() {
   const location = useLocation();
@@ -26,21 +26,23 @@ function App() {
       <main className="main-content">
         <Routes>
           <Route path="/login" element={<Login />} />
-          
+
           <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-          
-          <Route path="/assets" element={<ProtectedRoute allowedRoles={[Role.ADMINISTRADOR]}><Catalog /></ProtectedRoute>} />
-          <Route path="/assets/:id" element={<ProtectedRoute allowedRoles={[Role.ADMINISTRADOR]}><AssetProfile /></ProtectedRoute>} />
-          
-          <Route path="/collaborators" element={<ProtectedRoute allowedRoles={[Role.ADMINISTRADOR]}><Collaborators /></ProtectedRoute>} />
-          <Route path="/collaborators/:id" element={<ProtectedRoute allowedRoles={[Role.ADMINISTRADOR]}><CollaboratorProfile /></ProtectedRoute>} />
-          
-          <Route path="/maintenances" element={<ProtectedRoute allowedRoles={[Role.ADMINISTRADOR, Role.VISUALIZADOR]}><Maintenances /></ProtectedRoute>} />
+
+          <Route path="/assets" element={<ProtectedRoute module="assets"><Catalog /></ProtectedRoute>} />
+          <Route path="/assets/:id" element={<ProtectedRoute module="assets"><AssetProfile /></ProtectedRoute>} />
+
+          <Route path="/collaborators" element={<ProtectedRoute module="collaborators"><Collaborators /></ProtectedRoute>} />
+          <Route path="/collaborators/:id" element={<ProtectedRoute module="collaborators"><CollaboratorProfile /></ProtectedRoute>} />
+
+          <Route path="/maintenances" element={<ProtectedRoute module="maintenances"><Maintenances /></ProtectedRoute>} />
           <Route path="/maintenances/sign/:token" element={<MaintenanceSign />} />
-          
-          <Route path="/actas" element={<ProtectedRoute allowedRoles={[Role.ADMINISTRADOR, Role.VISUALIZADOR]}><Actas /></ProtectedRoute>} />
-          
-          <Route path="/settings" element={<ProtectedRoute allowedRoles={[Role.ADMINISTRADOR]}><Settings /></ProtectedRoute>} />
+
+          <Route path="/actas" element={<ProtectedRoute module="actas"><Actas /></ProtectedRoute>} />
+
+          <Route path="/settings" element={<ProtectedRoute module="settings"><Settings /></ProtectedRoute>} />
+
+          <Route path="/users" element={<ProtectedRoute module="users"><Users /></ProtectedRoute>} />
         </Routes>
       </main>
     </div>

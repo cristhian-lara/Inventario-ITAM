@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { Plus, Search, UserCheck, UserX, UserPlus, Edit2, Upload, Eye, Crown } from 'lucide-react';
 import { useConfirm } from '../context/ConfirmContext';
+import { usePermission } from '../context/AuthContext';
 import { showWebexFailureModal } from '../utils/notificationNotice';
 import './Collaborators.css';
 import { API_URL } from '../config';
@@ -24,6 +25,8 @@ interface Collaborator {
 }
 
 export default function Collaborators() {
+  // Permisos RBAC del módulo Colaboradores
+  const collabPerms = usePermission('collaborators');
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
@@ -278,10 +281,11 @@ export default function Collaborators() {
           </h1>
           <p className="page-subtitle">Gestión de personal para asignación de equipos</p>
         </div>
+        {collabPerms.create && (
         <div style={{ display: 'flex', gap: '10px' }}>
-          <input 
-            type="file" 
-            ref={fileInputRef} 
+          <input
+            type="file"
+            ref={fileInputRef}
             style={{ display: 'none' }} 
             accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel"
             onChange={handleImport}
@@ -300,6 +304,7 @@ export default function Collaborators() {
             Nuevo Colaborador
           </button>
         </div>
+        )}
       </header>
 
       <div className="glass-panel table-container">
@@ -430,21 +435,24 @@ export default function Collaborators() {
                   </td>
                   <td>
                     <ActionMenu>
-                      <button 
-                        className="action-icon-btn edit-btn" 
+                      {collabPerms.edit && (
+                      <button
+                        className="action-icon-btn edit-btn"
                         onClick={() => handleEditClick(c)}
                         title="Editar Colaborador"
                       >
                         <Edit2 size={16} />
                       </button>
-                      <Link 
+                      )}
+                      <Link
                         to={`/collaborators/${c.id}`} 
                         className="action-icon-btn view-btn" 
                         title="Ver Perfil"
                       >
                         <Eye size={16} />
                       </Link>
-                      <button 
+                      {collabPerms.edit && (
+                      <button
                         className={`action-icon-btn ${c.status === 'ACTIVE' ? 'delete-btn' : 'reactivate-btn'}`}
                         onClick={() => {
                           confirm({
@@ -460,6 +468,7 @@ export default function Collaborators() {
                       >
                         {c.status === 'ACTIVE' ? <UserX size={16} /> : <UserCheck size={16} />}
                       </button>
+                      )}
                     </ActionMenu>
                   </td>
                 </tr>

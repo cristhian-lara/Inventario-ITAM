@@ -35,6 +35,7 @@ app.get('/health', (req, res) => {
 app.use('/pdfs', express.static(path.join(__dirname, '../../storage/pdfs')));
 
 import authRoutes from './routes/auth.routes';
+import userRoutes from './routes/user.routes';
 import { documentRouter } from './routes/document.routes';
 import { apiGuard } from './middlewares/apiGuard.middleware';
 
@@ -44,6 +45,7 @@ app.use('/api', apiGuard);
 
 // Registrar Rutas
 app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);
 app.use('/api/documents', documentRouter);
 app.use('/api/catalog', catalogRoutes);
 app.use('/api/assignments', assignmentRoutes);

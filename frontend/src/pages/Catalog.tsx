@@ -5,6 +5,7 @@ import ActionMenu from '../components/ActionMenu';
 import axios from 'axios';
 import { Plus, Search, Tag, Cpu, HardDrive, Wifi, PlusCircle, MonitorSmartphone, RefreshCw, CheckCircle2, AlertCircle, AlertTriangle, UserCheck, Send, Upload, Trash2 } from 'lucide-react';
 import { useConfirm } from '../context/ConfirmContext';
+import { usePermission } from '../context/AuthContext';
 import { showWebexFailureModal } from '../utils/notificationNotice';
 import './Catalog.css';
 import { API_URL } from '../config';
@@ -18,6 +19,8 @@ interface Asset {
 }
 
 export default function Catalog() {
+  // Permisos RBAC del módulo Equipos: gobiernan crear/editar/dar de baja
+  const assetPerms = usePermission('assets');
   const queryClient = useQueryClient();
   const { confirm } = useConfirm();
   const [successMsg, setSuccessMsg] = useState('');
@@ -474,6 +477,7 @@ export default function Catalog() {
           </h1>
           <p style={{ color: 'var(--text-muted)' }}>Visualiza y administra todos los equipos registrados en el inventario.</p>
         </div>
+        {assetPerms.create && (
         <div style={{ display: 'flex', gap: '10px' }}>
           <input
             type="file"
@@ -505,6 +509,7 @@ export default function Catalog() {
             <Plus size={20} /> Nuevo Activo
           </button>
         </div>
+        )}
       </header>
 
       {successMsg && (
@@ -757,7 +762,7 @@ export default function Catalog() {
                       >
                         📋
                       </Link>
-                      {asset.status !== 'RETIRED' && (
+                      {assetPerms.edit && asset.status !== 'RETIRED' && (
                         <button
                           className="btn-action"
                           style={{ borderColor: 'var(--text-muted)', color: 'var(--text-muted)' }}
@@ -768,7 +773,7 @@ export default function Catalog() {
                         </button>
                       )}
 
-                      {(() => {
+                      {assetPerms.edit && (() => {
                         const activeAssignment = getActiveAssignmentForAsset(asset.id);
                         const isPendingAcceptance = activeAssignment?.status === 'PENDING_ACCEPTANCE';
                         const isPendingReturn = activeAssignment?.status === 'PENDING_RETURN';
@@ -856,7 +861,7 @@ export default function Catalog() {
 
                         return null;
                       })()}
-                      {asset.status !== 'RETIRED' && (
+                      {assetPerms.delete && asset.status !== 'RETIRED' && (
                         <button
                           className="btn-action"
                           style={{ borderColor: '#ef4444', color: '#ef4444' }}

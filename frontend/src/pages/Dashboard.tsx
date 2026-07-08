@@ -6,6 +6,7 @@ import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveCo
 import './Dashboard.css';
 import { API_URL } from '../config';
 import { useConfirm } from '../context/ConfirmContext';
+import { useAuth, usePermission } from '../context/AuthContext';
 
 interface DashboardMetrics {
   totalAssets: number;
@@ -42,12 +43,18 @@ const STATUS_LABELS: Record<string, string> = {
 
 export default function Dashboard() {
   const { confirm } = useConfirm();
+  const { user } = useAuth();
+  // El Dashboard es la pantalla de aterrizaje: si el usuario no tiene permiso de
+  // lectura sobre él, se muestra una bienvenida sin datos (las consultas darían 403).
+  const dashPerms = usePermission('dashboard');
+
   const { data: metrics, isLoading } = useQuery<DashboardMetrics>({
     queryKey: ['dashboard_metrics'],
     queryFn: async () => {
       const response = await axios.get(`${API_URL}/api/dashboard`);
       return response.data;
-    }
+    },
+    enabled: dashPerms.read
   });
 
   const { data: assignments } = useQuery<any[]>({
@@ -55,7 +62,8 @@ export default function Dashboard() {
     queryFn: async () => {
       const response = await axios.get(`${API_URL}/api/assignments`);
       return response.data;
-    }
+    },
+    enabled: dashPerms.read
   });
 
   const { data: assets } = useQuery<any[]>({
@@ -63,7 +71,8 @@ export default function Dashboard() {
     queryFn: async () => {
       const response = await axios.get(`${API_URL}/api/catalog/assets`);
       return response.data;
-    }
+    },
+    enabled: dashPerms.read
   });
 
   const { data: collaborators } = useQuery<any[]>({
@@ -71,7 +80,8 @@ export default function Dashboard() {
     queryFn: async () => {
       const response = await axios.get(`${API_URL}/api/collaborators`);
       return response.data;
-    }
+    },
+    enabled: dashPerms.read
   });
 
   const { data: categories } = useQuery<any[]>({
@@ -79,8 +89,20 @@ export default function Dashboard() {
     queryFn: async () => {
       const response = await axios.get(`${API_URL}/api/catalog/categories`);
       return response.data;
-    }
+    },
+    enabled: dashPerms.read
   });
+
+  if (!dashPerms.read) return (
+    <div className="dashboard-container" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', textAlign: 'center', gap: '10px' }}>
+      <ShieldCheck size={48} style={{ opacity: 0.4 }} />
+      <h2 className="title-glow" style={{ margin: 0 }}>Bienvenido{user?.fullName ? `, ${user.fullName}` : ''}</h2>
+      <p style={{ color: 'var(--text-muted)', maxWidth: '420px' }}>
+        Usa el menú superior para ir a los módulos donde tienes acceso.
+        Si necesitas ver el Dashboard, solicita el permiso al administrador.
+      </p>
+    </div>
+  );
 
   if (isLoading) return (
     <div className="dashboard-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>

@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import './AssetProfile.css';
 import { API_URL } from '../config';
+import { usePermission } from '../context/AuthContext';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -199,6 +200,8 @@ const getCurrentSpecValue = (component: string, attrs: Record<string, any>): str
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function AssetProfile() {
+    // Permisos RBAC del módulo Equipos
+    const assetPerms = usePermission('assets');
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const queryClient = useQueryClient();
@@ -592,6 +595,7 @@ export default function AssetProfile() {
                                     <span className="count-badge">{upgrades.length}</span>
                                 )}
                             </h3>
+                            {assetPerms.edit && (
                             <button
                                 className="btn-primary"
                                 style={{ padding: '8px 14px', fontSize: '13px' }}
@@ -600,6 +604,7 @@ export default function AssetProfile() {
                                 <Plus size={15} />
                                 Registrar Upgrade
                             </button>
+                            )}
                         </div>
 
                         {loadingUpgrades ? (
@@ -607,6 +612,7 @@ export default function AssetProfile() {
                         ) : !upgrades || upgrades.length === 0 ? (
                             <div style={{ textAlign: 'center', padding: '20px 0' }}>
                                 <p className="ap-empty">No hay actualizaciones de hardware registradas.</p>
+                                {assetPerms.edit && (
                                 <button
                                     className="btn-glass"
                                     style={{ marginTop: '12px', fontSize: '13px', padding: '8px 16px' }}
@@ -614,6 +620,7 @@ export default function AssetProfile() {
                                 >
                                     <Plus size={14} /> Registrar el primer upgrade
                                 </button>
+                                )}
                             </div>
                         ) : (
                             <div style={{ overflowX: 'auto' }}>
@@ -732,7 +739,7 @@ export default function AssetProfile() {
                                                             ✔ Visto bueno TI
                                                         </span>
                                                     )}
-                                                    {a.status === 'RETURNED' && !a.adminApproval && (
+                                                    {assetPerms.edit && a.status === 'RETURNED' && !a.adminApproval && (
                                                         <button
                                                             className="btn-action"
                                                             style={{ borderColor: '#f59e0b', color: '#f59e0b', fontSize: '11px', padding: '2px 10px' }}

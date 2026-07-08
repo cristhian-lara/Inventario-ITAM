@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { PackageSearch, Users, Activity, LogOut, Settings as SettingsIcon, Menu, X, FileText } from 'lucide-react';
-import { useAuth, Role } from '../context/AuthContext';
+import { PackageSearch, Users, Activity, LogOut, Settings as SettingsIcon, Menu, X, FileText, UserCog, KeyRound } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import ChangePasswordModal from './ChangePasswordModal';
 import { APP_VERSION } from '../version';
 import './TopNavbar.css';
 
@@ -9,18 +10,22 @@ export default function TopNavbar() {
   const location = useLocation();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
-  const { user, logout } = useAuth();
+  const [showChangePassword, setShowChangePassword] = useState(false);
+  const { user, logout, can } = useAuth();
 
+  // Cada link declara su módulo RBAC: aparece solo con permiso de lectura.
+  // Dashboard queda siempre visible (es la pantalla de aterrizaje).
   const allNavLinks = [
-    { path: '/', label: 'Dashboard', icon: <Activity size={20} />, roles: [Role.ADMINISTRADOR, Role.VISUALIZADOR] },
-    { path: '/settings', label: 'Administración', icon: <SettingsIcon size={20} />, roles: [Role.ADMINISTRADOR] },
-    { path: '/collaborators', label: 'Colaboradores', icon: <Users size={20} />, roles: [Role.ADMINISTRADOR] },
-    { path: '/assets', label: 'Catálogo', icon: <PackageSearch size={20} />, roles: [Role.ADMINISTRADOR] },
-    { path: '/maintenances', label: 'Mantenimiento', icon: <SettingsIcon size={20} />, roles: [Role.ADMINISTRADOR, Role.VISUALIZADOR] },
-    { path: '/actas', label: 'Actas', icon: <FileText size={20} />, roles: [Role.ADMINISTRADOR, Role.VISUALIZADOR] }
+    { path: '/', label: 'Dashboard', icon: <Activity size={20} />, module: null },
+    { path: '/settings', label: 'Administración', icon: <SettingsIcon size={20} />, module: 'settings' },
+    { path: '/users', label: 'Usuarios', icon: <UserCog size={20} />, module: 'users' },
+    { path: '/collaborators', label: 'Colaboradores', icon: <Users size={20} />, module: 'collaborators' },
+    { path: '/assets', label: 'Catálogo', icon: <PackageSearch size={20} />, module: 'assets' },
+    { path: '/maintenances', label: 'Mantenimiento', icon: <SettingsIcon size={20} />, module: 'maintenances' },
+    { path: '/actas', label: 'Actas', icon: <FileText size={20} />, module: 'actas' }
   ];
 
-  const navLinks = allNavLinks.filter(link => user && link.roles.includes(user.role as Role));
+  const navLinks = allNavLinks.filter(link => user && (link.module === null || can(link.module).read));
 
   const closeMenu = () => setMenuOpen(false);
 
@@ -64,9 +69,12 @@ export default function TopNavbar() {
           <div className="user-profile">
             <div className="avatar">{user?.username?.substring(0, 2).toUpperCase() || 'U'}</div>
             <div className="user-info">
-              <span className="user-name">{user?.username || 'Usuario'}</span>
+              <span className="user-name">{user?.fullName || user?.username || 'Usuario'}</span>
             </div>
           </div>
+          <button className="btn-icon" aria-label="Cambiar contraseña" title="Cambiar contraseña" onClick={() => setShowChangePassword(true)}>
+            <KeyRound size={20} />
+          </button>
           <button className="btn-icon" aria-label="Cerrar sesión" onClick={handleLogout}>
             <LogOut size={20} />
           </button>
@@ -110,15 +118,20 @@ export default function TopNavbar() {
             <div className="mobile-drawer-footer">
               <div className="user-profile">
                 <div className="avatar">{user?.username?.substring(0, 2).toUpperCase() || 'U'}</div>
-                <span className="user-name">{user?.username || 'Usuario'}</span>
+                <span className="user-name">{user?.fullName || user?.username || 'Usuario'}</span>
               </div>
-              <button className="btn-icon" style={{ marginLeft: 'auto' }} onClick={handleLogout}>
+              <button className="btn-icon" style={{ marginLeft: 'auto' }} aria-label="Cambiar contraseña" onClick={() => { closeMenu(); setShowChangePassword(true); }}>
+                <KeyRound size={20} />
+              </button>
+              <button className="btn-icon" onClick={handleLogout}>
                 <LogOut size={20} />
               </button>
             </div>
           </div>
         </div>
       )}
+
+      {showChangePassword && <ChangePasswordModal onClose={() => setShowChangePassword(false)} />}
     </>
   );
 }

@@ -1,11 +1,18 @@
 import { Response, NextFunction } from 'express';
 import { AuthRequest, authenticateJWT } from './auth.middleware';
+import { resolveRoutePermission } from './permission-map';
+import { PostgresUserRepository } from '../../modules/auth/infrastructure/repositories/PostgresUserRepository';
+import { PostgresPermissionRepository } from '../../modules/auth/infrastructure/repositories/PostgresPermissionRepository';
+import { Role } from '../../modules/auth/domain/Role';
 
 /**
- * Guard global del API:
+ * Guard global del API (RBAC):
  * - Endpoints públicos (login y firmas por enlace con token propio): pasan sin sesión.
- * - Lecturas (GET/HEAD): cualquier usuario autenticado (ADMINISTRADOR o VISUALIZADOR).
- * - Escrituras (POST/PUT/PATCH/DELETE): solo ADMINISTRADOR.
+ * - El resto exige JWT válido Y usuario activo en BD (la desactivación o el
+ *   cambio de permisos surte efecto inmediato, sin esperar a que expire el token).
+ * - SUPER_ADMIN: acceso total.
+ * - Demás roles: se resuelve (módulo, acción) con el mapa declarativo y se
+ *   verifica contra la matriz de permisos en BD. Ruta no mapeada = denegada.
  *
  * Los enlaces de firma que reciben los colaboradores por Webex validan su propio
  * JWT de firma dentro de cada endpoint, por eso quedan fuera de la sesión de la app.
@@ -29,11 +36,43 @@ export const apiGuard = (req: AuthRequest, res: Response, next: NextFunction): v
     if (isPublic) return next();
 
     authenticateJWT(req, res, () => {
-        const isReadOnly = req.method === 'GET' || req.method === 'HEAD';
-        if (isReadOnly) return next();
-
-        if (req.user?.role === 'ADMINISTRADOR') return next();
-
-        res.status(403).json({ error: 'No tienes permisos suficientes para realizar esta acción.' });
+        authorizeAgainstDatabase(req, res, next).catch(err => {
+            console.error('Error en autorización RBAC:', err);
+            res.status(500).json({ error: 'Error interno al validar permisos' });
+        });
     });
+};
+
+const authorizeAgainstDatabase = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+    const userRepository = new PostgresUserRepository();
+    const user = await userRepository.findById(req.user?.id);
+
+    if (!user || !user.isActive) {
+        res.status(401).json({ error: 'Tu cuenta está inactiva o ya no existe. Contacta al administrador.' });
+        return;
+    }
+
+    // Estado fresco desde BD para el resto de la petición (rol vigente, no el del token)
+    req.user = { id: user.id, username: user.username, role: user.role, fullName: user.fullName };
+
+    if (user.role === Role.SUPER_ADMIN) return next();
+
+    const rule = resolveRoutePermission(req.method, req.path);
+    if (!rule) {
+        // Default deny: toda ruta debe estar declarada en permission-map.ts
+        res.status(403).json({ error: 'No tienes permisos suficientes para realizar esta acción.' });
+        return;
+    }
+
+    if (rule.authOnly) return next();
+
+    const permissionRepository = new PostgresPermissionRepository();
+    const permissions = await permissionRepository.findByUser(user.id);
+    const allowed = (rule.anyOf || []).some(requirement =>
+        permissions.some(p => p.moduleKey === requirement.module && p.allows(requirement.action))
+    );
+
+    if (allowed) return next();
+
+    res.status(403).json({ error: 'No tienes permisos suficientes para realizar esta acción.' });
 };
