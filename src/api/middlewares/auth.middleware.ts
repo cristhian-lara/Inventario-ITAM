@@ -18,7 +18,9 @@ export const authenticateJWT = (req: AuthRequest, res: Response, next: NextFunct
             req.user = user;
             next();
         } catch (err) {
-            res.status(403).json({ error: 'Token inválido o expirado' });
+            // 401 (no autenticado): el interceptor del frontend detecta este código
+            // y redirige al login. 403 se reserva para usuarios autenticados sin permisos.
+            res.status(401).json({ error: 'Sesión inválida o expirada. Inicia sesión de nuevo.' });
         }
     } else {
         res.status(401).json({ error: 'Falta el token de autorización' });

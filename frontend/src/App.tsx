@@ -8,6 +8,7 @@ import Settings from './pages/Settings'
 import AssetProfile from './pages/AssetProfile'
 import Login from './pages/Login'
 import ProtectedRoute from './components/ProtectedRoute'
+import InactivityHandler from './components/InactivityHandler'
 import { Role } from './context/AuthContext'
 
 import Maintenances from './pages/Maintenances'
@@ -20,6 +21,7 @@ function App() {
 
   return (
     <div className="app-container">
+      {!isLoginPage && <InactivityHandler />}
       {!isLoginPage && <TopNavbar />}
       <main className="main-content">
         <Routes>
