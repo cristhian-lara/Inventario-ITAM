@@ -7,6 +7,7 @@ import dashboardRouter from './routes/dashboard.routes';
 import { maintenanceRouter } from './routes/maintenance.routes';
 import settingsRoutes from './routes/settings.routes';
 import { initializeDatabase } from '../shared/infrastructure/database/postgres';
+import { scheduleLoanExpiryAlertJob } from '../modules/assignment/infrastructure/LoanAlertJob';
 import path from 'path';
 
 const app = express();
@@ -16,12 +17,15 @@ const PORT = process.env.PORT || 3000;
 app.disable('x-powered-by');
 
 // CORS con lista de orígenes permitidos (configurable por env).
+// En desarrollo se acepta cualquier puerto de localhost / red local (Vite puede
+// arrancar en un puerto distinto a 5173 cuando el predeterminado está ocupado).
 // Las peticiones sin cabecera Origin (curl, enlaces de firma, misma-origin vía proxy) se permiten.
-const allowedOrigins = (process.env.CORS_ORIGINS || 'http://localhost:5173,http://127.0.0.1:5173,http://192.168.2.58:5173')
+const allowedOrigins = (process.env.CORS_ORIGINS || '')
     .split(',').map(o => o.trim()).filter(Boolean);
+const DEV_ORIGIN_PATTERN = /^http:\/\/(localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3}):\d+$/;
 app.use(cors({
     origin: (origin, callback) => {
-        if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+        if (!origin || allowedOrigins.includes(origin) || DEV_ORIGIN_PATTERN.test(origin)) return callback(null, true);
         callback(new Error('Origen no permitido por CORS'));
     }
 }));
@@ -59,6 +63,7 @@ initializeDatabase().then(() => {
   app.listen(PORT, () => {
     console.log(`Server is running on http://localhost:${PORT}`);
   });
+  scheduleLoanExpiryAlertJob();
 }).catch((error) => {
   console.error('Failed to start server:', error);
 });

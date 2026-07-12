@@ -98,6 +98,9 @@ interface AssignmentHistory {
     collaboratorName: string;
     collaboratorEmail: string;
     status: string;
+    assignmentType?: 'PERMANENT' | 'LOAN';
+    expectedReturnDate?: string | null;
+    lastAlertSentAt?: string | null;
     startDate: string;
     endDate?: string;
     documentPath?: string;
@@ -720,6 +723,20 @@ export default function AssetProfile() {
                                                     }`}>
                                                         {assignmentStatusLabel(a.status)}
                                                     </span>
+                                                    {a.assignmentType === 'LOAN' && (() => {
+                                                        const overdue = a.status === 'ACCEPTED' && a.expectedReturnDate && new Date(a.expectedReturnDate) < new Date();
+                                                        return (
+                                                            <span
+                                                                className="badge-ap"
+                                                                style={{
+                                                                    background: overdue ? 'rgba(239, 68, 68, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                                                                    color: overdue ? '#dc2626' : '#ca8a04'
+                                                                }}
+                                                            >
+                                                                Préstamo{a.expectedReturnDate ? ` · ${overdue ? 'Vencido' : 'Vence'} ${formatDateSafe(a.expectedReturnDate)}` : ''}
+                                                            </span>
+                                                        );
+                                                    })()}
                                                     {a.documentPath && (
                                                         <a
                                                             href={`${API_URL}${a.documentPath}`}

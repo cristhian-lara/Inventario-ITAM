@@ -137,6 +137,18 @@ export default function Dashboard() {
     .sort((a, b) => a.daysLeft - b.daysLeft)
     .slice(0, 5);
 
+  // ── Préstamos activos por vencer (o ya vencidos) ───────────────────────────
+  const loansDue = (assignments || [])
+    .filter(a => a.status === 'ACCEPTED' && a.assignmentType === 'LOAN' && a.expectedReturnDate)
+    .map(a => {
+      const dueDate = new Date(a.expectedReturnDate);
+      const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      const daysLeft = Math.floor((dueDate.getTime() - startOfToday.getTime()) / (1000 * 60 * 60 * 24));
+      return { ...a, dueDate, daysLeft };
+    })
+    .sort((a, b) => a.daysLeft - b.daysLeft)
+    .slice(0, 5);
+
   // ── Top 5 collaborators by accepted equipment count ───────────────────────
   const collabStats = (collaborators || [])
     .map(c => {
@@ -424,6 +436,48 @@ export default function Dashboard() {
         </div>
 
       </section>
+
+      {/* ── Préstamos por Vencer ───────────────────────────────────────────── */}
+      {loansDue.length > 0 && (
+        <section className="dash-row">
+          <div className="dash-card" style={{ flex: '1 1 100%' }}>
+            <h3 className="dash-card-title">Préstamos Próximos a Vencer</h3>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+              <thead>
+                <tr>
+                  {['Placa', 'Colaborador', 'Fecha Devolución', 'Días restantes', 'Estado'].map(h => (
+                    <th key={h} style={{ textAlign: 'left', padding: '8px 10px', color: 'var(--text-muted)', fontWeight: 600, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.4px', borderBottom: '1px solid var(--border-subtle)' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {loansDue.map(a => {
+                  const overdue = a.daysLeft < 0;
+                  const soon = a.daysLeft <= 7 && a.daysLeft >= 0;
+                  const color = overdue ? '#ef4444' : soon ? '#f59e0b' : '#10b981';
+                  const label = overdue ? 'VENCIDO' : soon ? 'POR VENCER' : 'VIGENTE';
+                  const collab = collaborators?.find(c => c.id === a.collaboratorId);
+                  return (
+                    <tr key={a.id} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+                      <td style={{ padding: '10px', fontWeight: 600 }}>
+                        <Link to={`/assets/${a.assetId}`} style={{ color: 'var(--accent-blue)', textDecoration: 'none' }}>{a.assetId}</Link>
+                      </td>
+                      <td style={{ padding: '10px', color: 'var(--text-muted)' }}>{collab?.name || collab?.email || a.collaboratorId}</td>
+                      <td style={{ padding: '10px' }}>{a.dueDate.toLocaleDateString('es-CO')}</td>
+                      <td style={{ padding: '10px', fontWeight: 600, color }}>
+                        {overdue ? `Vencido hace ${Math.abs(a.daysLeft)} días` : `${a.daysLeft} días`}
+                      </td>
+                      <td style={{ padding: '10px' }}>
+                        <span style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '4px', background: `${color}18`, color, fontWeight: 700 }}>{label}</span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
 
     </div>
   );

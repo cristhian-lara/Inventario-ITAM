@@ -14,11 +14,20 @@ export class AssignmentOrmEntity {
     @Column()
     status!: string;
 
+    @Column({ default: 'PERMANENT' })
+    assignment_type!: string;
+
     @Column({ type: 'timestamp' })
     start_date!: Date;
 
     @Column({ type: 'timestamp', nullable: true })
     end_date?: Date;
+
+    @Column({ type: 'timestamp', nullable: true })
+    expected_return_date?: Date;
+
+    @Column({ type: 'timestamp', nullable: true })
+    last_alert_sent_at?: Date;
 
     @Column({ nullable: true })
     signature_token?: string;

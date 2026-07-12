@@ -1,4 +1,4 @@
-import { Assignment } from '../domain/Assignment';
+import { Assignment, AssignmentType } from '../domain/Assignment';
 import { IAssignmentRepository } from '../domain/IAssignmentRepository';
 import { IMailerService } from '../../../shared/contracts/IMailerService';
 import * as jwt from 'jsonwebtoken';
@@ -14,9 +14,9 @@ export class AssignmentUseCases {
     /**
      * Inicia una asignación, genera el JWT de firma y envía el correo.
      */
-    async createAssignment(id: string, assetId: string, collaboratorId: string, collaboratorEmail: string, startDate?: string): Promise<{ assignment: Assignment; token: string }> {
+    async createAssignment(id: string, assetId: string, collaboratorId: string, collaboratorEmail: string, startDate?: string, assignmentType?: AssignmentType, expectedReturnDate?: string): Promise<{ assignment: Assignment; token: string }> {
         const existingAssignment = await this.repository.findCurrentByAssetId(assetId);
-        
+
         if (existingAssignment) {
             if (existingAssignment.status === 'PENDING_ACCEPTANCE') {
                 throw new Error('Este activo ya está en proceso de asignación (Pendiente de firma).');
@@ -29,16 +29,20 @@ export class AssignmentUseCases {
 
         // Un string 'YYYY-MM-DD' se parsea como medianoche UTC, que en Bogotá (UTC-5)
         // corresponde al día ANTERIOR. Se ancla a mediodía local para conservar el día elegido.
-        const parsedStartDate = startDate
-            ? (/^\d{4}-\d{2}-\d{2}$/.test(startDate) ? new Date(`${startDate}T12:00:00`) : new Date(startDate))
-            : new Date();
+        const parseLocalDate = (value: string) =>
+            /^\d{4}-\d{2}-\d{2}$/.test(value) ? new Date(`${value}T12:00:00`) : new Date(value);
+
+        const parsedStartDate = startDate ? parseLocalDate(startDate) : new Date();
+        const parsedExpectedReturnDate = expectedReturnDate ? parseLocalDate(expectedReturnDate) : undefined;
 
         const assignment = new Assignment({
             id,
             assetId,
             collaboratorId,
             status: 'PENDING_ACCEPTANCE',
-            startDate: parsedStartDate
+            assignmentType,
+            startDate: parsedStartDate,
+            expectedReturnDate: parsedExpectedReturnDate
         });
 
         // La función inyectada para generar el token usa JWT real
@@ -245,5 +249,39 @@ export class AssignmentUseCases {
 
         await this.repository.save(assignment);
         return assignment;
+    }
+
+    /**
+     * Extiende la fecha de devolución de un préstamo activo y reinicia su alerta de vencimiento.
+     */
+    async extendLoanReturnDate(assignmentId: string, newReturnDate: string): Promise<Assignment> {
+        const assignment = await this.repository.findById(assignmentId);
+        if (!assignment) throw new Error('Asignación no encontrada');
+
+        const parsed = /^\d{4}-\d{2}-\d{2}$/.test(newReturnDate) ? new Date(`${newReturnDate}T12:00:00`) : new Date(newReturnDate);
+        assignment.extendReturnDate(parsed);
+
+        await this.repository.save(assignment);
+        return assignment;
+    }
+
+    /**
+     * Préstamos activos que vencen dentro de `days` días (incluye los ya vencidos).
+     */
+    async getLoansDueWithinDays(days: number): Promise<Assignment[]> {
+        return this.repository.findLoansDueWithinDays(days);
+    }
+
+    /**
+     * Registra que se notificó hoy el vencimiento de varios préstamos (job diario de alertas),
+     * para que no se vuelvan a incluir en el digest hasta el día siguiente.
+     */
+    async registerLoanAlertsSent(assignmentIds: string[], sentAt: Date = new Date()): Promise<void> {
+        for (const id of assignmentIds) {
+            const assignment = await this.repository.findById(id);
+            if (!assignment) continue;
+            assignment.registerAlertSent(sentAt);
+            await this.repository.save(assignment);
+        }
     }
 }

@@ -6,4 +6,9 @@ export interface IAssignmentRepository {
     findAllActive(): Promise<Assignment[]>;
     findActiveByAssetId(assetId: string): Promise<Assignment | null>;
     findCurrentByAssetId(assetId: string): Promise<Assignment | null>;
+    /**
+     * Préstamos activos (ACCEPTED) cuya fecha de devolución vence dentro de
+     * `days` días, incluyendo los ya vencidos.
+     */
+    findLoansDueWithinDays(days: number): Promise<Assignment[]>;
 }

@@ -124,7 +124,9 @@ export class WebexNotificationService implements IMailerService {
     }
 
     async sendMaintenanceSignatureEmail(to: string, maintenanceId: string, token: string, documentPath?: string): Promise<void> {
-        const link = `${process.env.BACKEND_URL || 'http://localhost:3000'}/api/maintenance/${maintenanceId}/sign?token=${token}`;
+        // La firma de mantenimiento se hace en la página del frontend (trazo de firma),
+        // que valida el token vía /api/maintenances/verify-token y envía POST /sign.
+        const link = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/maintenances/sign/${token}`;
         const markdown = `**🔧 Firma Requerida: Mantenimiento Finalizado**\n\nHola, se ha completado el mantenimiento de uno de tus equipos. Por favor, revisa el acta adjunta y luego firma la conformidad:\n\n👉 [Aceptar Mantenimiento](${link})\n\n*⚠️ Importante: Para poder abrir el enlace y firmar el acta, recuerda que debes estar conectado a la red Wi-Fi de la oficina o tener activa tu sesión en la VPN (FortiClient).*`;
         await this.sendMessage(to, markdown, documentPath);
     }
@@ -145,5 +147,36 @@ export class WebexNotificationService implements IMailerService {
     async sendFinalPdfEmail(to: string, documentPath: string): Promise<void> {
         const markdown = `**✅ Copia de Acta Firmada**\n\nHola, adjuntamos la copia final en PDF de tu acta firmada. ¡Gracias!`;
         await this.sendMessage(to, markdown, documentPath);
+    }
+
+    /**
+     * Digest diario a un administrador con TODOS los préstamos que están a
+     * `alertThresholdDays` días de vencer o ya vencidos. Disparado por el job
+     * de alertas (no por acción manual de un usuario).
+     */
+    async sendLoanExpiryDigest(
+        to: string,
+        items: Array<{ assetId: string; hostname?: string; collaboratorName: string; expectedReturnDate: Date | string; daysLeft: number }>,
+        alertThresholdDays: number
+    ): Promise<void> {
+        const lines = [...items]
+            .sort((a, b) => a.daysLeft - b.daysLeft)
+            .map(item => {
+                const dateStr = typeof item.expectedReturnDate === 'string'
+                    ? item.expectedReturnDate.split('T')[0].split('-').reverse().join('/')
+                    : item.expectedReturnDate.toLocaleDateString('es-CO', { timeZone: 'America/Bogota' });
+                const equipo = item.hostname ? `${item.assetId} (${item.hostname})` : item.assetId;
+                const abs = Math.abs(item.daysLeft);
+                const estado = item.daysLeft < 0
+                    ? `🔴 Vencido hace ${abs} día${abs === 1 ? '' : 's'}`
+                    : item.daysLeft === 0
+                        ? `🟠 Vence HOY`
+                        : `🟡 Vence en ${abs} día${abs === 1 ? '' : 's'}`;
+                return `- **${equipo}** — Colaborador: ${item.collaboratorName} — Devolución esperada: ${dateStr} (${estado})`;
+            })
+            .join('\n');
+
+        const markdown = `**📦 Préstamos de Equipos Próximos a Vencer**\n\nHola, este es el resumen diario de préstamos que requieren atención (a ${alertThresholdDays} días o menos de su devolución, o ya vencidos):\n\n${lines}\n\nGestiona la devolución o extiende la fecha desde el Catálogo de Activos. Este aviso se repetirá a diario hasta que el equipo sea devuelto o se extienda su fecha.`;
+        await this.sendMessage(to, markdown);
     }
 }

@@ -1,6 +1,6 @@
 import { In } from 'typeorm';
 import { AppDataSource } from '../../../shared/infrastructure/database/postgres';
-import { Assignment, AssignmentStatus } from '../domain/Assignment';
+import { Assignment, AssignmentStatus, AssignmentType } from '../domain/Assignment';
 import { IAssignmentRepository } from '../domain/IAssignmentRepository';
 import { AssignmentOrmEntity } from './orm/Assignment.entity';
 
@@ -13,8 +13,11 @@ export class PostgresAssignmentRepository implements IAssignmentRepository {
             asset_id: assignment.assetId,
             collaborator_id: assignment.collaboratorId,
             status: assignment.status,
+            assignment_type: assignment.assignmentType,
             start_date: assignment.startDate,
             end_date: assignment.endDate,
+            expected_return_date: assignment.expectedReturnDate,
+            last_alert_sent_at: assignment.lastAlertSentAt,
             signature_token: assignment.signatureToken,
             signature_metadata: assignment.signatureMetadata,
             document_path: assignment.documentPath || undefined,
@@ -32,8 +35,11 @@ export class PostgresAssignmentRepository implements IAssignmentRepository {
             assetId: ormEntity.asset_id,
             collaboratorId: ormEntity.collaborator_id,
             status: ormEntity.status as AssignmentStatus,
+            assignmentType: (ormEntity.assignment_type || 'PERMANENT') as AssignmentType,
             startDate: ormEntity.start_date,
             endDate: ormEntity.end_date,
+            expectedReturnDate: ormEntity.expected_return_date,
+            lastAlertSentAt: ormEntity.last_alert_sent_at,
             signatureToken: ormEntity.signature_token,
             signatureMetadata: ormEntity.signature_metadata,
             documentPath: ormEntity.document_path,
@@ -50,8 +56,11 @@ export class PostgresAssignmentRepository implements IAssignmentRepository {
             assetId: ormEntity.asset_id,
             collaboratorId: ormEntity.collaborator_id,
             status: ormEntity.status as AssignmentStatus,
+            assignmentType: (ormEntity.assignment_type || 'PERMANENT') as AssignmentType,
             startDate: ormEntity.start_date,
             endDate: ormEntity.end_date,
+            expectedReturnDate: ormEntity.expected_return_date,
+            lastAlertSentAt: ormEntity.last_alert_sent_at,
             signatureToken: ormEntity.signature_token,
             signatureMetadata: ormEntity.signature_metadata,
             documentPath: ormEntity.document_path,
@@ -68,8 +77,11 @@ export class PostgresAssignmentRepository implements IAssignmentRepository {
             assetId: ormEntity.asset_id,
             collaboratorId: ormEntity.collaborator_id,
             status: ormEntity.status as AssignmentStatus,
+            assignmentType: (ormEntity.assignment_type || 'PERMANENT') as AssignmentType,
             startDate: ormEntity.start_date,
             endDate: ormEntity.end_date,
+            expectedReturnDate: ormEntity.expected_return_date,
+            lastAlertSentAt: ormEntity.last_alert_sent_at,
             signatureToken: ormEntity.signature_token,
             signatureMetadata: ormEntity.signature_metadata,
             documentPath: ormEntity.document_path,
@@ -90,12 +102,42 @@ export class PostgresAssignmentRepository implements IAssignmentRepository {
             assetId: ormEntity.asset_id,
             collaboratorId: ormEntity.collaborator_id,
             status: ormEntity.status as AssignmentStatus,
+            assignmentType: (ormEntity.assignment_type || 'PERMANENT') as AssignmentType,
             startDate: ormEntity.start_date,
             endDate: ormEntity.end_date,
+            expectedReturnDate: ormEntity.expected_return_date,
+            lastAlertSentAt: ormEntity.last_alert_sent_at,
             signatureToken: ormEntity.signature_token,
             signatureMetadata: ormEntity.signature_metadata,
             documentPath: ormEntity.document_path,
             adminApproval: ormEntity.admin_approval
         });
+    }
+
+    async findLoansDueWithinDays(days: number): Promise<Assignment[]> {
+        const limit = new Date();
+        limit.setDate(limit.getDate() + days);
+
+        const ormEntities = await this.repo.createQueryBuilder('assignment')
+            .where('assignment.assignment_type = :type', { type: 'LOAN' })
+            .andWhere('assignment.status = :status', { status: 'ACCEPTED' })
+            .andWhere('assignment.expected_return_date <= :limit', { limit })
+            .getMany();
+
+        return ormEntities.map(ormEntity => new Assignment({
+            id: ormEntity.id,
+            assetId: ormEntity.asset_id,
+            collaboratorId: ormEntity.collaborator_id,
+            status: ormEntity.status as AssignmentStatus,
+            assignmentType: (ormEntity.assignment_type || 'PERMANENT') as AssignmentType,
+            startDate: ormEntity.start_date,
+            endDate: ormEntity.end_date,
+            expectedReturnDate: ormEntity.expected_return_date,
+            lastAlertSentAt: ormEntity.last_alert_sent_at,
+            signatureToken: ormEntity.signature_token,
+            signatureMetadata: ormEntity.signature_metadata,
+            documentPath: ormEntity.document_path,
+            adminApproval: ormEntity.admin_approval
+        }));
     }
 }

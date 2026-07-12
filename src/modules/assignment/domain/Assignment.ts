@@ -1,4 +1,5 @@
 export type AssignmentStatus = 'PENDING_ACCEPTANCE' | 'ACCEPTED' | 'PENDING_RETURN' | 'RETURNED';
+export type AssignmentType = 'PERMANENT' | 'LOAN';
 
 export interface SignatureMetadata {
     ipAddress: string;
@@ -17,8 +18,11 @@ export interface AssignmentProps {
     assetId: string;
     collaboratorId: string;
     status: AssignmentStatus;
+    assignmentType?: AssignmentType;
     startDate: Date;
     endDate?: Date;
+    expectedReturnDate?: Date;
+    lastAlertSentAt?: Date;
     documentPath?: string;
     signatureToken?: string;
     signatureMetadata?: SignatureMetadata;
@@ -26,21 +30,32 @@ export interface AssignmentProps {
 }
 
 export class Assignment {
-    private props: AssignmentProps;
+    private props: AssignmentProps & { assignmentType: AssignmentType };
 
     constructor(props: AssignmentProps) {
         if (!props.assetId || !props.collaboratorId) {
             throw new Error('Asset ID y Collaborator ID son obligatorios');
         }
-        this.props = props;
+        const assignmentType = props.assignmentType ?? 'PERMANENT';
+        if (assignmentType === 'LOAN' && !props.expectedReturnDate) {
+            throw new Error('Los préstamos requieren una fecha de devolución esperada');
+        }
+        if (assignmentType === 'PERMANENT' && props.expectedReturnDate) {
+            throw new Error('Las asignaciones permanentes no deben tener fecha de devolución esperada');
+        }
+        this.props = { ...props, assignmentType };
     }
 
     get id(): string { return this.props.id; }
     get status(): AssignmentStatus { return this.props.status; }
+    get assignmentType(): AssignmentType { return this.props.assignmentType; }
+    get isLoan(): boolean { return this.props.assignmentType === 'LOAN'; }
     get assetId(): string { return this.props.assetId; }
     get collaboratorId(): string { return this.props.collaboratorId; }
     get startDate(): Date { return this.props.startDate; }
     get endDate(): Date | undefined { return this.props.endDate; }
+    get expectedReturnDate(): Date | undefined { return this.props.expectedReturnDate; }
+    get lastAlertSentAt(): Date | undefined { return this.props.lastAlertSentAt; }
     get signatureToken(): string | undefined { return this.props.signatureToken; }
     get signatureMetadata(): SignatureMetadata | undefined { return this.props.signatureMetadata; }
     get adminApproval(): AdminApproval | undefined { return this.props.adminApproval; }
@@ -144,5 +159,31 @@ export class Assignment {
 
     public get documentPath(): string | undefined {
         return this.props.documentPath;
+    }
+
+    /**
+     * Extiende la fecha de devolución de un préstamo activo. Reinicia el estado
+     * de alerta para que el vencimiento vuelva a notificarse en el futuro.
+     */
+    public extendReturnDate(newReturnDate: Date): void {
+        if (this.props.assignmentType !== 'LOAN') {
+            throw new Error('Solo los préstamos tienen fecha de devolución para extender');
+        }
+        if (this.props.status === 'RETURNED') {
+            throw new Error('No se puede extender un préstamo ya devuelto');
+        }
+        this.props.expectedReturnDate = newReturnDate;
+        this.props.lastAlertSentAt = undefined;
+    }
+
+    /**
+     * Registra que se notificó el vencimiento de este préstamo en `sentAt`,
+     * para que el job diario no lo vuelva a incluir el mismo día.
+     */
+    public registerAlertSent(sentAt: Date): void {
+        if (this.props.assignmentType !== 'LOAN') {
+            throw new Error('Solo los préstamos generan alertas de vencimiento');
+        }
+        this.props.lastAlertSentAt = sentAt;
     }
 }

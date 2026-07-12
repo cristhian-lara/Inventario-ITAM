@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router-dom';
 import ActionMenu from '../components/ActionMenu';
 import axios from 'axios';
-import { Plus, Search, Tag, Cpu, HardDrive, Wifi, PlusCircle, MonitorSmartphone, RefreshCw, CheckCircle2, AlertCircle, AlertTriangle, UserCheck, Send, Upload, Trash2 } from 'lucide-react';
+import { Plus, Search, Tag, Cpu, HardDrive, Wifi, PlusCircle, MonitorSmartphone, RefreshCw, CheckCircle2, AlertCircle, AlertTriangle, UserCheck, Send, Upload, Trash2, CalendarClock } from 'lucide-react';
 import { useConfirm } from '../context/ConfirmContext';
 import { usePermission } from '../context/AuthContext';
 import { showWebexFailureModal } from '../utils/notificationNotice';
@@ -72,8 +72,14 @@ export default function Catalog() {
     collaboratorId: '',
     collaboratorEmail: '',
     collaboratorName: '',
-    startDate: new Date().toISOString().split('T')[0]
+    startDate: new Date().toISOString().split('T')[0],
+    assignmentType: 'PERMANENT' as 'PERMANENT' | 'LOAN',
+    expectedReturnDate: ''
   });
+
+  // Extender fecha de devolución de un préstamo activo
+  const [extendLoanTarget, setExtendLoanTarget] = useState<{ assignmentId: string; assetId: string; currentReturnDate?: string } | null>(null);
+  const [extendLoanDate, setExtendLoanDate] = useState('');
 
   useEffect(() => {
     if (assignModalAssetId) {
@@ -209,7 +215,9 @@ export default function Catalog() {
         collaboratorId: '',
         collaboratorEmail: '',
         collaboratorName: '',
-        startDate: new Date().toISOString().split('T')[0]
+        startDate: new Date().toISOString().split('T')[0],
+        assignmentType: 'PERMANENT',
+        expectedReturnDate: ''
       });
       setAssignModalAssetId(null);
       setCollabSearchTerm('');
@@ -365,7 +373,9 @@ export default function Catalog() {
       collaboratorId: '',
       collaboratorEmail: '',
       collaboratorName: '',
-      startDate: new Date().toISOString().split('T')[0]
+      startDate: new Date().toISOString().split('T')[0],
+      assignmentType: 'PERMANENT',
+      expectedReturnDate: ''
     });
     setAssignModalAssetId(assetId);
     setCollabSearchTerm('');
@@ -375,11 +385,34 @@ export default function Catalog() {
     e.preventDefault();
     confirm({
       title: 'Confirmar Asignación',
-      message: '¿Estás seguro de asignar este equipo al colaborador seleccionado?',
+      message: formData.assignmentType === 'LOAN'
+        ? `¿Estás seguro de asignar este equipo en modalidad de PRÉSTAMO, con devolución esperada el ${formData.expectedReturnDate}?`
+        : '¿Estás seguro de asignar este equipo de forma permanente al colaborador seleccionado?',
       type: 'info',
-      onConfirm: () => assignMutation.mutate(formData)
+      onConfirm: () => assignMutation.mutate({
+        ...formData,
+        expectedReturnDate: formData.assignmentType === 'LOAN' ? formData.expectedReturnDate : ''
+      })
     });
   };
+
+  const extendLoanMutation = useMutation({
+    mutationFn: async ({ assignmentId, newReturnDate }: { assignmentId: string, newReturnDate: string }) => {
+      const response = await axios.post(`${API_URL}/api/assignments/${assignmentId}/extend-loan`, { newReturnDate });
+      return response.data;
+    },
+    onSuccess: () => {
+      setSuccessMsg('Fecha de devolución del préstamo extendida exitosamente.');
+      setTimeout(() => setSuccessMsg(''), 8000);
+      setExtendLoanTarget(null);
+      setExtendLoanDate('');
+      queryClient.invalidateQueries({ queryKey: ['assignments'] });
+    },
+    onError: (err: any) => {
+      setErrorMsg(err.response?.data?.error || err.message);
+      setTimeout(() => setErrorMsg(''), 8000);
+    }
+  });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -638,11 +671,31 @@ export default function Catalog() {
                       const activeAssignment = getActiveAssignmentForAsset(asset.id);
                       if (activeAssignment && activeAssignment.collaboratorId) {
                         const coll = collaborators?.find(c => c.id === activeAssignment.collaboratorId);
-                        return coll ? (
-                          <Link to={`/collaborators/${activeAssignment.collaboratorId}`} style={{ color: 'var(--accent-blue)', textDecoration: 'none', fontWeight: '500' }}>
-                            {coll.email}
-                          </Link>
-                        ) : 'Sin asignar';
+                        if (!coll) return 'Sin asignar';
+                        const isLoan = activeAssignment.assignmentType === 'LOAN';
+                        const overdue = isLoan && activeAssignment.expectedReturnDate && new Date(activeAssignment.expectedReturnDate) < new Date();
+                        return (
+                          <>
+                            <Link to={`/collaborators/${activeAssignment.collaboratorId}`} style={{ color: 'var(--accent-blue)', textDecoration: 'none', fontWeight: '500' }}>
+                              {coll.email}
+                            </Link>
+                            {isLoan && (
+                              <div style={{ marginTop: '4px' }}>
+                                <span
+                                  className="badge"
+                                  style={{
+                                    fontSize: '11px',
+                                    background: overdue ? 'rgba(239, 68, 68, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                                    color: overdue ? '#dc2626' : '#ca8a04'
+                                  }}
+                                  title={overdue ? 'Préstamo vencido' : 'Préstamo activo'}
+                                >
+                                  Préstamo · {overdue ? 'Vencido' : 'Vence'} {activeAssignment.expectedReturnDate ? new Date(activeAssignment.expectedReturnDate).toLocaleDateString('es-CO') : ''}
+                                </span>
+                              </div>
+                            )}
+                          </>
+                        );
                       }
                       return 'Sin asignar';
                     })()}
@@ -829,6 +882,23 @@ export default function Catalog() {
                                   <RefreshCw size={16} />
                                 </button>
                               )}
+                              {!isPendingReturn && activeAssignment?.assignmentType === 'LOAN' && (
+                                <button
+                                  className="btn-action"
+                                  style={{ borderColor: '#f59e0b', color: '#f59e0b' }}
+                                  title="Extender Préstamo"
+                                  onClick={() => {
+                                    setExtendLoanDate('');
+                                    setExtendLoanTarget({
+                                      assignmentId: activeAssignment.id,
+                                      assetId: asset.id,
+                                      currentReturnDate: activeAssignment.expectedReturnDate
+                                    });
+                                  }}
+                                >
+                                  <CalendarClock size={16} />
+                                </button>
+                              )}
                               <button
                                 className="btn-action"
                                 style={{ borderColor: '#ef4444', color: '#ef4444' }}
@@ -933,6 +1003,42 @@ export default function Catalog() {
         </div>
       )}
 
+      {/* MODAL EXTENDER PRÉSTAMO */}
+      {extendLoanTarget && (
+        <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(4px)' }}>
+          <div className="glass-panel" style={{ width: '400px', padding: '20px' }}>
+            <h3 style={{ marginTop: 0 }}>Extender Préstamo</h3>
+            <p style={{ color: 'var(--text-muted)', marginBottom: '1rem' }}>
+              Activo <strong>{extendLoanTarget.assetId}</strong>. Fecha de devolución actual:{' '}
+              <strong>{extendLoanTarget.currentReturnDate ? new Date(extendLoanTarget.currentReturnDate).toLocaleDateString('es-CO') : 'N/A'}</strong>.
+              Al extender, se reinicia la alerta de vencimiento.
+            </p>
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              extendLoanMutation.mutate({ assignmentId: extendLoanTarget.assignmentId, newReturnDate: extendLoanDate });
+            }}>
+              <div className="form-group">
+                <label>Nueva Fecha de Devolución</label>
+                <input
+                  type="date"
+                  required
+                  className="glass-input"
+                  min={new Date().toISOString().split('T')[0]}
+                  value={extendLoanDate}
+                  onChange={(e) => setExtendLoanDate(e.target.value)}
+                />
+              </div>
+              <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+                <button type="button" className="btn-glass" onClick={() => { setExtendLoanTarget(null); setExtendLoanDate(''); }}>Cancelar</button>
+                <button type="submit" className="btn-primary" disabled={extendLoanMutation.isPending}>
+                  {extendLoanMutation.isPending ? 'Procesando...' : 'Confirmar Extensión'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* MODAL CONFIRMACIÓN DEVOLUCIÓN ELIMINADO PARA USAR EL GLOBAL */}
 
 
@@ -953,7 +1059,9 @@ export default function Catalog() {
                   collaboratorId: '',
                   collaboratorEmail: '',
                   collaboratorName: '',
-                  startDate: new Date().toISOString().split('T')[0]
+                  startDate: new Date().toISOString().split('T')[0],
+                  assignmentType: 'PERMANENT',
+                  expectedReturnDate: ''
                 });
               }}
             >
@@ -1066,6 +1174,43 @@ export default function Catalog() {
                 <label>Fecha de Asignación</label>
                 <input type="date" className="glass-input" name="startDate" value={formData.startDate} onChange={handleChange} required />
               </div>
+
+              <div className="form-group">
+                <label>Modalidad de Asignación</label>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button
+                    type="button"
+                    className={formData.assignmentType === 'PERMANENT' ? 'btn-primary' : 'btn-glass'}
+                    style={{ flex: 1, padding: '10px' }}
+                    onClick={() => setFormData({ ...formData, assignmentType: 'PERMANENT', expectedReturnDate: '' })}
+                  >
+                    Permanente
+                  </button>
+                  <button
+                    type="button"
+                    className={formData.assignmentType === 'LOAN' ? 'btn-primary' : 'btn-glass'}
+                    style={{ flex: 1, padding: '10px' }}
+                    onClick={() => setFormData({ ...formData, assignmentType: 'LOAN' })}
+                  >
+                    Préstamo
+                  </button>
+                </div>
+              </div>
+
+              {formData.assignmentType === 'LOAN' && (
+                <div className="form-group">
+                  <label>Fecha de Devolución Esperada</label>
+                  <input
+                    type="date"
+                    className="glass-input"
+                    name="expectedReturnDate"
+                    min={formData.startDate}
+                    value={formData.expectedReturnDate}
+                    onChange={handleChange}
+                    required
+                  />
+                </div>
+              )}
 
               <button type="submit" className="btn-primary submit-btn" disabled={assignMutation.isPending}>
                 {assignMutation.isPending ? 'Procesando...' : <><Send size={18} /> Procesar Asignación</>}

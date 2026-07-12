@@ -156,8 +156,8 @@ async function generateDraftPdf(
 // 1. Iniciar Asignación
 router.post('/', async (req, res) => {
     try {
-        const { id, assetId, collaboratorId, collaboratorEmail, collaboratorName, startDate } = req.body;
-        
+        const { id, assetId, collaboratorId, collaboratorEmail, collaboratorName, startDate, assignmentType, expectedReturnDate } = req.body;
+
         // Validación de Dominio: El activo debe existir y estar DISPONIBLE
         const asset = await catalogUseCases.getAssetById(assetId);
         if (!asset) {
@@ -167,7 +167,7 @@ router.post('/', async (req, res) => {
             return res.status(400).json({ error: `El activo ${assetId} no se puede asignar porque su estado actual es: ${asset.status}` });
         }
 
-        const { assignment, token } = await assignmentUseCases.createAssignment(id, assetId, collaboratorId, collaboratorEmail, startDate);
+        const { assignment, token } = await assignmentUseCases.createAssignment(id, assetId, collaboratorId, collaboratorEmail, startDate, assignmentType, expectedReturnDate);
 
         const documentPath = await generateDraftPdf(assignment, 'ASSIGNMENT', collaboratorName);
 
@@ -199,12 +199,55 @@ router.get('/', async (req, res) => {
             assetId: a.assetId,
             collaboratorId: a.collaboratorId,
             status: a.status,
+            assignmentType: a.assignmentType,
             startDate: a.startDate,
             endDate: a.endDate,
+            expectedReturnDate: a.expectedReturnDate,
+            lastAlertSentAt: a.lastAlertSentAt,
             documentPath: (a as any).props.documentPath
         })));
     } catch (error: any) {
         res.status(500).json({ error: error.message });
+    }
+});
+
+// Préstamos próximos a vencer (o ya vencidos) dentro de N días
+router.get('/loans/due-within', async (req, res) => {
+    try {
+        const days = parseInt(req.query.days as string, 10);
+        if (Number.isNaN(days) || days < 0) {
+            return res.status(400).json({ error: 'El parámetro "days" debe ser un número mayor o igual a 0.' });
+        }
+        const loans = await assignmentUseCases.getLoansDueWithinDays(days);
+        res.json(loans.map(a => ({
+            id: a.id,
+            assetId: a.assetId,
+            collaboratorId: a.collaboratorId,
+            status: a.status,
+            expectedReturnDate: a.expectedReturnDate,
+            lastAlertSentAt: a.lastAlertSentAt
+        })));
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Extender la fecha de devolución de un préstamo activo (reinicia su alerta de vencimiento)
+router.post('/:id/extend-loan', async (req, res) => {
+    try {
+        const { newReturnDate } = req.body || {};
+        if (!newReturnDate) {
+            return res.status(400).json({ error: 'newReturnDate es obligatorio.' });
+        }
+        const assignment = await assignmentUseCases.extendLoanReturnDate(req.params.id, newReturnDate);
+        res.json({
+            message: 'Fecha de devolución del préstamo extendida.',
+            assignmentId: assignment.id,
+            expectedReturnDate: assignment.expectedReturnDate,
+            lastAlertSentAt: assignment.lastAlertSentAt
+        });
+    } catch (error: any) {
+        res.status(400).json({ error: error.message });
     }
 });
 
@@ -937,6 +980,9 @@ router.get('/asset/:assetId/history', async (req, res) => {
                 collaboratorName,
                 collaboratorEmail,
                 status: a.status,
+                assignmentType: a.assignment_type || 'PERMANENT',
+                expectedReturnDate: a.expected_return_date || null,
+                lastAlertSentAt: a.last_alert_sent_at || null,
                 startDate: a.start_date,
                 endDate: a.end_date,
                 documentPath: a.document_path || null,
