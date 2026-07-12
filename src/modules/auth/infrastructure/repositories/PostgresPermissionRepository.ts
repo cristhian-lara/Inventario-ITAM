@@ -20,7 +20,10 @@ export class PostgresPermissionRepository implements IPermissionRepository {
             where: { isActive: true },
             order: { displayOrder: 'ASC' }
         });
-        return entities.map(e => new SystemModule(e.id, e.key, e.name, e.displayOrder, e.isActive));
+        return entities.map(e => new SystemModule(
+            e.id, e.key, e.name, e.displayOrder, e.isActive,
+            e.supportsCreate, e.supportsEdit, e.supportsDelete
+        ));
     }
 
     async findByUser(userId: string): Promise<UserPermission[]> {
@@ -40,10 +43,14 @@ export class PostgresPermissionRepository implements IPermissionRepository {
         await AppDataSource.transaction(async manager => {
             await manager.delete(UserPermissionEntity, { userId });
             for (const permission of permissions) {
-                permission.normalize();
-                if (!permission.hasAnyAccess()) continue; // sin acceso = sin fila
                 const module = moduleByKey.get(permission.moduleKey);
                 if (!module) continue;
+                // Enmascarar acciones que el módulo no ofrece (p. ej. Dashboard/Actas solo consulta)
+                if (!module.supportsCreate) permission.canCreate = false;
+                if (!module.supportsEdit) permission.canEdit = false;
+                if (!module.supportsDelete) permission.canDelete = false;
+                permission.normalize();
+                if (!permission.hasAnyAccess()) continue; // sin acceso = sin fila
                 await manager.save(UserPermissionEntity, manager.create(UserPermissionEntity, {
                     userId,
                     moduleId: module.id,

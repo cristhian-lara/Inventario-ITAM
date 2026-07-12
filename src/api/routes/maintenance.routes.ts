@@ -33,7 +33,35 @@ const assignmentAdapter: any = {
     }
 };
 
-const useCases = new MaintenanceUseCases(repo, assignmentAdapter, mailerService);
+/**
+ * Genera el acta borrador (sin firma gráfica) para adjuntarla a la notificación
+ * de Webex. No actualiza pdf_url: ese campo marca el acta FIRMADA en la UI.
+ * Usa el mismo nombre de archivo que el acta final, así la versión firmada la
+ * reemplaza al momento de firmar (sin duplicados en el módulo Actas).
+ */
+const draftActaProvider = async (record: any): Promise<string> => {
+    const { PostgresCatalogRepository } = require('../../modules/catalog/infrastructure/PostgresCatalogRepository');
+    const catalogRepo = new PostgresCatalogRepository(AppDataSource);
+    const asset = await catalogRepo.getAssetById(record.assetId);
+    let categoryName = 'EQUIPO';
+    if (asset && asset.categoryId) {
+        const category = await catalogRepo.getCategoryById(asset.categoryId);
+        if (category) categoryName = category.name;
+    }
+
+    const recordData = serializeRecord(record) as any;
+    if (!recordData.collaboratorInTurnName) {
+        const activeAssignment = await assignmentAdapter.getActiveAssignmentForAsset(record.assetId);
+        if (activeAssignment) {
+            recordData.collaboratorInTurnName = activeAssignment.collaboratorName;
+            recordData.collaboratorEmail = activeAssignment.collaboratorEmail;
+        }
+    }
+
+    return documentService.generateMaintenanceAct(recordData, asset, '', categoryName);
+};
+
+const useCases = new MaintenanceUseCases(repo, assignmentAdapter, mailerService, draftActaProvider);
 
 const serializeRecord = (record: any) => {
     return {
@@ -43,6 +71,7 @@ const serializeRecord = (record: any) => {
         type: record.type,
         status: record.status,
         scheduledDate: record.scheduledDate,
+        startedAt: record.startedAt,
         executionDate: record.executionDate,
         reason: record.reason,
         startNote: record.startNote,

@@ -20,6 +20,7 @@ interface MaintenanceRecord {
   executionDate?: string;
   reason?: string;
   startNote?: string;
+  startedAt?: string;
   notes?: string;
   collaboratorInTurnId?: string;
   collaboratorInTurnName?: string;
@@ -1082,6 +1083,11 @@ const Maintenances: React.FC = () => {
                       <div className="history-dot" style={{ background: '#f59e0b' }}></div>
                       <div className="history-content">
                         <h4><Wrench size={16} color="#f59e0b" /> En Progreso</h4>
+                        {selectedRecord.startedAt ? (
+                          <p><strong>Fecha de inicio:</strong> {new Date(selectedRecord.startedAt).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' })}</p>
+                        ) : (
+                          <p style={{ fontStyle: 'italic', opacity: 0.7 }}>Fecha de inicio no registrada (mantenimiento anterior a esta función).</p>
+                        )}
                         <p>El mantenimiento ha sido iniciado por el técnico.</p>
                         {selectedRecord.startNote && <p><strong>Diagnóstico Inicial:</strong> {selectedRecord.startNote}</p>}
                       </div>

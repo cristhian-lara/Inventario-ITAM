@@ -6,6 +6,8 @@ export interface MaintenanceRecordProps {
     type: MaintenanceType;
     status: MaintenanceStatus;
     scheduledDate: Date;
+    /** Fecha y hora exacta en que el mantenimiento pasó a En Progreso */
+    startedAt?: Date;
     executionDate?: Date;
     reason?: string;
     startNote?: string;
@@ -33,6 +35,7 @@ export class MaintenanceRecord {
     get type(): MaintenanceType { return this.props.type; }
     get status(): MaintenanceStatus { return this.props.status; }
     get scheduledDate(): Date { return this.props.scheduledDate; }
+    get startedAt(): Date | undefined { return this.props.startedAt; }
     get executionDate(): Date | undefined { return this.props.executionDate; }
     get reason(): string | undefined { return this.props.reason; }
     get startNote(): string | undefined { return this.props.startNote; }
@@ -49,6 +52,8 @@ export class MaintenanceRecord {
             throw new Error('No se puede iniciar un mantenimiento cerrado');
         }
         this.props.status = 'IN_PROGRESS';
+        // Trazabilidad: momento exacto del cambio a En Progreso (solo la primera vez)
+        if (!this.props.startedAt) this.props.startedAt = new Date();
         if (startNote) this.props.startNote = startNote;
     }
 

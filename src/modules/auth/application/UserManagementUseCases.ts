@@ -82,7 +82,7 @@ export class UserManagementUseCases {
         });
 
         if (data.permissions) {
-            await this.permissionRepository.replaceForUser(created.id, this.toDomainPermissions(created.id, data.permissions));
+            await this.permissionRepository.replaceForUser(created.id, this.toDomainPermissions(created.id, created.role, data.permissions));
         }
         return this.toSummary(created);
     }
@@ -105,15 +105,27 @@ export class UserManagementUseCases {
                 user.email = normalized;
             }
         }
+        let roleChangedToAuditor = false;
         if (data.role !== undefined && data.role !== user.role) {
             if (user.role === Role.SUPER_ADMIN) {
                 throw new UserManagementError('El Super Administrador no puede ser degradado.', 403);
             }
             this.validateAssignableRole(actor, data.role);
+            roleChangedToAuditor = data.role === Role.ESTANDAR;
             user.role = data.role;
         }
 
         const saved = await this.userRepository.save(user);
+
+        // Al pasar a Auditor (solo consulta) se recortan los permisos de escritura existentes
+        if (roleChangedToAuditor) {
+            const current = await this.permissionRepository.findByUser(userId);
+            await this.permissionRepository.replaceForUser(userId, this.toDomainPermissions(
+                userId, Role.ESTANDAR,
+                current.map(p => ({ moduleKey: p.moduleKey, canRead: p.canRead, canCreate: false, canEdit: false, canDelete: false }))
+            ));
+        }
+
         return this.toSummary(saved);
     }
 
@@ -126,7 +138,7 @@ export class UserManagementUseCases {
         if (actor.id === userId && actor.role !== Role.SUPER_ADMIN) {
             throw new UserManagementError('No puedes modificar tus propios permisos.', 403);
         }
-        await this.permissionRepository.replaceForUser(userId, this.toDomainPermissions(userId, permissions));
+        await this.permissionRepository.replaceForUser(userId, this.toDomainPermissions(userId, user.role, permissions));
     }
 
     async setStatus(actor: ActorContext, userId: string, isActive: boolean): Promise<UserSummary> {
@@ -235,9 +247,19 @@ export class UserManagementUseCases {
         if (existing) throw new UserManagementError('Ya existe un usuario con ese correo electrónico.');
     }
 
-    private toDomainPermissions(userId: string, inputs: PermissionInput[]): UserPermission[] {
+    /**
+     * El rol Auditor (ESTANDAR) es de solo consulta: cualquier flag de
+     * escritura que llegue se descarta y solo se conserva la lectura.
+     */
+    private toDomainPermissions(userId: string, role: Role, inputs: PermissionInput[]): UserPermission[] {
+        const readOnly = role === Role.ESTANDAR;
         return inputs.map(p => new UserPermission(
-            userId, p.moduleKey, !!p.canRead, !!p.canCreate, !!p.canEdit, !!p.canDelete
+            userId,
+            p.moduleKey,
+            !!p.canRead,
+            !readOnly && !!p.canCreate,
+            !readOnly && !!p.canEdit,
+            !readOnly && !!p.canDelete
         ));
     }
 

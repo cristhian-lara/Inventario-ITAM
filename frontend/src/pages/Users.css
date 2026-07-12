@@ -156,6 +156,11 @@
     cursor: pointer;
 }
 
+.permissions-table input[type='checkbox']:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
 .users-modal-footer {
     display: flex;
     justify-content: flex-end;

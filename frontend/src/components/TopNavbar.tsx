@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { PackageSearch, Users, Activity, LogOut, Settings as SettingsIcon, Menu, X, FileText, UserCog, KeyRound } from 'lucide-react';
+import { PackageSearch, Users, Activity, LogOut, Settings as SettingsIcon, Menu, X, FileText, UserCog, KeyRound, ChevronDown } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import ChangePasswordModal from './ChangePasswordModal';
 import { APP_VERSION } from '../version';
@@ -10,15 +10,17 @@ export default function TopNavbar() {
   const location = useLocation();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [showChangePassword, setShowChangePassword] = useState(false);
   const { user, logout, can } = useAuth();
+  const userMenuRef = useRef<HTMLDivElement>(null);
 
   // Cada link declara su módulo RBAC: aparece solo con permiso de lectura.
   // Dashboard queda siempre visible (es la pantalla de aterrizaje).
+  // Usuarios no va aquí: vive en el menú del usuario (esquina superior derecha).
   const allNavLinks = [
     { path: '/', label: 'Dashboard', icon: <Activity size={20} />, module: null },
     { path: '/settings', label: 'Administración', icon: <SettingsIcon size={20} />, module: 'settings' },
-    { path: '/users', label: 'Usuarios', icon: <UserCog size={20} />, module: 'users' },
     { path: '/collaborators', label: 'Colaboradores', icon: <Users size={20} />, module: 'collaborators' },
     { path: '/assets', label: 'Catálogo', icon: <PackageSearch size={20} />, module: 'assets' },
     { path: '/maintenances', label: 'Mantenimiento', icon: <SettingsIcon size={20} />, module: 'maintenances' },
@@ -26,8 +28,21 @@ export default function TopNavbar() {
   ];
 
   const navLinks = allNavLinks.filter(link => user && (link.module === null || can(link.module).read));
+  const canManageUsers = !!user && can('users').read;
 
   const closeMenu = () => setMenuOpen(false);
+
+  // Cerrar el menú del usuario al hacer clic fuera
+  useEffect(() => {
+    if (!userMenuOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+        setUserMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [userMenuOpen]);
 
   const handleLogout = () => {
     logout();
@@ -66,18 +81,46 @@ export default function TopNavbar() {
 
         <div className="navbar-right">
           {/* Desktop user */}
-          <div className="user-profile">
-            <div className="avatar">{user?.username?.substring(0, 2).toUpperCase() || 'U'}</div>
-            <div className="user-info">
-              <span className="user-name">{user?.fullName || user?.username || 'Usuario'}</span>
-            </div>
+          <div className="user-menu" ref={userMenuRef}>
+            <button
+              type="button"
+              className="user-profile user-menu-trigger"
+              onClick={() => setUserMenuOpen(v => !v)}
+              aria-haspopup="true"
+              aria-expanded={userMenuOpen}
+            >
+              <div className="avatar">{user?.username?.substring(0, 2).toUpperCase() || 'U'}</div>
+              <div className="user-info">
+                <span className="user-name">{user?.fullName || user?.username || 'Usuario'}</span>
+              </div>
+              <ChevronDown size={16} className={`user-menu-chevron ${userMenuOpen ? 'open' : ''}`} />
+            </button>
+
+            {userMenuOpen && (
+              <div className="user-menu-dropdown glass-panel">
+                {canManageUsers && (
+                  <button
+                    className="user-menu-item"
+                    onClick={() => { setUserMenuOpen(false); navigate('/users'); }}
+                  >
+                    <UserCog size={16} />
+                    Gestión de Usuarios
+                  </button>
+                )}
+                <button
+                  className="user-menu-item"
+                  onClick={() => { setUserMenuOpen(false); setShowChangePassword(true); }}
+                >
+                  <KeyRound size={16} />
+                  Cambiar contraseña
+                </button>
+                <button className="user-menu-item danger" onClick={handleLogout}>
+                  <LogOut size={16} />
+                  Cerrar sesión
+                </button>
+              </div>
+            )}
           </div>
-          <button className="btn-icon" aria-label="Cambiar contraseña" title="Cambiar contraseña" onClick={() => setShowChangePassword(true)}>
-            <KeyRound size={20} />
-          </button>
-          <button className="btn-icon" aria-label="Cerrar sesión" onClick={handleLogout}>
-            <LogOut size={20} />
-          </button>
 
           {/* Hamburger button — only on mobile */}
           <button

@@ -12,7 +12,13 @@ export class MaintenanceUseCases {
     constructor(
         private repo: IMaintenanceRepository,
         private assignmentService: IAssetAssignmentService,
-        private mailerService?: any // We will type it properly
+        private mailerService?: any, // We will type it properly
+        /**
+         * Genera el acta borrador (sin firma) del mantenimiento y devuelve su ruta,
+         * para adjuntarla en la notificación de Webex. Inyectado desde las rutas,
+         * que son quienes conocen el servicio de PDF y los datos del activo.
+         */
+        private draftActaProvider?: (record: MaintenanceRecord) => Promise<string>
     ) {}
 
     async createManualMaintenance(dto: { assetId: string, type: MaintenanceType, scheduledDate: Date, reason?: string }): Promise<MaintenanceRecord> {
@@ -75,10 +81,22 @@ export class MaintenanceUseCases {
      * y persistido, así que un fallo de Webex (cuenta inexistente, sin red/VPN)
      * solo se reporta — el enlace sigue vigente para reenviarlo después.
      */
-    private async trySendSignatureNotification(email: string, maintenanceId: string, token: string): Promise<NotificationResult> {
+    private async trySendSignatureNotification(email: string, maintenanceId: string, token: string, record?: MaintenanceRecord): Promise<NotificationResult> {
         if (!this.mailerService) return { sent: false, accountNotFound: false, error: 'Servicio de notificaciones no configurado' };
+
+        // Acta borrador (sin firma) para adjuntar al mensaje. Si su generación
+        // falla, se notifica igual sin adjunto: el enlace de firma es lo esencial.
+        let documentPath: string | undefined;
+        if (record && this.draftActaProvider) {
+            try {
+                documentPath = await this.draftActaProvider(record);
+            } catch (error: any) {
+                console.error(`⚠️ No se pudo generar el acta borrador de ${maintenanceId}:`, error.message);
+            }
+        }
+
         try {
-            await this.mailerService.sendMaintenanceSignatureEmail(email, maintenanceId, token);
+            await this.mailerService.sendMaintenanceSignatureEmail(email, maintenanceId, token, documentPath);
             return { sent: true, accountNotFound: false };
         } catch (error: any) {
             const accountNotFound = error instanceof NotificationError && error.reason === 'ACCOUNT_NOT_FOUND';
@@ -104,7 +122,7 @@ export class MaintenanceUseCases {
                     return jwt.sign({ maintenanceId: maintId }, secret, { expiresIn: '24h' });
                 });
 
-                notification = await this.trySendSignatureNotification(assignment.collaboratorEmail, id, token);
+                notification = await this.trySendSignatureNotification(assignment.collaboratorEmail, id, token, record);
             }
         }
 
@@ -134,7 +152,7 @@ export class MaintenanceUseCases {
 
         await this.repo.save(record);
 
-        const notification = await this.trySendSignatureNotification(assignment.collaboratorEmail, id, token);
+        const notification = await this.trySendSignatureNotification(assignment.collaboratorEmail, id, token, record);
 
         return { record, notification };
     }

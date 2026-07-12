@@ -18,6 +18,7 @@ export class PostgresMaintenanceRepository implements IMaintenanceRepository {
             type: orm.type as MaintenanceType,
             status: orm.status as MaintenanceStatus,
             scheduledDate: orm.scheduled_date,
+            startedAt: orm.started_at || undefined,
             executionDate: orm.execution_date || undefined,
             reason: orm.reason || undefined,
             startNote: orm.start_note || undefined,
@@ -39,6 +40,7 @@ export class PostgresMaintenanceRepository implements IMaintenanceRepository {
         orm.type = domain.type;
         orm.status = domain.status;
         orm.scheduled_date = domain.scheduledDate;
+        orm.started_at = domain.startedAt;
         orm.execution_date = domain.executionDate;
         orm.reason = domain.reason;
         orm.start_note = domain.startNote;

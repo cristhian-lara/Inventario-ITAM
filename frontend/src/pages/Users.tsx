@@ -21,6 +21,9 @@ interface SystemModule {
     key: string;
     name: string;
     displayOrder: number;
+    supportsCreate: boolean;
+    supportsEdit: boolean;
+    supportsDelete: boolean;
 }
 
 interface PermissionRow {
@@ -36,7 +39,7 @@ type MatrixState = Record<string, { canRead: boolean; canCreate: boolean; canEdi
 const ROLE_LABELS: Record<string, string> = {
     SUPER_ADMIN: 'Super Administrador',
     ADMINISTRADOR: 'Administrador',
-    ESTANDAR: 'Usuario Estándar',
+    ESTANDAR: 'Auditor',
 };
 
 const PASSWORD_HINT = 'Mínimo 8 caracteres, con mayúscula, minúscula y número.';
@@ -183,6 +186,30 @@ export default function Users() {
             if (current.canCreate || current.canEdit || current.canDelete) current.canRead = true;
             return { ...prev, [moduleKey]: current };
         });
+    };
+
+    // El rol Auditor es de solo consulta: al seleccionarlo se limpian los
+    // permisos de escritura y sus casillas quedan deshabilitadas.
+    const handleRoleChange = (newRole: Role) => {
+        setRole(newRole);
+        if (newRole === Role.ESTANDAR) {
+            setMatrix(prev => {
+                const cleaned: MatrixState = {};
+                for (const [key, flags] of Object.entries(prev)) {
+                    cleaned[key] = { canRead: flags.canRead, canCreate: false, canEdit: false, canDelete: false };
+                }
+                return cleaned;
+            });
+        }
+    };
+
+    /** Una casilla se deshabilita si el rol Auditor no admite escritura o el módulo no ofrece esa acción. */
+    const isFlagDisabled = (m: SystemModule, flag: keyof MatrixState[string]): boolean => {
+        if (flag === 'canRead') return false;
+        if (role === Role.ESTANDAR) return true;
+        if (flag === 'canCreate') return !m.supportsCreate;
+        if (flag === 'canEdit') return !m.supportsEdit;
+        return !m.supportsDelete;
     };
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -341,8 +368,8 @@ export default function Users() {
                                         /* Solo el Super Admin puede cambiar el rol de un Administrador */
                                         <input className="glass-input" value="Administrador" disabled />
                                     ) : (
-                                        <select className="glass-input" value={role} onChange={e => setRole(e.target.value as Role)}>
-                                            <option value={Role.ESTANDAR}>Usuario Estándar</option>
+                                        <select className="glass-input" value={role} onChange={e => handleRoleChange(e.target.value as Role)}>
+                                            <option value={Role.ESTANDAR}>Auditor</option>
                                             {isSuperAdmin && <option value={Role.ADMINISTRADOR}>Administrador</option>}
                                         </select>
                                     )}
@@ -355,7 +382,10 @@ export default function Users() {
                                     <p className="field-hint">
                                         Sin casillas marcadas = sin acceso (el módulo no aparece en el menú).
                                         Crear, Editar o Eliminar activan Lectura automáticamente.
-                                        Nota: Mantenimientos y Dashboard usan datos de Equipos y Colaboradores;
+                                        {role === Role.ESTANDAR
+                                            ? ' El rol Auditor es de solo consulta: únicamente puede otorgarse Lectura.'
+                                            : ' Las casillas deshabilitadas indican acciones que ese módulo no ofrece.'}
+                                        {' '}Nota: Mantenimientos y Dashboard usan datos de Equipos y Colaboradores;
                                         otorga Lectura en esos módulos para que sus pantallas carguen completas.
                                     </p>
                                     <div className="table-responsive" style={{ minHeight: 'unset' }}>
@@ -373,15 +403,20 @@ export default function Users() {
                                                 {modules.map(m => (
                                                     <tr key={m.key}>
                                                         <td>{m.name}</td>
-                                                        {(['canRead', 'canCreate', 'canEdit', 'canDelete'] as const).map(flag => (
-                                                            <td key={flag}>
-                                                                <input
-                                                                    type="checkbox"
-                                                                    checked={matrix[m.key]?.[flag] || false}
-                                                                    onChange={() => togglePermission(m.key, flag)}
-                                                                />
-                                                            </td>
-                                                        ))}
+                                                        {(['canRead', 'canCreate', 'canEdit', 'canDelete'] as const).map(flag => {
+                                                            const disabled = isFlagDisabled(m, flag);
+                                                            return (
+                                                                <td key={flag}>
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        checked={matrix[m.key]?.[flag] || false}
+                                                                        disabled={disabled}
+                                                                        title={disabled ? (role === Role.ESTANDAR ? 'El rol Auditor es de solo consulta' : 'Este módulo no ofrece esta acción') : undefined}
+                                                                        onChange={() => togglePermission(m.key, flag)}
+                                                                    />
+                                                                </td>
+                                                            );
+                                                        })}
                                                     </tr>
                                                 ))}
                                             </tbody>

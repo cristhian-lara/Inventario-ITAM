@@ -18,14 +18,16 @@ import { Role } from '../domain/Role';
 
 dotenv.config();
 
-const SYSTEM_MODULES: { key: string; name: string; displayOrder: number }[] = [
-    { key: 'dashboard', name: 'Dashboard', displayOrder: 1 },
-    { key: 'users', name: 'Usuarios', displayOrder: 2 },
-    { key: 'settings', name: 'Configuración', displayOrder: 3 },
-    { key: 'collaborators', name: 'Colaboradores', displayOrder: 4 },
-    { key: 'assets', name: 'Equipos (Catálogo)', displayOrder: 5 },
-    { key: 'maintenances', name: 'Mantenimientos', displayOrder: 6 },
-    { key: 'actas', name: 'Actas', displayOrder: 7 },
+// supports*: acciones que el módulo realmente ofrece — Dashboard y Actas son de
+// solo consulta, por lo que su matriz únicamente habilita Lectura.
+const SYSTEM_MODULES: { key: string; name: string; displayOrder: number; supportsCreate: boolean; supportsEdit: boolean; supportsDelete: boolean }[] = [
+    { key: 'dashboard', name: 'Dashboard', displayOrder: 1, supportsCreate: false, supportsEdit: false, supportsDelete: false },
+    { key: 'users', name: 'Usuarios', displayOrder: 2, supportsCreate: true, supportsEdit: true, supportsDelete: true },
+    { key: 'settings', name: 'Configuración', displayOrder: 3, supportsCreate: true, supportsEdit: true, supportsDelete: false },
+    { key: 'collaborators', name: 'Colaboradores', displayOrder: 4, supportsCreate: true, supportsEdit: true, supportsDelete: false },
+    { key: 'assets', name: 'Equipos (Catálogo)', displayOrder: 5, supportsCreate: true, supportsEdit: true, supportsDelete: true },
+    { key: 'maintenances', name: 'Mantenimientos', displayOrder: 6, supportsCreate: true, supportsEdit: true, supportsDelete: false },
+    { key: 'actas', name: 'Actas', displayOrder: 7, supportsCreate: false, supportsEdit: false, supportsDelete: false },
 ];
 
 // Lectura para usuarios ESTANDAR migrados (antiguos VISUALIZADOR):
@@ -92,6 +94,16 @@ const fase2 = async () => {
         if (!existing) {
             await moduleRepo.save(moduleRepo.create({ ...mod, isActive: true }));
             console.log(`   ✅ Módulo ${mod.key}`);
+        } else if (
+            existing.supportsCreate !== mod.supportsCreate ||
+            existing.supportsEdit !== mod.supportsEdit ||
+            existing.supportsDelete !== mod.supportsDelete
+        ) {
+            existing.supportsCreate = mod.supportsCreate;
+            existing.supportsEdit = mod.supportsEdit;
+            existing.supportsDelete = mod.supportsDelete;
+            await moduleRepo.save(existing);
+            console.log(`   ↺ Módulo ${mod.key}: capacidades actualizadas`);
         }
     }
 

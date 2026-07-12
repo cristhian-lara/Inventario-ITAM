@@ -17,6 +17,10 @@ export class MaintenanceOrmEntity {
     @Column({ type: 'date' })
     scheduled_date!: Date;
 
+    /** Fecha y hora exacta en que el mantenimiento pasó a En Progreso */
+    @Column({ type: 'timestamp', nullable: true })
+    started_at?: Date;
+
     @Column({ type: 'date', nullable: true })
     execution_date?: Date;
 
