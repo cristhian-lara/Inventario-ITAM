@@ -8,5 +8,6 @@ export interface ICatalogRepository {
     saveAsset(asset: Asset): Promise<void>;
     getAssetById(id: string): Promise<Asset | null>;
     getAllAssets(): Promise<Asset[]>;
+    getAssetsPaginated(page: number, limit: number): Promise<{ items: Asset[]; total: number }>;
     generateIncrementalId(categoryId: number): Promise<string>;
 }

@@ -1,13 +1,28 @@
 import { Router } from 'express';
 import multer from 'multer';
 import * as xlsx from 'xlsx';
+import { z } from 'zod';
 import { CatalogUseCases } from '../../modules/catalog/application/CatalogUseCases';
 import { PostgresCatalogRepository } from '../../modules/catalog/infrastructure/PostgresCatalogRepository';
 import { AppDataSource } from '../../shared/infrastructure/database/postgres';
 import { HardwareUpgradeOrmEntity } from '../../modules/catalog/infrastructure/orm/HardwareUpgrade.entity';
 import { v4 as uuidv4 } from 'uuid';
+import { validateBody } from '../middlewares/validate.middleware';
 
 const router = Router();
+
+const createAssetSchema = z.object({
+    id: z.string().min(1, 'id es requerido'),
+    categoryId: z.coerce.number({ message: 'categoryId debe ser numérico' }),
+    serial: z.string().optional(),
+    dynamicAttributes: z.record(z.string(), z.any()).optional().default({}),
+    purchaseDate: z.string().regex(/^\d{4}-\d{2}-\d{2}/, 'purchaseDate debe tener formato YYYY-MM-DD').optional(),
+    warrantyMonths: z.coerce.number().optional(),
+    depreciationYears: z.coerce.number().optional(),
+    purchasePrice: z.coerce.number().optional(),
+    vendorName: z.string().optional(),
+    internalBuyer: z.string().optional(),
+});
 const upload = multer({ storage: multer.memoryStorage() });
 
 // Inyección de Dependencias Manual (MVP)
@@ -74,7 +89,7 @@ router.post('/assets/import', upload.single('file'), async (req, res) => {
     }
 });
 
-router.post('/assets', async (req, res) => {
+router.post('/assets', validateBody(createAssetSchema), async (req, res) => {
     try {
         const { id, categoryId, serial, dynamicAttributes, purchaseDate, warrantyMonths, depreciationYears, purchasePrice, vendorName, internalBuyer } = req.body;
         const asset = await catalogUseCases.createAsset(
@@ -172,22 +187,32 @@ router.put('/assets/:id/status', async (req, res) => {
     }
 });
 
+const toAssetDto = (a: any) => ({
+    id: a.id,
+    categoryId: a.categoryId,
+    serial: a.serial,
+    status: a.status,
+    dynamicAttributes: a.dynamicAttributes,
+    purchaseDate: a.purchaseDate,
+    warrantyMonths: a.warrantyMonths,
+    depreciationYears: a.depreciationYears,
+    purchasePrice: a.purchasePrice,
+    vendorName: a.vendorName,
+    internalBuyer: a.internalBuyer,
+    disposal: a.disposal
+});
+
+// Paginación opcional vía ?page=&limit= (compatible hacia atrás: sin esos
+// parámetros devuelve el arreglo completo, igual que antes).
 router.get('/assets', async (req, res) => {
+    if (req.query.page || req.query.limit) {
+        const page = Math.max(1, parseInt(req.query.page as string, 10) || 1);
+        const limit = Math.min(200, Math.max(1, parseInt(req.query.limit as string, 10) || 50));
+        const { items, total } = await catalogUseCases.getAssetsPaginated(page, limit);
+        return res.json({ data: items.map(toAssetDto), total, page, limit });
+    }
     const assets = await catalogUseCases.getAllAssets();
-    res.json(assets.map(a => ({
-        id: a.id,
-        categoryId: a.categoryId,
-        serial: a.serial,
-        status: a.status,
-        dynamicAttributes: a.dynamicAttributes,
-        purchaseDate: a.purchaseDate,
-        warrantyMonths: a.warrantyMonths,
-        depreciationYears: a.depreciationYears,
-        purchasePrice: a.purchasePrice,
-        vendorName: a.vendorName,
-        internalBuyer: a.internalBuyer,
-        disposal: a.disposal
-    })));
+    res.json(assets.map(toAssetDto));
 });
 
 // ══════════════════════════════════════════════

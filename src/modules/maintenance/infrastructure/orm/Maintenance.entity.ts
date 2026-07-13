@@ -1,16 +1,18 @@
-import { Entity, PrimaryColumn, Column, CreateDateColumn } from 'typeorm';
+import { Entity, PrimaryColumn, Column, CreateDateColumn, Index } from 'typeorm';
 
 @Entity('maintenances', { schema: 'public' })
 export class MaintenanceOrmEntity {
     @PrimaryColumn()
     id!: string;
 
+    @Index()
     @Column()
     asset_id!: string;
 
     @Column()
     type!: string; // PREVENTIVE, CORRECTIVE
 
+    @Index()
     @Column()
     status!: string; // SCHEDULED, IN_PROGRESS, COMPLETED, CANCELLED
 

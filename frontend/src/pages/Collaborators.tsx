@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { Plus, Search, UserCheck, UserX, UserPlus, Edit2, Upload, Eye, Crown } from 'lucide-react';
 import { useConfirm } from '../context/ConfirmContext';
+import { useToast } from '../context/ToastContext';
 import { usePermission } from '../context/AuthContext';
 import { showWebexFailureModal } from '../utils/notificationNotice';
 import './Collaborators.css';
@@ -36,6 +37,7 @@ export default function Collaborators() {
   const [locationType, setLocationType] = useState('Medellín');
   const queryClient = useQueryClient();
   const { confirm } = useConfirm();
+  const toast = useToast();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importing, setImporting] = useState(false);
@@ -56,12 +58,7 @@ export default function Collaborators() {
       setImportResult(response.data);
       queryClient.invalidateQueries({ queryKey: ['collaborators'] });
     } catch (error: any) {
-      confirm({
-        title: 'Error de Importación',
-        message: 'Error en la importación: ' + (error.response?.data?.error || error.message),
-        type: 'danger',
-        onConfirm: () => {}
-      });
+      toast.error('Error en la importación: ' + (error.response?.data?.error || error.message));
     } finally {
       setImporting(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -140,20 +137,10 @@ export default function Collaborators() {
         queryClient.invalidateQueries({ queryKey: ['collaborators'] });
         queryClient.invalidateQueries({ queryKey: ['assignments'] });
         if (!showWebexFailureModal(confirm, response.data)) {
-            confirm({
-                title: 'Éxito',
-                message: 'El acta de devolución múltiple ha sido enviada al colaborador por Webex.',
-                type: 'success',
-                onConfirm: () => {}
-            });
+            toast.success('El acta de devolución múltiple ha sido enviada al colaborador por Webex.');
         }
     } catch (error: any) {
-        confirm({
-            title: 'Error',
-            message: error.response?.data?.error || 'Error al iniciar devolución',
-            type: 'danger',
-            onConfirm: () => {}
-        });
+        toast.error(error.response?.data?.error || 'Error al iniciar devolución');
     } finally {
         setIsBatchReturning(false);
     }
@@ -161,6 +148,10 @@ export default function Collaborators() {
 
   const handleOffboardSubmit = async () => {
     if (!offboardTarget) return;
+    if (!offboardReason.trim()) {
+      toast.error('El motivo de la baja es obligatorio.');
+      return;
+    }
     setIsOffboarding(true);
     try {
       const response = await axios.post(`${API_URL}/api/collaborators/${offboardTarget.id}/offboard`, {
@@ -184,12 +175,7 @@ export default function Collaborators() {
         }
       });
     } catch (error: any) {
-      confirm({
-        title: 'Error',
-        message: error.response?.data?.error || 'Error al procesar la baja del colaborador',
-        type: 'danger',
-        onConfirm: () => {}
-      });
+      toast.error(error.response?.data?.error || 'Error al procesar la baja del colaborador');
     } finally {
       setIsOffboarding(false);
     }
@@ -1052,10 +1038,11 @@ export default function Collaborators() {
               {/* Reason Input */}
               <div style={{ padding: '16px 28px 20px' }}>
                 <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#475569', marginBottom: '8px' }}>
-                  Motivo de la baja
+                  Motivo de la baja <span style={{ color: '#dc2626' }}>*</span>
                 </label>
                 <input
                   type="text"
+                  required
                   value={offboardReason}
                   onChange={(e) => setOffboardReason(e.target.value)}
                   placeholder="Ej: Fin de contrato, Renuncia, Terminación anticipada, etc."
@@ -1093,16 +1080,18 @@ export default function Collaborators() {
                 >Cancelar</button>
                 <button
                   onClick={handleOffboardSubmit}
-                  disabled={isOffboarding}
+                  disabled={isOffboarding || !offboardReason.trim()}
                   style={{
                     padding: '10px 22px', borderRadius: '10px', border: 'none',
-                    background: 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)',
+                    background: (isOffboarding || !offboardReason.trim())
+                      ? '#cbd5e1'
+                      : 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)',
                     color: '#fff',
                     fontWeight: '600', fontSize: '13px',
-                    cursor: isOffboarding ? 'not-allowed' : 'pointer',
+                    cursor: (isOffboarding || !offboardReason.trim()) ? 'not-allowed' : 'pointer',
                     transition: 'all 0.15s',
                     display: 'flex', alignItems: 'center', gap: '7px',
-                    boxShadow: '0 4px 14px rgba(220,38,38,0.35)'
+                    boxShadow: (isOffboarding || !offboardReason.trim()) ? 'none' : '0 4px 14px rgba(220,38,38,0.35)'
                   }}
                 >
                   {isOffboarding ? (

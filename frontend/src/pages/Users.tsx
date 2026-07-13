@@ -4,6 +4,7 @@ import axios from 'axios';
 import { Plus, UserCog, Edit, Trash2, X, KeyRound, ShieldCheck, Power } from 'lucide-react';
 import { useAuth, usePermission, Role } from '../context/AuthContext';
 import { useConfirm } from '../context/ConfirmContext';
+import { useToast } from '../context/ToastContext';
 import { API_URL } from '../config';
 import './Users.css';
 
@@ -55,12 +56,10 @@ const emptyMatrix = (modules: SystemModule[]): MatrixState => {
 export default function Users() {
     const queryClient = useQueryClient();
     const { confirm } = useConfirm();
+    const toast = useToast();
     const { user: currentUser } = useAuth();
     const perms = usePermission('users');
     const isSuperAdmin = currentUser?.role === Role.SUPER_ADMIN;
-
-    const [successMsg, setSuccessMsg] = useState('');
-    const [errorMsg, setErrorMsg] = useState('');
 
     // Modal crear/editar
     const [showModal, setShowModal] = useState(false);
@@ -76,11 +75,7 @@ export default function Users() {
     const [resetTarget, setResetTarget] = useState<UserRow | null>(null);
     const [newPassword, setNewPassword] = useState('');
 
-    const flash = (setter: (v: string) => void, msg: string) => {
-        setter(msg);
-        setTimeout(() => setter(''), 5000);
-    };
-    const onApiError = (err: any) => flash(setErrorMsg, err.response?.data?.error || err.message);
+    const onApiError = (err: any) => toast.error(err.response?.data?.error || err.message, 5000);
 
     const { data: users = [], isLoading } = useQuery<UserRow[]>({
         queryKey: ['users'],
@@ -99,7 +94,7 @@ export default function Users() {
             const permissions = toPermissionPayload(matrix);
             return axios.post(`${API_URL}/api/users`, { username, password, fullName, email, role, permissions });
         },
-        onSuccess: () => { flash(setSuccessMsg, 'Usuario creado con éxito'); closeModal(); invalidate(); },
+        onSuccess: () => { toast.success('Usuario creado con éxito'); closeModal(); invalidate(); },
         onError: onApiError,
     });
 
@@ -113,7 +108,7 @@ export default function Users() {
                 });
             }
         },
-        onSuccess: () => { flash(setSuccessMsg, 'Usuario actualizado con éxito'); closeModal(); invalidate(); },
+        onSuccess: () => { toast.success('Usuario actualizado con éxito'); closeModal(); invalidate(); },
         onError: onApiError,
     });
 
@@ -121,7 +116,7 @@ export default function Users() {
         mutationFn: async ({ id, isActive }: { id: string; isActive: boolean }) =>
             axios.patch(`${API_URL}/api/users/${id}/status`, { isActive }),
         onSuccess: (_d, vars) => {
-            flash(setSuccessMsg, vars.isActive ? 'Usuario reactivado' : 'Usuario desactivado');
+            toast.success(vars.isActive ? 'Usuario reactivado' : 'Usuario desactivado');
             invalidate();
         },
         onError: onApiError,
@@ -129,7 +124,7 @@ export default function Users() {
 
     const deleteMutation = useMutation({
         mutationFn: async (id: string) => axios.delete(`${API_URL}/api/users/${id}`),
-        onSuccess: () => { flash(setSuccessMsg, 'Usuario eliminado'); invalidate(); },
+        onSuccess: () => { toast.success('Usuario eliminado'); invalidate(); },
         onError: onApiError,
     });
 
@@ -139,7 +134,7 @@ export default function Users() {
             return axios.post(`${API_URL}/api/users/${resetTarget.id}/reset-password`, { newPassword });
         },
         onSuccess: () => {
-            flash(setSuccessMsg, `Contraseña de ${resetTarget?.username} restablecida`);
+            toast.success(`Contraseña de ${resetTarget?.username} restablecida`);
             setResetTarget(null); setNewPassword('');
         },
         onError: onApiError,
@@ -257,9 +252,6 @@ export default function Users() {
                 )}
             </header>
 
-            {successMsg && <div className="users-alert success">{successMsg}</div>}
-            {errorMsg && <div className="users-alert error">{errorMsg}</div>}
-
             <div className="glass-panel" style={{ padding: 0 }}>
                 <div className="table-responsive">
                     <table className="glass-table users-table">
@@ -297,7 +289,7 @@ export default function Users() {
                                     </td>
                                     <td>
                                         <div className="users-actions">
-                                            {perms.edit && (!isTargetSuperAdmin(u) || isSuperAdmin) && (
+                                            {perms.edit && (!isTargetSuperAdmin(u) || isSuperAdmin) && u.id !== currentUser?.id && (
                                                 <button className="btn-icon" title="Editar" onClick={() => openEdit(u)}>
                                                     <Edit size={17} />
                                                 </button>

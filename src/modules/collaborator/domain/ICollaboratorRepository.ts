@@ -6,6 +6,7 @@ export interface ICollaboratorRepository {
     findById(id: string): Promise<Collaborator | null>;
     findByEmail(email: string): Promise<Collaborator | null>;
     findAll(): Promise<Collaborator[]>;
+    findAllPaginated(page: number, limit: number): Promise<{ items: Collaborator[]; total: number }>;
     update(collaborator: Collaborator): Promise<void>;
     saveHistory(history: CollaboratorHistory): Promise<void>;
     getHistory(collaboratorId: string): Promise<CollaboratorHistory[]>;

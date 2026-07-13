@@ -6,30 +6,17 @@ import { BcryptPasswordHasher } from '../../modules/auth/infrastructure/services
 import { JwtTokenService } from '../../modules/auth/infrastructure/services/JwtTokenService';
 import { PostgresPermissionRepository } from '../../modules/auth/infrastructure/repositories/PostgresPermissionRepository';
 import { UserManagementUseCases } from '../../modules/auth/application/UserManagementUseCases';
+import { createRateLimiter } from '../middlewares/rateLimit.middleware';
 
 const authRouter = Router();
 
-// Rate limit simple en memoria para el login: máx. 5 intentos por IP por minuto.
-// Mitiga fuerza bruta de credenciales sin dependencias externas.
-const loginAttempts = new Map<string, { count: number; windowStart: number }>();
-const LOGIN_WINDOW_MS = 60_000;
-const LOGIN_MAX_ATTEMPTS = 5;
-
-const loginRateLimit = (req: any, res: any, next: any) => {
-    const ip = req.ip || req.socket?.remoteAddress || 'unknown';
-    const now = Date.now();
-    const entry = loginAttempts.get(ip);
-
-    if (!entry || now - entry.windowStart > LOGIN_WINDOW_MS) {
-        loginAttempts.set(ip, { count: 1, windowStart: now });
-        return next();
-    }
-    entry.count++;
-    if (entry.count > LOGIN_MAX_ATTEMPTS) {
-        return res.status(429).json({ error: 'Demasiados intentos de inicio de sesión. Espera un minuto e intenta de nuevo.' });
-    }
-    next();
-};
+// Máx. 5 intentos de login por IP por minuto. Mitiga fuerza bruta de credenciales.
+const loginRateLimit = createRateLimiter({
+    windowMs: 60_000,
+    max: 5,
+    keyPrefix: 'login',
+    message: 'Demasiados intentos de inicio de sesión. Espera un minuto e intenta de nuevo.'
+});
 
 // Dependencias
 const userRepository = new PostgresUserRepository();

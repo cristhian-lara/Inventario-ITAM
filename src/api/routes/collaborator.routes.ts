@@ -2,6 +2,8 @@ import { Router } from 'express';
 import multer from 'multer';
 import * as xlsx from 'xlsx';
 import { v4 as uuidv4 } from 'uuid';
+import { z } from 'zod';
+import { validateBody } from '../middlewares/validate.middleware';
 import { PostgresCollaboratorRepository } from '../../modules/collaborator/infrastructure/PostgresCollaboratorRepository';
 import { PostgresDepartmentRepository } from '../../modules/collaborator/infrastructure/PostgresDepartmentRepository';
 import { PostgresCecosRepository } from '../../modules/collaborator/infrastructure/PostgresCecosRepository';
@@ -13,6 +15,7 @@ import { WebexNotificationService } from '../../shared/infrastructure/services/W
 import { PdfKitService } from '../../shared/infrastructure/services/PdfKitService';
 import { CatalogUseCases } from '../../modules/catalog/application/CatalogUseCases';
 import { PostgresCatalogRepository } from '../../modules/catalog/infrastructure/PostgresCatalogRepository';
+import { AppDataSource } from '../../shared/infrastructure/database/postgres';
 
 export const collaboratorRouter = Router();
 const collaboratorRepository = new PostgresCollaboratorRepository();
@@ -101,20 +104,27 @@ collaboratorRouter.put('/cecos/:id', async (req, res) => {
 
 // --- Collaborators Routes ---
 
+const withAssignedCount = (collaborators: any[], allAssignments: any[]) =>
+    collaborators.map(c => ({
+        ...c,
+        assignedAssetsCount: allAssignments.filter(a => a.collaboratorId === c.id && (a.status === 'ACCEPTED' || a.status === 'PENDING_ACCEPTANCE')).length
+    }));
+
+// Paginación opcional vía ?page=&limit= (compatible hacia atrás: sin esos
+// parámetros devuelve el arreglo completo, igual que antes).
 collaboratorRouter.get('/', async (req, res) => {
     try {
-        const collaborators = await useCases.getAllCollaborators();
         const allAssignments = await assignmentRepository.findAllActive();
-        
-        const response = collaborators.map(c => {
-            const assignedAssetsCount = allAssignments.filter(a => a.collaboratorId === c.id && (a.status === 'ACCEPTED' || a.status === 'PENDING_ACCEPTANCE')).length;
-            return {
-                ...c,
-                assignedAssetsCount
-            };
-        });
-        
-        res.json(response);
+
+        if (req.query.page || req.query.limit) {
+            const page = Math.max(1, parseInt(req.query.page as string, 10) || 1);
+            const limit = Math.min(200, Math.max(1, parseInt(req.query.limit as string, 10) || 50));
+            const { items, total } = await useCases.getCollaboratorsPaginated(page, limit);
+            return res.json({ data: withAssignedCount(items, allAssignments), total, page, limit });
+        }
+
+        const collaborators = await useCases.getAllCollaborators();
+        res.json(withAssignedCount(collaborators, allAssignments));
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
@@ -174,14 +184,22 @@ collaboratorRouter.post('/import', upload.single('file'), async (req, res) => {
     }
 });
 
-collaboratorRouter.post('/', async (req, res) => {
+const createCollaboratorSchema = z.object({
+    name: z.string().min(1, 'name es requerido'),
+    email: z.string().email('email inválido'),
+    department: z.coerce.number({ message: 'department debe ser numérico' }),
+    location: z.string().min(1, 'location es requerido'),
+    isLeader: z.boolean().optional(),
+    leaderId: z.string().nullable().optional(),
+    dynamicAttributes: z.record(z.string(), z.any()).optional(),
+    activationDate: z.union([z.string(), z.date()]).optional(),
+});
+
+collaboratorRouter.post('/', validateBody(createCollaboratorSchema), async (req, res) => {
     try {
         const { name, email, department, location, isLeader, leaderId, dynamicAttributes, activationDate } = req.body;
-        if (!name || !email || !department || !location) {
-            return res.status(400).json({ error: 'Missing required fields' });
-        }
 
-        const collaborator = await useCases.createCollaborator({ 
+        const collaborator = await useCases.createCollaborator({
             name, email, department: Number(department), location, isLeader, leaderId, dynamicAttributes, activationDate 
         });
         res.status(201).json(collaborator);
@@ -213,7 +231,10 @@ collaboratorRouter.patch('/:id/toggle-status', async (req, res) => {
 collaboratorRouter.post('/:id/offboard', async (req, res) => {
     try {
         const { id } = req.params;
-        const reason = (req.body?.reason || 'Baja de colaborador').toString().trim();
+        const reason = (req.body?.reason || '').toString().trim();
+        if (!reason) {
+            return res.status(400).json({ error: 'El motivo de la baja es obligatorio.' });
+        }
 
         const collaborator = await useCases.getCollaboratorById(id);
         if (!collaborator) return res.status(404).json({ error: 'Colaborador no encontrado' });
@@ -224,87 +245,104 @@ collaboratorRouter.post('/:id/offboard', async (req, res) => {
         const allActive = await assignmentRepository.findAllActive();
         const toReturn = allActive.filter(a => a.collaboratorId === id && (a.status === 'ACCEPTED' || a.status === 'PENDING_ACCEPTANCE'));
 
-        let documentPath: string | undefined;
+        // Toda la operación (devoluciones + cambio de estado de activos + acta +
+        // baja del colaborador) corre en una única transacción: si falla cualquier
+        // paso (incluida la generación del PDF), no debe quedar ningún activo
+        // marcado como devuelto ni el colaborador dado de baja a medias.
+        const result = await AppDataSource.manager.transaction(async (manager) => {
+            const txAssignmentRepo = new PostgresAssignmentRepository(manager);
+            const txAssignmentUseCases = new AssignmentUseCases(txAssignmentRepo, new WebexNotificationService());
+            const txCatalogRepo = new PostgresCatalogRepository(manager);
+            const txCatalogUseCases = new CatalogUseCases(txCatalogRepo);
+            const txCollaboratorRepo = new PostgresCollaboratorRepository(manager);
+            const txCollaboratorUseCases = new CollaboratorUseCases(txCollaboratorRepo, departmentRepository, cecosRepository);
 
-        if (toReturn.length > 0) {
-            const ipAddress = `Baja de colaborador (Paz y Salvo).\nMotivo: ${reason}`;
-            const returnedAssignments = [];
-            for (const a of toReturn) {
-                const returned = await assignmentUseCases.forceReturn(a.id, ipAddress);
-                // El activo queda bloqueado hasta que TI otorgue el Visto Bueno (approve-return)
-                await catalogUseCases.changeAssetStatus(returned.assetId, 'PENDING_INSPECTION');
-                returnedAssignments.push(returned);
-            }
+            let documentPath: string | undefined;
 
-            const assetsDetails = [];
-            for (const assign of returnedAssignments) {
-                const asset = await catalogUseCases.getAssetById(assign.assetId);
-                const category = asset ? await catalogRepo.getCategoryById(asset.categoryId) : null;
-                assetsDetails.push({
-                    assetId: assign.assetId,
-                    assignmentDate: assign.startDate,
-                    assetSerial: asset ? (asset.serial || 'N/A') : 'N/A',
-                    assetType: category ? category.name : 'Laptop',
-                    assetBrand: asset?.dynamicAttributes?.marca || asset?.dynamicAttributes?.Marca || 'Generico',
-                    assetHostname: asset?.dynamicAttributes?.hostname || asset?.dynamicAttributes?.Hostname || 'N/A',
-                    assetVersionOs: asset?.dynamicAttributes?.versionOs || 'N/A',
-                    assetModel: asset?.dynamicAttributes?.modelo || asset?.dynamicAttributes?.Modelo || 'Generico',
-                    assetMac: asset?.dynamicAttributes?.macAddress || 'N/A',
-                    assetRam: asset?.dynamicAttributes?.ram || 'N/A',
-                    assetProcessor: asset?.dynamicAttributes?.processor || 'N/A',
-                    assetStorage: asset?.dynamicAttributes?.storage || 'N/A',
-                    requiresPlacaIkusi: true
-                });
-            }
-
-            let realDept = 'Sistemas';
-            if (collaborator.department) {
-                try {
-                    const dept = await departmentRepository.findById(Number(collaborator.department));
-                    realDept = dept ? dept.name : collaborator.department.toString();
-                } catch (e) {
-                    realDept = collaborator.department.toString();
+            if (toReturn.length > 0) {
+                const ipAddress = `Baja de colaborador (Paz y Salvo).\nMotivo: ${reason}`;
+                const returnedAssignments = [];
+                for (const a of toReturn) {
+                    const returned = await txAssignmentUseCases.forceReturn(a.id, ipAddress);
+                    // El activo queda bloqueado hasta que TI otorgue el Visto Bueno (approve-return)
+                    await txCatalogUseCases.changeAssetStatus(returned.assetId, 'PENDING_INSPECTION');
+                    returnedAssignments.push(returned);
                 }
+
+                const assetsDetails = [];
+                for (const assign of returnedAssignments) {
+                    const asset = await txCatalogUseCases.getAssetById(assign.assetId);
+                    const category = asset ? await txCatalogRepo.getCategoryById(asset.categoryId) : null;
+                    assetsDetails.push({
+                        assetId: assign.assetId,
+                        assignmentDate: assign.startDate,
+                        assetSerial: asset ? (asset.serial || 'N/A') : 'N/A',
+                        assetType: category ? category.name : 'Laptop',
+                        assetBrand: asset?.dynamicAttributes?.marca || asset?.dynamicAttributes?.Marca || 'Generico',
+                        assetHostname: asset?.dynamicAttributes?.hostname || asset?.dynamicAttributes?.Hostname || 'N/A',
+                        assetVersionOs: asset?.dynamicAttributes?.versionOs || 'N/A',
+                        assetModel: asset?.dynamicAttributes?.modelo || asset?.dynamicAttributes?.Modelo || 'Generico',
+                        assetMac: asset?.dynamicAttributes?.macAddress || 'N/A',
+                        assetRam: asset?.dynamicAttributes?.ram || 'N/A',
+                        assetProcessor: asset?.dynamicAttributes?.processor || 'N/A',
+                        assetStorage: asset?.dynamicAttributes?.storage || 'N/A',
+                        requiresPlacaIkusi: true
+                    });
+                }
+
+                let realDept = 'Sistemas';
+                if (collaborator.department) {
+                    try {
+                        const dept = await departmentRepository.findById(Number(collaborator.department));
+                        realDept = dept ? dept.name : collaborator.department.toString();
+                    } catch (e) {
+                        realDept = collaborator.department.toString();
+                    }
+                }
+                const ceco = collaborator.dynamicAttributes?.CECOS || collaborator.dynamicAttributes?.cecos || collaborator.dynamicAttributes?.CECO || 'N/A';
+
+                // Generación del PDF dentro de la transacción a propósito: si falla,
+                // el rollback deshace las devoluciones y los cambios de estado de activos.
+                documentPath = await documentService.generateAssignmentAct({
+                    actType: 'RETURN',
+                    returnMode: 'PAZ_Y_SALVO',
+                    assignmentId: `OFFBOARD-${id}-${Date.now()}`,
+                    collaboratorName: collaborator.name,
+                    collaboratorEmail: collaborator.email,
+                    department: realDept,
+                    ceco,
+                    sede: collaborator.location,
+                    assets: assetsDetails,
+                    ipAddress,
+                    timestamp: new Date(),
+                    isForcedSignature: true,
+                    returnReason: reason
+                });
+
+                for (const assign of returnedAssignments) {
+                    await txAssignmentUseCases.updateDocumentPath(assign.id, documentPath);
+                }
+
+                await txCollaboratorRepo.saveHistory(new CollaboratorHistory(
+                    uuidv4(),
+                    id,
+                    'ASSET_RETURNED',
+                    new Date(),
+                    `Paz y Salvo: ${toReturn.length} activo(s) devuelto(s) por baja del colaborador. Motivo: ${reason}`
+                ));
             }
-            const ceco = collaborator.dynamicAttributes?.CECOS || collaborator.dynamicAttributes?.cecos || collaborator.dynamicAttributes?.CECO || 'N/A';
 
-            documentPath = await documentService.generateAssignmentAct({
-                actType: 'RETURN',
-                returnMode: 'PAZ_Y_SALVO',
-                assignmentId: `OFFBOARD-${id}-${Date.now()}`,
-                collaboratorName: collaborator.name,
-                collaboratorEmail: collaborator.email,
-                department: realDept,
-                ceco,
-                sede: collaborator.location,
-                assets: assetsDetails,
-                ipAddress,
-                timestamp: new Date(),
-                isForcedSignature: true,
-                returnReason: reason
-            });
+            const updatedCollaborator = await txCollaboratorUseCases.toggleCollaboratorStatus(id);
 
-            for (const assign of returnedAssignments) {
-                await assignmentUseCases.updateDocumentPath(assign.id, documentPath);
-            }
-
-            await collaboratorRepository.saveHistory(new CollaboratorHistory(
-                uuidv4(),
-                id,
-                'ASSET_RETURNED',
-                new Date(),
-                `Paz y Salvo: ${toReturn.length} activo(s) devuelto(s) por baja del colaborador. Motivo: ${reason}`
-            ));
-        }
-
-        const updatedCollaborator = await useCases.toggleCollaboratorStatus(id);
+            return { updatedCollaborator, documentPath };
+        });
 
         res.json({
             message: toReturn.length > 0
                 ? `Colaborador dado de baja. Se generó el Paz y Salvo de ${toReturn.length} activo(s).`
                 : 'Colaborador dado de baja.',
-            collaborator: updatedCollaborator,
-            documentPath,
+            collaborator: result.updatedCollaborator,
+            documentPath: result.documentPath,
             returnedCount: toReturn.length
         });
     } catch (error: any) {

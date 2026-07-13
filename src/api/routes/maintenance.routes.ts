@@ -6,6 +6,7 @@ import { AssignmentUseCases } from '../../modules/assignment/application/Assignm
 import { PostgresAssignmentRepository } from '../../modules/assignment/infrastructure/PostgresAssignmentRepository';
 import { WebexNotificationService } from '../../shared/infrastructure/services/WebexNotificationService';
 import { PdfKitService } from '../../shared/infrastructure/services/PdfKitService';
+import { JWT_SECRET } from '../../shared/infrastructure/config/env';
 
 const router = Router();
 
@@ -110,14 +111,48 @@ router.post('/:id/start', async (req, res) => {
 // 3. Completar mantenimiento
 router.post('/:id/complete', async (req, res) => {
     try {
-        const { notes } = req.body;
-        const { record, notification } = await useCases.completeMaintenance(req.params.id, notes);
+        const { notes, realStartDate, realEndDate } = req.body;
+        const parsedStart = realStartDate ? new Date(realStartDate.includes('T') ? realStartDate : `${realStartDate}T12:00:00Z`) : undefined;
+        const parsedEnd = realEndDate ? new Date(realEndDate.includes('T') ? realEndDate : `${realEndDate}T12:00:00Z`) : undefined;
+        let { record, notification } = await useCases.completeMaintenance(req.params.id, notes, parsedStart, parsedEnd);
+
+        let autoSigned = false;
+        // notification === null: no había colaborador en turno (ni asignación activa) a quien notificar
+        // para firmar. Sin eso, el mantenimiento quedaría sin acta indefinidamente, así que se firma
+        // forzadamente de inmediato y se genera el documento.
+        if (notification === null) {
+            const adminUsername = (req as any).user?.username || 'system';
+            record = await useCases.forceSignMaintenance(
+                record.id,
+                'Firma forzada automática: el activo no tenía colaborador asignado al completar el mantenimiento.',
+                adminUsername
+            );
+
+            const { PdfKitService } = require('../../shared/infrastructure/services/PdfKitService');
+            const documentService = new PdfKitService();
+            const catalogRepo = new (require('../../modules/catalog/infrastructure/PostgresCatalogRepository').PostgresCatalogRepository)(AppDataSource);
+            const asset = await catalogRepo.getAssetById(record.assetId);
+            let categoryName = 'EQUIPO';
+            if (asset && asset.categoryId) {
+                const category = await catalogRepo.getCategoryById(asset.categoryId);
+                if (category) categoryName = category.name;
+            }
+
+            const recordData = serializeRecord(record) as any;
+            const signatureText = 'Firma forzada automáticamente por el sistema.\nMotivo: Activo sin colaborador asignado al momento del cierre.';
+            const pdfPath = await documentService.generateMaintenanceAct(recordData, asset, signatureText, categoryName);
+
+            await useCases.updatePdfUrl(record.id, pdfPath);
+            autoSigned = true;
+        }
+
         res.json({
             ...serializeRecord(record),
             // notification es null cuando no había colaborador en turno que notificar
             notificationSent: notification ? notification.sent : null,
             accountNotFound: notification ? notification.accountNotFound : false,
-            notificationError: notification?.error
+            notificationError: notification?.error,
+            autoSigned
         });
     } catch (error: any) {
         res.status(400).json({ error: error.message });
@@ -217,7 +252,7 @@ router.get('/asset/:assetId', async (req, res) => {
 router.get('/verify-token/:token', async (req, res) => {
     try {
         const jwt = require('jsonwebtoken');
-        const secret = process.env.JWT_SECRET || 'secret';
+        const secret = JWT_SECRET;
         const decoded = jwt.verify(req.params.token, secret) as any;
 
         const record = await repo.findById(decoded.maintenanceId);
@@ -239,7 +274,7 @@ router.get('/accept', async (req, res) => {
         }
 
         const jwt = require('jsonwebtoken');
-        const secret = process.env.JWT_SECRET || 'secret';
+        const secret = JWT_SECRET;
         const decoded = jwt.verify(token, secret) as any;
 
         const ipAddress = req.ip || req.socket.remoteAddress || 'unknown';
@@ -295,7 +330,7 @@ router.post('/sign', async (req, res) => {
     try {
         const { token, signature } = req.body;
         const jwt = require('jsonwebtoken');
-        const secret = process.env.JWT_SECRET || 'secret';
+        const secret = JWT_SECRET;
         const decoded = jwt.verify(token, secret) as any;
 
         const ip = req.ip || req.socket.remoteAddress || 'unknown';

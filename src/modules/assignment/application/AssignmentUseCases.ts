@@ -2,6 +2,7 @@ import { Assignment, AssignmentType } from '../domain/Assignment';
 import { IAssignmentRepository } from '../domain/IAssignmentRepository';
 import { IMailerService } from '../../../shared/contracts/IMailerService';
 import * as jwt from 'jsonwebtoken';
+import { JWT_SECRET } from '../../../shared/infrastructure/config/env';
 
 import { IDocumentService } from '../../../shared/contracts/IDocumentService';
 
@@ -47,7 +48,7 @@ export class AssignmentUseCases {
 
         // La función inyectada para generar el token usa JWT real
         const token = assignment.generateToken((assignId) => {
-            const secret = process.env.JWT_SECRET || 'secret';
+            const secret = JWT_SECRET;
             return jwt.sign({ assignmentId: assignId }, secret, { expiresIn: '24h' });
         });
 
@@ -66,7 +67,7 @@ export class AssignmentUseCases {
             throw new Error('Asignación no encontrada');
         }
 
-        const secret = process.env.JWT_SECRET || 'secret';
+        const secret = JWT_SECRET;
         
         try {
             // Verificar expiración y firma
@@ -115,7 +116,7 @@ export class AssignmentUseCases {
 
         assignment.initiateReturn();
 
-        const secret = process.env.JWT_SECRET || 'secret';
+        const secret = JWT_SECRET;
         const token = assignment.generateToken((assignId) => {
             return jwt.sign({ assignmentId: assignId }, secret, { expiresIn: '24h' });
         });
@@ -135,7 +136,7 @@ export class AssignmentUseCases {
             assignments.push(assignment);
         }
 
-        const secret = process.env.JWT_SECRET || 'secret';
+        const secret = JWT_SECRET;
         const token = jwt.sign({ assignmentIds }, secret, { expiresIn: '24h' });
 
         for (const assignment of assignments) {
@@ -158,7 +159,7 @@ export class AssignmentUseCases {
         const assignment = await this.repository.findById(assignmentId);
         if (!assignment) throw new Error('Asignación no encontrada');
 
-        const secret = process.env.JWT_SECRET || 'secret';
+        const secret = JWT_SECRET;
         try {
             jwt.verify(token, secret);
         } catch (error) {
@@ -176,7 +177,7 @@ export class AssignmentUseCases {
     }
 
     async confirmBatchReturn(token: string, ipAddress: string, userAgent: string): Promise<Assignment[]> {
-        const secret = process.env.JWT_SECRET || 'secret';
+        const secret = JWT_SECRET;
         let payload: any;
         try {
             payload = jwt.verify(token, secret);
@@ -209,7 +210,7 @@ export class AssignmentUseCases {
         const assignment = await this.repository.findById(assignmentId);
         if (!assignment) throw new Error('Asignación no encontrada');
         
-        const secret = process.env.JWT_SECRET || 'secret';
+        const secret = JWT_SECRET;
         const token = assignment.generateToken((assignId) => {
             return jwt.sign({ assignmentId: assignId }, secret, { expiresIn: '24h' });
         });

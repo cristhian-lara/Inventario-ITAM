@@ -1,16 +1,19 @@
-import { Entity, PrimaryColumn, Column } from 'typeorm';
+import { Entity, PrimaryColumn, Column, Index } from 'typeorm';
 
 @Entity('assignments', { schema: 'public' })
 export class AssignmentOrmEntity {
     @PrimaryColumn()
     id!: string;
 
+    @Index()
     @Column()
     asset_id!: string;
 
+    @Index()
     @Column()
     collaborator_id!: string;
 
+    @Index()
     @Column()
     status!: string;
 

@@ -1,16 +1,10 @@
 import jwt from 'jsonwebtoken';
 import { ITokenService } from '../../domain/ITokenService';
 import { User } from '../../domain/User';
-import * as dotenv from 'dotenv';
-
-dotenv.config();
+import { JWT_SECRET } from '../../../../shared/infrastructure/config/env';
 
 export class JwtTokenService implements ITokenService {
-    private readonly secret: string;
-
-    constructor() {
-        this.secret = process.env.JWT_SECRET || 'super-secret-default-key';
-    }
+    private readonly secret: string = JWT_SECRET;
 
     generateToken(user: User): string {
         const payload = {

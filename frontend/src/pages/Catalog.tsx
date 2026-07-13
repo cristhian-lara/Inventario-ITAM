@@ -5,6 +5,7 @@ import ActionMenu from '../components/ActionMenu';
 import axios from 'axios';
 import { Plus, Search, Tag, Cpu, HardDrive, Wifi, PlusCircle, MonitorSmartphone, RefreshCw, CheckCircle2, AlertCircle, AlertTriangle, UserCheck, Send, Upload, Trash2, CalendarClock } from 'lucide-react';
 import { useConfirm } from '../context/ConfirmContext';
+import { useToast } from '../context/ToastContext';
 import { usePermission } from '../context/AuthContext';
 import { showWebexFailureModal } from '../utils/notificationNotice';
 import './Catalog.css';
@@ -23,8 +24,7 @@ export default function Catalog() {
   const assetPerms = usePermission('assets');
   const queryClient = useQueryClient();
   const { confirm } = useConfirm();
-  const [successMsg, setSuccessMsg] = useState('');
-  const [errorMsg, setErrorMsg] = useState('');
+  const toast = useToast();
   const [modalErrorMsg, setModalErrorMsg] = useState('');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -104,11 +104,9 @@ export default function Catalog() {
       });
       setImportResult(response.data);
       queryClient.invalidateQueries({ queryKey: ['assets'] });
-      setSuccessMsg('Importación procesada');
-      setTimeout(() => setSuccessMsg(''), 8000);
+      toast.success('Importación procesada', 8000);
     } catch (error: any) {
-      setErrorMsg('Error en la importación: ' + (error.response?.data?.error || error.message));
-      setTimeout(() => setErrorMsg(''), 8000);
+      toast.error('Error en la importación: ' + (error.response?.data?.error || error.message), 8000);
     } finally {
       setImporting(false);
       if (fileInputRef.current) {
@@ -184,16 +182,14 @@ export default function Catalog() {
     },
     onSuccess: (data: any) => {
       if (!showWebexFailureModal(confirm, data)) {
-        setSuccessMsg(data?.message || '¡Proceso de devolución iniciado! Se envió la notificación de firma por Webex.');
-        setTimeout(() => setSuccessMsg(''), 8000);
+        toast.success(data?.message || '¡Proceso de devolución iniciado! Se envió la notificación de firma por Webex.', 8000);
       }
       setReturnId(null);
       queryClient.invalidateQueries({ queryKey: ['assets'] });
       queryClient.invalidateQueries({ queryKey: ['assignments'] });
     },
     onError: (err: any) => {
-      setErrorMsg(err.response?.data?.error || err.message);
-      setTimeout(() => setErrorMsg(''), 8000);
+      toast.error(err.response?.data?.error || err.message, 8000);
       setReturnId(null);
     }
   });
@@ -206,8 +202,7 @@ export default function Catalog() {
     },
     onSuccess: (data: any) => {
       if (!showWebexFailureModal(confirm, data)) {
-        setSuccessMsg(data?.message || '¡Asignación iniciada! Se envió la notificación de firma por Webex.');
-        setTimeout(() => setSuccessMsg(''), 8000);
+        toast.success(data?.message || '¡Asignación iniciada! Se envió la notificación de firma por Webex.', 8000);
       }
       setFormData({
         id: `assig-${Math.floor(Math.random() * 1000)}`,
@@ -225,8 +220,7 @@ export default function Catalog() {
       queryClient.invalidateQueries({ queryKey: ['assignments'] });
     },
     onError: (err: any) => {
-      setErrorMsg(err.response?.data?.error || err.message);
-      setTimeout(() => setErrorMsg(''), 8000);
+      toast.error(err.response?.data?.error || err.message, 8000);
       setAssignModalAssetId(null);
     }
   });
@@ -252,8 +246,7 @@ export default function Catalog() {
       setShowAddModal(false);
       setNewAsset({ id: '', categoryId: '', serial: '', dynamicAttributes: {} });
       setIsEditing(false);
-      setSuccessMsg('Activo guardado exitosamente');
-      setTimeout(() => setSuccessMsg(''), 3000);
+      toast.success('Activo guardado exitosamente', 3000);
     },
     onError: (err: any) => {
       setModalErrorMsg(err.response?.data?.error || err.message);
@@ -271,8 +264,7 @@ export default function Catalog() {
       setShowAddModal(false);
       setNewAsset({ id: '', categoryId: '', serial: '', dynamicAttributes: {} });
       setIsEditing(false);
-      setSuccessMsg('Activo actualizado exitosamente');
-      setTimeout(() => setSuccessMsg(''), 3000);
+      toast.success('Activo actualizado exitosamente', 3000);
     },
     onError: (err: any) => {
       setModalErrorMsg(err.response?.data?.error || err.message);
@@ -287,12 +279,10 @@ export default function Catalog() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['assets'] });
-      setSuccessMsg('Activo dado de baja exitosamente');
-      setTimeout(() => setSuccessMsg(''), 3000);
+      toast.success('Activo dado de baja exitosamente', 3000);
     },
     onError: (err: any) => {
-      setErrorMsg(err.response?.data?.error || err.message);
-      setTimeout(() => setErrorMsg(''), 8000);
+      toast.error(err.response?.data?.error || err.message, 8000);
     }
   });
 
@@ -302,7 +292,7 @@ export default function Catalog() {
       return response.data;
     },
     onSuccess: (data) => {
-      setSuccessMsg(`Firma forzada completada (Administrativa).`);
+      toast.success(`Firma forzada completada (Administrativa).`);
       setForceActionModal(null);
       setForceReason('');
       queryClient.invalidateQueries({ queryKey: ['assets'] });
@@ -312,8 +302,7 @@ export default function Catalog() {
       }
     },
     onError: (err: any) => {
-      setErrorMsg(err.response?.data?.error || err.message);
-      setTimeout(() => setErrorMsg(''), 8000);
+      toast.error(err.response?.data?.error || err.message, 8000);
     }
   });
 
@@ -323,7 +312,7 @@ export default function Catalog() {
       return response.data;
     },
     onSuccess: (data) => {
-      setSuccessMsg(`Devolución forzada completada (Administrativa).`);
+      toast.success(`Devolución forzada completada (Administrativa).`);
       setForceActionModal(null);
       setForceReason('');
       queryClient.invalidateQueries({ queryKey: ['assets'] });
@@ -333,8 +322,7 @@ export default function Catalog() {
       }
     },
     onError: (err: any) => {
-      setErrorMsg(err.response?.data?.error || err.message);
-      setTimeout(() => setErrorMsg(''), 8000);
+      toast.error(err.response?.data?.error || err.message, 8000);
     }
   });
 
@@ -345,13 +333,11 @@ export default function Catalog() {
     },
     onSuccess: (data: any) => {
       if (!showWebexFailureModal(confirm, data)) {
-        setSuccessMsg(data?.message || 'Enlace de firma reenviado al colaborador por Webex.');
-        setTimeout(() => setSuccessMsg(''), 8000);
+        toast.success(data?.message || 'Enlace de firma reenviado al colaborador por Webex.', 8000);
       }
     },
     onError: (err: any) => {
-      setErrorMsg(err.response?.data?.error || err.message);
-      setTimeout(() => setErrorMsg(''), 8000);
+      toast.error(err.response?.data?.error || err.message, 8000);
     }
   });
 
@@ -404,15 +390,13 @@ export default function Catalog() {
       return response.data;
     },
     onSuccess: () => {
-      setSuccessMsg('Fecha de devolución del préstamo extendida exitosamente.');
-      setTimeout(() => setSuccessMsg(''), 8000);
+      toast.success('Fecha de devolución del préstamo extendida exitosamente.', 8000);
       setExtendLoanTarget(null);
       setExtendLoanDate('');
       queryClient.invalidateQueries({ queryKey: ['assignments'] });
     },
     onError: (err: any) => {
-      setErrorMsg(err.response?.data?.error || err.message);
-      setTimeout(() => setErrorMsg(''), 8000);
+      toast.error(err.response?.data?.error || err.message, 8000);
     }
   });
 
@@ -555,20 +539,6 @@ export default function Catalog() {
         </div>
         )}
       </header>
-
-      {successMsg && (
-        <div className="alert alert-success" style={{ marginBottom: '20px' }}>
-          <CheckCircle2 size={20} />
-          {successMsg}
-        </div>
-      )}
-
-      {errorMsg && (
-        <div className="alert alert-error" style={{ marginBottom: '20px' }}>
-          <AlertCircle size={20} />
-          {errorMsg}
-        </div>
-      )}
 
       {importResult && (
         <div className="glass-panel" style={{ marginBottom: '20px', borderLeft: '4px solid #3b82f6', background: 'rgba(59, 130, 246, 0.05)' }}>

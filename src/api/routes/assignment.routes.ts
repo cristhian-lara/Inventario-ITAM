@@ -11,6 +11,7 @@ import { PostgresCollaboratorRepository } from '../../modules/collaborator/infra
 import { PostgresDepartmentRepository } from '../../modules/collaborator/infrastructure/PostgresDepartmentRepository';
 import { CollaboratorHistory } from '../../modules/collaborator/domain/CollaboratorHistory';
 import { v4 as uuidv4 } from 'uuid';
+import { AppDataSource } from '../../shared/infrastructure/database/postgres';
 
 const router = Router();
 
@@ -58,21 +59,21 @@ function notificationMessage(result: NotificationResult, email: string, successM
  * - PAZ_Y_SALVO: al colaborador no le queda ningún activo tras devolver los indicados.
  * - DEVOLUCION: devolución parcial (conserva al menos un activo asignado o en proceso).
  */
-async function resolveReturnMode(collaboratorId: string, excludeAssignmentIds: string[]): Promise<'PAZ_Y_SALVO' | 'DEVOLUCION'> {
-    const allActive = await assignmentRepo.findAllActive();
+async function resolveReturnMode(collaboratorId: string, excludeAssignmentIds: string[], repo: PostgresAssignmentRepository = assignmentRepo): Promise<'PAZ_Y_SALVO' | 'DEVOLUCION'> {
+    const allActive = await repo.findAllActive();
     const remaining = allActive.filter(a =>
         a.collaboratorId === collaboratorId && !excludeAssignmentIds.includes(a.id)
     );
     return remaining.length === 0 ? 'PAZ_Y_SALVO' : 'DEVOLUCION';
 }
 
-async function getOtherAssignedAssets(collaboratorId: string, currentAssignmentId: string) {
-    const allAssignments = await assignmentRepo.findAllActive();
+async function getOtherAssignedAssets(collaboratorId: string, currentAssignmentId: string, repo: PostgresAssignmentRepository = assignmentRepo, catalogUC: CatalogUseCases = catalogUseCases) {
+    const allAssignments = await repo.findAllActive();
     const otherAssignments = allAssignments.filter(a => a.collaboratorId === collaboratorId && a.id !== currentAssignmentId && a.status === 'ACCEPTED');
     const otherAssignedAssets = [];
-    const allCategories = await catalogUseCases.getAllCategories();
+    const allCategories = await catalogUC.getAllCategories();
     for (const a of otherAssignments) {
-        const ast = await catalogUseCases.getAssetById(a.assetId);
+        const ast = await catalogUC.getAssetById(a.assetId);
         if (ast) {
             const cat = allCategories.find(c => c.id === ast.categoryId);
             otherAssignedAssets.push({
@@ -191,21 +192,33 @@ router.post('/', async (req, res) => {
 });
 
 // Listar todas las asignaciones activas
+const toAssignmentDto = (a: any) => ({
+    id: a.id,
+    assetId: a.assetId,
+    collaboratorId: a.collaboratorId,
+    status: a.status,
+    assignmentType: a.assignmentType,
+    startDate: a.startDate,
+    endDate: a.endDate,
+    expectedReturnDate: a.expectedReturnDate,
+    lastAlertSentAt: a.lastAlertSentAt,
+    documentPath: a.props.documentPath
+});
+
+// Paginación opcional vía ?page=&limit= (compatible hacia atrás: sin esos
+// parámetros devuelve el arreglo completo, igual que antes). La lista base ya
+// está acotada a asignaciones activas, por lo que paginar en memoria es aceptable.
 router.get('/', async (req, res) => {
     try {
         const assignments = await assignmentUseCases.getAllActiveAssignments();
-        res.json(assignments.map(a => ({
-            id: a.id,
-            assetId: a.assetId,
-            collaboratorId: a.collaboratorId,
-            status: a.status,
-            assignmentType: a.assignmentType,
-            startDate: a.startDate,
-            endDate: a.endDate,
-            expectedReturnDate: a.expectedReturnDate,
-            lastAlertSentAt: a.lastAlertSentAt,
-            documentPath: (a as any).props.documentPath
-        })));
+        if (req.query.page || req.query.limit) {
+            const page = Math.max(1, parseInt(req.query.page as string, 10) || 1);
+            const limit = Math.min(200, Math.max(1, parseInt(req.query.limit as string, 10) || 50));
+            const start = (page - 1) * limit;
+            const items = assignments.slice(start, start + limit);
+            return res.json({ data: items.map(toAssignmentDto), total: assignments.length, page, limit });
+        }
+        res.json(assignments.map(toAssignmentDto));
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
@@ -409,74 +422,88 @@ router.post('/:id/force-return', async (req, res) => {
     try {
         const reason = req.body.reason || 'Firma forzada administrativa';
         const ipAddress = `Firma forzada por administrador.\nMotivo: ${reason}`;
-        const returnedAssignment = await assignmentUseCases.forceReturn(req.params.id, ipAddress);
 
-        // El activo queda bloqueado hasta que TI otorgue el Visto Bueno (approve-return)
-        await catalogUseCases.changeAssetStatus(returnedAssignment.assetId, 'PENDING_INSPECTION');
+        // Devolución + cambio de estado del activo + acta + historial en una sola
+        // transacción: si falla algo (incluida la generación del PDF), no debe
+        // quedar el activo marcado como devuelto sin su acta correspondiente.
+        const { documentPath } = await AppDataSource.manager.transaction(async (manager) => {
+            const txAssignmentRepo = new PostgresAssignmentRepository(manager);
+            const txAssignmentUseCases = new AssignmentUseCases(txAssignmentRepo, mailerService);
+            const txCatalogRepo = new PostgresCatalogRepository(manager);
+            const txCatalogUseCases = new CatalogUseCases(txCatalogRepo);
+            const txCollaboratorRepo = new PostgresCollaboratorRepository(manager);
 
-        // Generar PDF de Paz y Salvo Administrativo
-                const asset = await catalogUseCases.getAssetById(returnedAssignment.assetId);
-        const category = asset ? await catalogRepo.getCategoryById(asset.categoryId) : null;
-        const requiresPlaca = category ? category.schemaDefinition.requiresPlacaIkusi !== false : true;
-        const collaborator = await collaboratorRepo.findById(returnedAssignment.collaboratorId);
-        const ceco = collaborator && collaborator.dynamicAttributes ? collaborator.dynamicAttributes['CECOS'] || collaborator.dynamicAttributes['cecos'] || collaborator.dynamicAttributes['CECO'] || 'N/A' : 'N/A';
-        const sede = collaborator ? collaborator.location : 'N/A';
-        const realColName = collaborator ? collaborator.name : returnedAssignment.collaboratorId;
-        const realColEmail = collaborator ? collaborator.email : 'test@ikusi.com';
-        let realDept = 'Sistemas';
-        if (collaborator && collaborator.department) {
-            try {
-                const dept = await departmentRepo.findById(Number(collaborator.department));
-                if (dept) realDept = dept.name;
-                else realDept = collaborator.department.toString();
-            } catch(e) {
-                realDept = collaborator.department.toString();
+            const returnedAssignment = await txAssignmentUseCases.forceReturn(req.params.id, ipAddress);
+
+            // El activo queda bloqueado hasta que TI otorgue el Visto Bueno (approve-return)
+            await txCatalogUseCases.changeAssetStatus(returnedAssignment.assetId, 'PENDING_INSPECTION');
+
+            // Generar PDF de Paz y Salvo Administrativo
+            const asset = await txCatalogUseCases.getAssetById(returnedAssignment.assetId);
+            const category = asset ? await txCatalogRepo.getCategoryById(asset.categoryId) : null;
+            const requiresPlaca = category ? category.schemaDefinition.requiresPlacaIkusi !== false : true;
+            const collaborator = await txCollaboratorRepo.findById(returnedAssignment.collaboratorId);
+            const ceco = collaborator && collaborator.dynamicAttributes ? collaborator.dynamicAttributes['CECOS'] || collaborator.dynamicAttributes['cecos'] || collaborator.dynamicAttributes['CECO'] || 'N/A' : 'N/A';
+            const sede = collaborator ? collaborator.location : 'N/A';
+            const realColName = collaborator ? collaborator.name : returnedAssignment.collaboratorId;
+            const realColEmail = collaborator ? collaborator.email : 'test@ikusi.com';
+            let realDept = 'Sistemas';
+            if (collaborator && collaborator.department) {
+                try {
+                    const dept = await departmentRepo.findById(Number(collaborator.department));
+                    if (dept) realDept = dept.name;
+                    else realDept = collaborator.department.toString();
+                } catch(e) {
+                    realDept = collaborator.department.toString();
+                }
             }
-        }
 
-        const otherAssignedAssets = await getOtherAssignedAssets(returnedAssignment.collaboratorId, returnedAssignment.id);
-        const returnMode = await resolveReturnMode(returnedAssignment.collaboratorId, [returnedAssignment.id]);
+            const otherAssignedAssets = await getOtherAssignedAssets(returnedAssignment.collaboratorId, returnedAssignment.id, txAssignmentRepo, txCatalogUseCases);
+            const returnMode = await resolveReturnMode(returnedAssignment.collaboratorId, [returnedAssignment.id], txAssignmentRepo);
 
-        const documentPath = await documentService.generateAssignmentAct({
-            otherAssignedAssets,
-            actType: 'RETURN',
-            returnMode,
-            assignmentId: returnedAssignment.id,
-            collaboratorName: realColName,
-            collaboratorEmail: realColEmail,
-            department: realDept,
-            ceco: ceco,
-            sede: sede,
-            assets: [{
-            assetId: returnedAssignment.assetId,
-            assignmentDate: returnedAssignment.startDate,
-            assetSerial: asset ? (asset.serial || 'N/A') : 'N/A',
-            assetType: category ? category.name : 'Laptop',
-            assetBrand: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.marca || asset.dynamicAttributes.Marca || asset.dynamicAttributes.brand || asset.dynamicAttributes.Brand) || 'Generico' : 'Generico',
-            assetHostname: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.hostname || asset.dynamicAttributes.Hostname) || 'N/A' : 'N/A',
-            assetVersionOs: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.versionOs || asset.dynamicAttributes.VersionOS || asset.dynamicAttributes['Version OS'] || asset.dynamicAttributes['Versión OS'] || asset.dynamicAttributes['Sistema Operativo'] || asset.dynamicAttributes['Sistema operativo'] || asset.dynamicAttributes['SistemaOperativo'] || asset.dynamicAttributes['OS'] || asset.dynamicAttributes['os']) || 'N/A' : 'N/A',
-            assetModel: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.modelo || asset.dynamicAttributes.Modelo) || 'Generico' : 'Generico',
-            assetMac: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.macAddress || asset.dynamicAttributes.MacAddress || asset.dynamicAttributes.MAC || asset.dynamicAttributes['MAC Address']) || 'N/A' : 'N/A',
-            assetRam: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.ram || asset.dynamicAttributes.RAM || asset.dynamicAttributes.Ram || asset.dynamicAttributes['Memoria RAM']) || 'N/A' : 'N/A',
-            assetProcessor: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.processor || asset.dynamicAttributes.Processor || asset.dynamicAttributes.Procesador || asset.dynamicAttributes.procesador) || 'N/A' : 'N/A',
-            assetStorage: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.storage || asset.dynamicAttributes.Storage || asset.dynamicAttributes.Almacenamiento || asset.dynamicAttributes.Disco) || 'N/A' : 'N/A',
-            requiresPlacaIkusi: typeof requiresPlaca !== 'undefined' ? requiresPlaca : true
-        }],
-            ipAddress,
-            timestamp: new Date(),
-            isForcedSignature: req.path.includes('force') ? true : false,
-            signatureEmail: req.body && req.body.email ? req.body.email : realColEmail
+            const documentPath = await documentService.generateAssignmentAct({
+                otherAssignedAssets,
+                actType: 'RETURN',
+                returnMode,
+                assignmentId: returnedAssignment.id,
+                collaboratorName: realColName,
+                collaboratorEmail: realColEmail,
+                department: realDept,
+                ceco: ceco,
+                sede: sede,
+                assets: [{
+                assetId: returnedAssignment.assetId,
+                assignmentDate: returnedAssignment.startDate,
+                assetSerial: asset ? (asset.serial || 'N/A') : 'N/A',
+                assetType: category ? category.name : 'Laptop',
+                assetBrand: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.marca || asset.dynamicAttributes.Marca || asset.dynamicAttributes.brand || asset.dynamicAttributes.Brand) || 'Generico' : 'Generico',
+                assetHostname: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.hostname || asset.dynamicAttributes.Hostname) || 'N/A' : 'N/A',
+                assetVersionOs: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.versionOs || asset.dynamicAttributes.VersionOS || asset.dynamicAttributes['Version OS'] || asset.dynamicAttributes['Versión OS'] || asset.dynamicAttributes['Sistema Operativo'] || asset.dynamicAttributes['Sistema operativo'] || asset.dynamicAttributes['SistemaOperativo'] || asset.dynamicAttributes['OS'] || asset.dynamicAttributes['os']) || 'N/A' : 'N/A',
+                assetModel: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.modelo || asset.dynamicAttributes.Modelo) || 'Generico' : 'Generico',
+                assetMac: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.macAddress || asset.dynamicAttributes.MacAddress || asset.dynamicAttributes.MAC || asset.dynamicAttributes['MAC Address']) || 'N/A' : 'N/A',
+                assetRam: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.ram || asset.dynamicAttributes.RAM || asset.dynamicAttributes.Ram || asset.dynamicAttributes['Memoria RAM']) || 'N/A' : 'N/A',
+                assetProcessor: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.processor || asset.dynamicAttributes.Processor || asset.dynamicAttributes.Procesador || asset.dynamicAttributes.procesador) || 'N/A' : 'N/A',
+                assetStorage: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.storage || asset.dynamicAttributes.Storage || asset.dynamicAttributes.Almacenamiento || asset.dynamicAttributes.Disco) || 'N/A' : 'N/A',
+                requiresPlacaIkusi: typeof requiresPlaca !== 'undefined' ? requiresPlaca : true
+            }],
+                ipAddress,
+                timestamp: new Date(),
+                isForcedSignature: req.path.includes('force') ? true : false,
+                signatureEmail: req.body && req.body.email ? req.body.email : realColEmail
+            });
+
+            await txAssignmentUseCases.updateDocumentPath(returnedAssignment.id, documentPath);
+
+            await txCollaboratorRepo.saveHistory(new CollaboratorHistory(
+                uuidv4(),
+                returnedAssignment.collaboratorId,
+                'ASSET_RETURNED' as any,
+                new Date(),
+                `Activo ${returnedAssignment.assetId} devuelto forzadamente`
+            ));
+
+            return { documentPath };
         });
-
-        await assignmentUseCases.updateDocumentPath(returnedAssignment.id, documentPath);
-        
-        await collaboratorRepo.saveHistory(new CollaboratorHistory(
-            uuidv4(),
-            returnedAssignment.collaboratorId,
-            'ASSET_RETURNED' as any,
-            new Date(),
-            `Activo ${returnedAssignment.assetId} devuelto forzadamente`
-        ));
 
         res.json({ message: 'Devolución forzada exitosa', documentPath });
     } catch (error: any) {
@@ -489,76 +516,87 @@ router.post('/force-return-by-asset/:assetId', async (req, res) => {
         const { email, collaboratorName } = req.body || {};
         const reason = req.body?.reason || 'Firma forzada administrativa';
         const ipAddress = `Firma forzada por administrador.\nMotivo: ${reason}`;
-        const assignment = await assignmentRepo.findCurrentByAssetId(req.params.assetId);
-        if (!assignment) throw new Error('No se encontró asignación activa o pendiente');
-        const returnedAssignment = await assignmentUseCases.forceReturn(assignment.id, ipAddress);
 
-        // El activo queda bloqueado hasta que TI otorgue el Visto Bueno (approve-return)
-        await catalogUseCases.changeAssetStatus(returnedAssignment.assetId, 'PENDING_INSPECTION');
+        const { documentPath } = await AppDataSource.manager.transaction(async (manager) => {
+            const txAssignmentRepo = new PostgresAssignmentRepository(manager);
+            const txAssignmentUseCases = new AssignmentUseCases(txAssignmentRepo, mailerService);
+            const txCatalogRepo = new PostgresCatalogRepository(manager);
+            const txCatalogUseCases = new CatalogUseCases(txCatalogRepo);
+            const txCollaboratorRepo = new PostgresCollaboratorRepository(manager);
 
-                const asset = await catalogUseCases.getAssetById(returnedAssignment.assetId);
-        const category = asset ? await catalogRepo.getCategoryById(asset.categoryId) : null;
-        const requiresPlaca = category ? category.schemaDefinition.requiresPlacaIkusi !== false : true;
-        const collaborator = await collaboratorRepo.findById(returnedAssignment.collaboratorId);
-        const ceco = collaborator && collaborator.dynamicAttributes ? collaborator.dynamicAttributes['CECOS'] || collaborator.dynamicAttributes['cecos'] || collaborator.dynamicAttributes['CECO'] || 'N/A' : 'N/A';
-        const sede = collaborator ? collaborator.location : 'N/A';
-        const realColName = collaborator ? collaborator.name : (collaboratorName || returnedAssignment.collaboratorId);
-        const realColEmail = collaborator ? collaborator.email : 'test@ikusi.com';
-        let realDept = 'Sistemas';
-        if (collaborator && collaborator.department) {
-            try {
-                const dept = await departmentRepo.findById(Number(collaborator.department));
-                if (dept) realDept = dept.name;
-                else realDept = collaborator.department.toString();
-            } catch(e) {
-                realDept = collaborator.department.toString();
+            const assignment = await txAssignmentRepo.findCurrentByAssetId(req.params.assetId);
+            if (!assignment) throw new Error('No se encontró asignación activa o pendiente');
+            const returnedAssignment = await txAssignmentUseCases.forceReturn(assignment.id, ipAddress);
+
+            // El activo queda bloqueado hasta que TI otorgue el Visto Bueno (approve-return)
+            await txCatalogUseCases.changeAssetStatus(returnedAssignment.assetId, 'PENDING_INSPECTION');
+
+            const asset = await txCatalogUseCases.getAssetById(returnedAssignment.assetId);
+            const category = asset ? await txCatalogRepo.getCategoryById(asset.categoryId) : null;
+            const requiresPlaca = category ? category.schemaDefinition.requiresPlacaIkusi !== false : true;
+            const collaborator = await txCollaboratorRepo.findById(returnedAssignment.collaboratorId);
+            const ceco = collaborator && collaborator.dynamicAttributes ? collaborator.dynamicAttributes['CECOS'] || collaborator.dynamicAttributes['cecos'] || collaborator.dynamicAttributes['CECO'] || 'N/A' : 'N/A';
+            const sede = collaborator ? collaborator.location : 'N/A';
+            const realColName = collaborator ? collaborator.name : (collaboratorName || returnedAssignment.collaboratorId);
+            const realColEmail = collaborator ? collaborator.email : 'test@ikusi.com';
+            let realDept = 'Sistemas';
+            if (collaborator && collaborator.department) {
+                try {
+                    const dept = await departmentRepo.findById(Number(collaborator.department));
+                    if (dept) realDept = dept.name;
+                    else realDept = collaborator.department.toString();
+                } catch(e) {
+                    realDept = collaborator.department.toString();
+                }
             }
-        }
 
-        const otherAssignedAssets = await getOtherAssignedAssets(returnedAssignment.collaboratorId, returnedAssignment.id);
-        const returnMode = await resolveReturnMode(returnedAssignment.collaboratorId, [returnedAssignment.id]);
+            const otherAssignedAssets = await getOtherAssignedAssets(returnedAssignment.collaboratorId, returnedAssignment.id, txAssignmentRepo, txCatalogUseCases);
+            const returnMode = await resolveReturnMode(returnedAssignment.collaboratorId, [returnedAssignment.id], txAssignmentRepo);
 
-        const documentPath = await documentService.generateAssignmentAct({
-            otherAssignedAssets,
-            actType: 'RETURN',
-            returnMode,
-            assignmentId: returnedAssignment.id,
-            collaboratorName: realColName,
-            collaboratorEmail: realColEmail,
-            department: realDept,
-            ceco: ceco,
-            sede: sede,
-            returnReason: reason,
-            assets: [{
-            assetId: returnedAssignment.assetId,
-            assignmentDate: returnedAssignment.startDate,
-            assetSerial: asset ? (asset.serial || 'N/A') : 'N/A',
-            assetType: category ? category.name : 'Laptop',
-            assetBrand: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.marca || asset.dynamicAttributes.Marca || asset.dynamicAttributes.brand || asset.dynamicAttributes.Brand) || 'Generico' : 'Generico',
-            assetHostname: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.hostname || asset.dynamicAttributes.Hostname) || 'N/A' : 'N/A',
-            assetVersionOs: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.versionOs || asset.dynamicAttributes.VersionOS || asset.dynamicAttributes['Version OS'] || asset.dynamicAttributes['Versión OS'] || asset.dynamicAttributes['Sistema Operativo'] || asset.dynamicAttributes['Sistema operativo'] || asset.dynamicAttributes['SistemaOperativo'] || asset.dynamicAttributes['OS'] || asset.dynamicAttributes['os']) || 'N/A' : 'N/A',
-            assetModel: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.modelo || asset.dynamicAttributes.Modelo) || 'Generico' : 'Generico',
-            assetMac: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.macAddress || asset.dynamicAttributes.MacAddress || asset.dynamicAttributes.MAC || asset.dynamicAttributes['MAC Address']) || 'N/A' : 'N/A',
-            assetRam: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.ram || asset.dynamicAttributes.RAM || asset.dynamicAttributes.Ram || asset.dynamicAttributes['Memoria RAM']) || 'N/A' : 'N/A',
-            assetProcessor: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.processor || asset.dynamicAttributes.Processor || asset.dynamicAttributes.Procesador || asset.dynamicAttributes.procesador) || 'N/A' : 'N/A',
-            assetStorage: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.storage || asset.dynamicAttributes.Storage || asset.dynamicAttributes.Almacenamiento || asset.dynamicAttributes.Disco) || 'N/A' : 'N/A',
-            requiresPlacaIkusi: typeof requiresPlaca !== 'undefined' ? requiresPlaca : true
-        }],
-            ipAddress,
-            timestamp: new Date(),
-            isForcedSignature: req.path.includes('force') ? true : false,
-            signatureEmail: req.body && req.body.email ? req.body.email : realColEmail
+            const documentPath = await documentService.generateAssignmentAct({
+                otherAssignedAssets,
+                actType: 'RETURN',
+                returnMode,
+                assignmentId: returnedAssignment.id,
+                collaboratorName: realColName,
+                collaboratorEmail: realColEmail,
+                department: realDept,
+                ceco: ceco,
+                sede: sede,
+                returnReason: reason,
+                assets: [{
+                assetId: returnedAssignment.assetId,
+                assignmentDate: returnedAssignment.startDate,
+                assetSerial: asset ? (asset.serial || 'N/A') : 'N/A',
+                assetType: category ? category.name : 'Laptop',
+                assetBrand: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.marca || asset.dynamicAttributes.Marca || asset.dynamicAttributes.brand || asset.dynamicAttributes.Brand) || 'Generico' : 'Generico',
+                assetHostname: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.hostname || asset.dynamicAttributes.Hostname) || 'N/A' : 'N/A',
+                assetVersionOs: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.versionOs || asset.dynamicAttributes.VersionOS || asset.dynamicAttributes['Version OS'] || asset.dynamicAttributes['Versión OS'] || asset.dynamicAttributes['Sistema Operativo'] || asset.dynamicAttributes['Sistema operativo'] || asset.dynamicAttributes['SistemaOperativo'] || asset.dynamicAttributes['OS'] || asset.dynamicAttributes['os']) || 'N/A' : 'N/A',
+                assetModel: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.modelo || asset.dynamicAttributes.Modelo) || 'Generico' : 'Generico',
+                assetMac: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.macAddress || asset.dynamicAttributes.MacAddress || asset.dynamicAttributes.MAC || asset.dynamicAttributes['MAC Address']) || 'N/A' : 'N/A',
+                assetRam: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.ram || asset.dynamicAttributes.RAM || asset.dynamicAttributes.Ram || asset.dynamicAttributes['Memoria RAM']) || 'N/A' : 'N/A',
+                assetProcessor: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.processor || asset.dynamicAttributes.Processor || asset.dynamicAttributes.Procesador || asset.dynamicAttributes.procesador) || 'N/A' : 'N/A',
+                assetStorage: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.storage || asset.dynamicAttributes.Storage || asset.dynamicAttributes.Almacenamiento || asset.dynamicAttributes.Disco) || 'N/A' : 'N/A',
+                requiresPlacaIkusi: typeof requiresPlaca !== 'undefined' ? requiresPlaca : true
+            }],
+                ipAddress,
+                timestamp: new Date(),
+                isForcedSignature: req.path.includes('force') ? true : false,
+                signatureEmail: req.body && req.body.email ? req.body.email : realColEmail
+            });
+
+            await txAssignmentUseCases.updateDocumentPath(returnedAssignment.id, documentPath);
+
+            await txCollaboratorRepo.saveHistory(new CollaboratorHistory(
+                uuidv4(),
+                returnedAssignment.collaboratorId,
+                'ASSET_RETURNED' as any,
+                new Date(),
+                `Activo ${returnedAssignment.assetId} devuelto forzadamente`
+            ));
+
+            return { documentPath };
         });
-
-        await assignmentUseCases.updateDocumentPath(returnedAssignment.id, documentPath);
-        
-        await collaboratorRepo.saveHistory(new CollaboratorHistory(
-            uuidv4(),
-            returnedAssignment.collaboratorId,
-            'ASSET_RETURNED' as any,
-            new Date(),
-            `Activo ${returnedAssignment.assetId} devuelto forzadamente`
-        ));
 
         res.json({ message: 'Devolución forzada exitosa', documentPath });
     } catch (error: any) {

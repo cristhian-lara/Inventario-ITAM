@@ -72,7 +72,10 @@ export default function CollaboratorProfile() {
     queryKey: ['assignments'],
     queryFn: async () => {
       const response = await axios.get(`${API_URL}/api/assignments`);
-      return response.data.filter((a: any) => a.collaboratorId === collaborator?.id);
+      return response.data.filter((a: any) =>
+        a.collaboratorId === collaborator?.id &&
+        (a.status === 'PENDING_ACCEPTANCE' || a.status === 'ACCEPTED')
+      );
     },
     enabled: !!collaborator
   });

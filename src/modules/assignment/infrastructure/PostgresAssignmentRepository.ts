@@ -1,11 +1,15 @@
-import { In } from 'typeorm';
+import { EntityManager, In, Repository } from 'typeorm';
 import { AppDataSource } from '../../../shared/infrastructure/database/postgres';
 import { Assignment, AssignmentStatus, AssignmentType } from '../domain/Assignment';
 import { IAssignmentRepository } from '../domain/IAssignmentRepository';
 import { AssignmentOrmEntity } from './orm/Assignment.entity';
 
 export class PostgresAssignmentRepository implements IAssignmentRepository {
-    private repo = AppDataSource.getRepository(AssignmentOrmEntity);
+    private repo: Repository<AssignmentOrmEntity>;
+
+    constructor(manager: EntityManager = AppDataSource.manager) {
+        this.repo = manager.getRepository(AssignmentOrmEntity);
+    }
 
     async save(assignment: Assignment): Promise<void> {
         const ormEntity = this.repo.create({

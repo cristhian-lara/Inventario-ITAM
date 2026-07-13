@@ -1,3 +1,4 @@
+import { EntityManager, Repository } from 'typeorm';
 import { AppDataSource } from '../../../shared/infrastructure/database/postgres';
 import { Collaborator } from '../domain/Collaborator';
 import { CollaboratorHistory } from '../domain/CollaboratorHistory';
@@ -6,8 +7,13 @@ import { CollaboratorOrmEntity } from './orm/Collaborator.entity';
 import { CollaboratorHistoryOrmEntity } from './orm/CollaboratorHistory.entity';
 
 export class PostgresCollaboratorRepository implements ICollaboratorRepository {
-    private repo = AppDataSource.getRepository(CollaboratorOrmEntity);
-    private historyRepo = AppDataSource.getRepository(CollaboratorHistoryOrmEntity);
+    private repo: Repository<CollaboratorOrmEntity>;
+    private historyRepo: Repository<CollaboratorHistoryOrmEntity>;
+
+    constructor(manager: EntityManager = AppDataSource.manager) {
+        this.repo = manager.getRepository(CollaboratorOrmEntity);
+        this.historyRepo = manager.getRepository(CollaboratorHistoryOrmEntity);
+    }
 
     async save(collaborator: Collaborator): Promise<void> {
         const ormEntity = this.repo.create({
@@ -45,6 +51,15 @@ export class PostgresCollaboratorRepository implements ICollaboratorRepository {
     async findAll(): Promise<Collaborator[]> {
         const ormEntities = await this.repo.find({ order: { name: 'ASC' } });
         return ormEntities.map(ormEntity => this.mapToDomain(ormEntity));
+    }
+
+    async findAllPaginated(page: number, limit: number): Promise<{ items: Collaborator[]; total: number }> {
+        const [ormEntities, total] = await this.repo.findAndCount({
+            order: { name: 'ASC' },
+            skip: (page - 1) * limit,
+            take: limit
+        });
+        return { items: ormEntities.map(ormEntity => this.mapToDomain(ormEntity)), total };
     }
 
     async saveHistory(history: CollaboratorHistory): Promise<void> {

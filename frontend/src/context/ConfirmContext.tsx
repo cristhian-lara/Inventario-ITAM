@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode, useCallback } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useCallback, useEffect } from 'react';
 import { AlertCircle, CheckCircle2, HelpCircle } from 'lucide-react';
 import './ConfirmContext.css';
 
@@ -45,18 +45,27 @@ export const ConfirmProvider: React.FC<{ children: ReactNode }> = ({ children })
     setOptions(null);
   }, []);
 
+  useEffect(() => {
+    if (!options) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !options.hideCancel) handleCancel();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [options, handleCancel]);
+
   return (
     <ConfirmContext.Provider value={{ confirm }}>
       {children}
       {options && (
         <div className="confirm-modal-overlay">
-          <div className="confirm-modal glass-panel slide-up">
+          <div className="confirm-modal glass-panel slide-up" role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title">
             <div className="confirm-modal-header">
               {options.type === 'danger' && <AlertCircle size={32} className="confirm-icon danger" />}
               {options.type === 'warning' && <HelpCircle size={32} className="confirm-icon warning" />}
               {(!options.type || options.type === 'info' || options.type === 'success') && <CheckCircle2 size={32} className="confirm-icon info" />}
             </div>
-            <h3 className="confirm-modal-title">{options.title}</h3>
+            <h3 className="confirm-modal-title" id="confirm-modal-title">{options.title}</h3>
             <p className="confirm-modal-message">{options.message}</p>
             <div className="confirm-modal-actions">
               {!options.hideCancel && (

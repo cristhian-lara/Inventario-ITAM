@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
 import catalogRoutes from './routes/catalog.routes';
 import assignmentRoutes from './routes/assignment.routes';
 import { collaboratorRouter } from './routes/collaborator.routes';
@@ -15,6 +16,14 @@ const PORT = process.env.PORT || 3000;
 
 // No exponer la tecnología del servidor
 app.disable('x-powered-by');
+
+// Cabeceras de seguridad HTTP. CSP desactivada porque esta API no sirve HTML;
+// crossOriginResourcePolicy en 'cross-origin' porque el frontend (Vite, otro
+// puerto/origen) necesita poder cargar los PDFs servidos en /pdfs.
+app.use(helmet({
+    contentSecurityPolicy: false,
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+}));
 
 // CORS con lista de orígenes permitidos (configurable por env).
 // En desarrollo se acepta cualquier puerto de localhost / red local (Vite puede
@@ -57,6 +66,15 @@ app.use('/api/collaborators', collaboratorRouter);
 app.use('/api/dashboard', dashboardRouter);
 app.use('/api/maintenances', maintenanceRouter);
 app.use('/api/settings', settingsRoutes);
+
+// Manejador de errores global: última red de seguridad para excepciones no
+// atrapadas en un handler async (ej. un throw fuera de try/catch). Nunca
+// expone el stack trace al cliente; solo se loguea en el servidor.
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    console.error('Error no controlado:', err);
+    if (res.headersSent) return next(err);
+    res.status(err.status || 500).json({ error: 'Error interno del servidor' });
+});
 
 // Iniciar Base de Datos y Servidor
 initializeDatabase().then(() => {

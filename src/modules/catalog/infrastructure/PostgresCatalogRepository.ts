@@ -1,3 +1,4 @@
+import { EntityManager, Repository } from 'typeorm';
 import { AppDataSource } from '../../../shared/infrastructure/database/postgres';
 import { Asset, AssetStatus } from '../domain/Asset';
 import { Category } from '../domain/Category';
@@ -6,8 +7,13 @@ import { AssetOrmEntity } from './orm/Asset.entity';
 import { CategoryOrmEntity } from './orm/Category.entity';
 
 export class PostgresCatalogRepository implements ICatalogRepository {
-    private categoryRepo = AppDataSource.getRepository(CategoryOrmEntity);
-    private assetRepo = AppDataSource.getRepository(AssetOrmEntity);
+    private categoryRepo: Repository<CategoryOrmEntity>;
+    private assetRepo: Repository<AssetOrmEntity>;
+
+    constructor(manager: EntityManager = AppDataSource.manager) {
+        this.categoryRepo = manager.getRepository(CategoryOrmEntity);
+        this.assetRepo = manager.getRepository(AssetOrmEntity);
+    }
 
     async saveCategory(category: Category): Promise<void> {
         const ormEntity = this.categoryRepo.create({
@@ -102,6 +108,29 @@ export class PostgresCatalogRepository implements ICatalogRepository {
             }));
         }
         return assets;
+    }
+
+    async getAssetsPaginated(page: number, limit: number): Promise<{ items: Asset[]; total: number }> {
+        const [ormEntities, total] = await this.assetRepo.findAndCount({
+            skip: (page - 1) * limit,
+            take: limit,
+            order: { id: 'ASC' }
+        });
+        const items = ormEntities.map(orm => new Asset({
+            id: orm.id,
+            categoryId: orm.category_id || 0,
+            serial: orm.serial,
+            status: orm.status as AssetStatus,
+            dynamicAttributes: orm.dynamic_data,
+            purchaseDate: orm.purchase_date,
+            warrantyMonths: orm.warranty_months,
+            depreciationYears: orm.depreciation_years,
+            purchasePrice: orm.purchase_price ? parseFloat(orm.purchase_price as any) : undefined,
+            vendorName: orm.vendor_name,
+            internalBuyer: orm.internal_buyer,
+            disposal: orm.disposal
+        }));
+        return { items, total };
     }
 
     async generateIncrementalId(categoryId: number): Promise<string> {

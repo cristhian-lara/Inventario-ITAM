@@ -92,6 +92,9 @@ export class UserManagementUseCases {
     }): Promise<UserSummary> {
         const user = await this.findTargetOrFail(userId);
         this.ensureCanModifyTarget(actor, user, 'editar');
+        if (actor.id === userId) {
+            throw new UserManagementError('No puedes editar tu propio usuario.', 403);
+        }
 
         if (data.fullName !== undefined) {
             this.validateRequired(data.fullName, 'nombre completo');

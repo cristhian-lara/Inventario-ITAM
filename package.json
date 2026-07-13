@@ -7,7 +7,10 @@
     "start": "ts-node src/api/server.ts",
     "dev": "nodemon --watch src --ext ts,json --exec ts-node src/api/server.ts",
     "seed": "ts-node src/scripts/seed.ts",
-    "seed:auth": "ts-node src/modules/auth/infrastructure/seeder.ts"
+    "seed:auth": "ts-node src/modules/auth/infrastructure/seeder.ts",
+    "migration:generate": "typeorm-ts-node-commonjs migration:generate -d src/shared/infrastructure/database/data-source.ts",
+    "migration:run": "typeorm-ts-node-commonjs migration:run -d src/shared/infrastructure/database/data-source.ts",
+    "migration:revert": "typeorm-ts-node-commonjs migration:revert -d src/shared/infrastructure/database/data-source.ts"
   },
   "keywords": [],
   "author": "",
@@ -19,6 +22,7 @@
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "helmet": "^8.3.0",
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.1.1",
     "node-cron": "^4.6.0",
@@ -29,7 +33,8 @@
     "reflect-metadata": "^0.2.2",
     "typeorm": "^1.0.0",
     "uuid": "^14.0.0",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",

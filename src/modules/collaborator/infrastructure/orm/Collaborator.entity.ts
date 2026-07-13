@@ -1,4 +1,4 @@
-import { Entity, PrimaryColumn, Column, CreateDateColumn } from 'typeorm';
+import { Entity, PrimaryColumn, Column, CreateDateColumn, Index } from 'typeorm';
 
 @Entity('collaborators')
 export class CollaboratorOrmEntity {
@@ -11,12 +11,14 @@ export class CollaboratorOrmEntity {
     @Column({ unique: true })
     email!: string;
 
+    @Index()
     @Column({ nullable: true })
     department!: number;
 
     @Column()
     location!: string;
 
+    @Index()
     @Column({ default: 'ACTIVE' })
     status!: string;
 

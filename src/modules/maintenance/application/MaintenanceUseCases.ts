@@ -2,6 +2,7 @@ import { IMaintenanceRepository } from '../domain/IMaintenanceRepository';
 import { MaintenanceRecord } from '../domain/MaintenanceRecord';
 import { MaintenanceStatus, MaintenanceType } from '../domain/MaintenanceTypes';
 import { NotificationError, NotificationResult } from '../../../shared/contracts/NotificationError';
+import { JWT_SECRET } from '../../../shared/infrastructure/config/env';
 
 // Definimos un contrato para consultar si un activo está asignado (así no acoplamos directamente al repositorio de asignaciones)
 export interface IAssetAssignmentService {
@@ -105,11 +106,11 @@ export class MaintenanceUseCases {
         }
     }
 
-    async completeMaintenance(id: string, notes?: string): Promise<{ record: MaintenanceRecord; notification: NotificationResult | null }> {
+    async completeMaintenance(id: string, notes?: string, realStartDate?: Date, realEndDate?: Date): Promise<{ record: MaintenanceRecord; notification: NotificationResult | null }> {
         const record = await this.repo.findById(id);
         if (!record) throw new Error('Mantenimiento no encontrado');
 
-        const nextPreventive = record.completeMaintenance(new Date(), notes);
+        const nextPreventive = record.completeMaintenance(realEndDate || new Date(), notes, realStartDate);
         let notification: NotificationResult | null = null;
 
         // Si hay un usuario en turno, generamos token de firma para el acta
@@ -117,7 +118,7 @@ export class MaintenanceUseCases {
             const assignment = await this.assignmentService.getActiveAssignmentForAsset(record.assetId);
             if (assignment && assignment.collaboratorEmail) {
                 const jwt = require('jsonwebtoken');
-                const secret = process.env.JWT_SECRET || 'secret';
+                const secret = JWT_SECRET;
                 const token = record.generateSignatureToken((maintId) => {
                     return jwt.sign({ maintenanceId: maintId }, secret, { expiresIn: '24h' });
                 });
@@ -145,7 +146,7 @@ export class MaintenanceUseCases {
         }
 
         const jwt = require('jsonwebtoken');
-        const secret = process.env.JWT_SECRET || 'secret';
+        const secret = JWT_SECRET;
         const token = record.generateSignatureToken((maintId) => {
             return jwt.sign({ maintenanceId: maintId }, secret, { expiresIn: '24h' });
         });

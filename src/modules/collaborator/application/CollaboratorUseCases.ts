@@ -110,6 +110,10 @@ export class CollaboratorUseCases {
         return this.collaboratorRepo.findAll();
     }
 
+    async getCollaboratorsPaginated(page: number, limit: number): Promise<{ items: Collaborator[]; total: number }> {
+        return this.collaboratorRepo.findAllPaginated(page, limit);
+    }
+
     async getCollaboratorById(id: string): Promise<Collaborator | null> {
         return this.collaboratorRepo.findById(id);
     }

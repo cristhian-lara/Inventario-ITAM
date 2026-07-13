@@ -1,4 +1,4 @@
-import { Entity, PrimaryColumn, Column, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, PrimaryColumn, Column, ManyToOne, JoinColumn, Index } from 'typeorm';
 import { CategoryOrmEntity } from './Category.entity';
 
 @Entity('assets', { schema: 'public' })
@@ -6,12 +6,14 @@ export class AssetOrmEntity {
     @PrimaryColumn()
     id!: string;
 
+    @Index()
     @Column({ nullable: true })
     category_id!: number;
 
     @Column({ nullable: true })
     serial?: string;
 
+    @Index()
     @Column()
     status!: string;
 

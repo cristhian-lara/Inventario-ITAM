@@ -4,6 +4,18 @@ import { resolveRoutePermission } from './permission-map';
 import { PostgresUserRepository } from '../../modules/auth/infrastructure/repositories/PostgresUserRepository';
 import { PostgresPermissionRepository } from '../../modules/auth/infrastructure/repositories/PostgresPermissionRepository';
 import { Role } from '../../modules/auth/domain/Role';
+import { createRateLimiter } from './rateLimit.middleware';
+
+// Los endpoints públicos de firma verifican un JWT propio (enlace enviado por
+// Webex) sin ninguna otra fricción; sin límite de tasa quedan expuestos a
+// fuerza bruta sobre el token. 30/min por IP es holgado para uso legítimo
+// (un colaborador reintentando el enlace) pero corta un ataque automatizado.
+const publicEndpointRateLimit = createRateLimiter({
+    windowMs: 60_000,
+    max: 30,
+    keyPrefix: 'public-signing',
+    message: 'Demasiadas solicitudes. Espera un minuto e intenta de nuevo.'
+});
 
 /**
  * Guard global del API (RBAC):
@@ -33,7 +45,12 @@ export const apiGuard = (req: AuthRequest, res: Response, next: NextFunction): v
     if (req.method === 'OPTIONS') return next();
 
     const isPublic = PUBLIC_ENDPOINTS.some(e => e.method === req.method && e.pattern.test(req.path));
-    if (isPublic) return next();
+    if (isPublic) {
+        // El login tiene su propio limitador, más estricto, en auth.routes.ts.
+        if (req.path === '/auth/login') return next();
+        publicEndpointRateLimit(req, res, next);
+        return;
+    }
 
     authenticateJWT(req, res, () => {
         authorizeAgainstDatabase(req, res, next).catch(err => {

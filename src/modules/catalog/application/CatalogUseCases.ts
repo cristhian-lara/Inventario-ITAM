@@ -75,6 +75,10 @@ export class CatalogUseCases {
         return this.repository.getAllAssets();
     }
 
+    async getAssetsPaginated(page: number, limit: number): Promise<{ items: Asset[]; total: number }> {
+        return this.repository.getAssetsPaginated(page, limit);
+    }
+
     async getAssetById(assetId: string): Promise<Asset | null> {
         return this.repository.getAssetById(assetId);
     }

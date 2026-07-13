@@ -5,6 +5,7 @@ import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveCo
 import { Link } from 'react-router-dom';
 import ActionMenu from '../components/ActionMenu';
 import { useConfirm } from '../context/ConfirmContext';
+import { useToast } from '../context/ToastContext';
 import { usePermission } from '../context/AuthContext';
 import { showWebexFailureModal } from '../utils/notificationNotice';
 import { authHeaders } from '../utils/authHeaders';
@@ -40,6 +41,11 @@ const STATUS_LABELS: Record<string, string> = {
   CANCELLED: 'Cancelado',
 };
 
+// Para completados, la fecha que importa para ubicarlos en el tiempo es la de ejecución real
+// (puede ser muy distinta de la programada cuando se carga historial retroactivo), no la programada.
+const getRelevantDate = (m: MaintenanceRecord): string | undefined =>
+  (m.status === 'COMPLETED' && m.executionDate) ? m.executionDate : m.scheduledDate;
+
 const Maintenances: React.FC = () => {
   const queryClient = useQueryClient();
   const [filterType, setFilterType] = useState('all');
@@ -50,6 +56,7 @@ const Maintenances: React.FC = () => {
   const [viewMode, setViewMode] = useState<'general' | 'auditoria' | 'balance' | 'preventive'>('general');
   const [coverageFilter, setCoverageFilter] = useState<'all' | 'completed' | 'scheduled' | 'pending'>('all');
   const { confirm } = useConfirm();
+  const toast = useToast();
   // Permisos RBAC del módulo Mantenimientos: crear = programar; editar = ejecutar acciones de estado
   const maintPerms = usePermission('maintenances');
   const canCreate = maintPerms.create;
@@ -58,8 +65,6 @@ const Maintenances: React.FC = () => {
   const [showModal, setShowModal] = useState(false);
   const [modalMode, setModalMode] = useState<'create' | 'start' | 'complete' | 'view' | 'forceSign'>('create');
   const [selectedRecord, setSelectedRecord] = useState<MaintenanceRecord | null>(null);
-  const [successMsg, setSuccessMsg] = useState('');
-  const [errorToast, setErrorToast] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
   const [formData, setFormData] = useState({
@@ -69,7 +74,9 @@ const Maintenances: React.FC = () => {
     reason: '',
     startNote: '',
     notes: '',
-    executionDate: new Date().toISOString().split('T')[0]
+    executionDate: new Date().toISOString().split('T')[0],
+    realStartDate: '',
+    realEndDate: ''
   });
 
   const { data: maintenances, isLoading } = useQuery<MaintenanceRecord[]>({
@@ -83,7 +90,7 @@ const Maintenances: React.FC = () => {
 
   const availableYears = React.useMemo(() => {
     if (!maintenances) return [];
-    const years = new Set(maintenances.map(m => new Date(m.scheduledDate).getFullYear()));
+    const years = new Set(maintenances.map(m => new Date(getRelevantDate(m) || m.scheduledDate).getFullYear()));
     return Array.from(years).sort((a, b) => b - a);
   }, [maintenances]);
 
@@ -159,9 +166,9 @@ const Maintenances: React.FC = () => {
   });
 
   const completeMutation = useMutation({
-    mutationFn: async (data: { id: string, notes: string }) => {
+    mutationFn: async (data: { id: string, notes: string, realStartDate?: string, realEndDate?: string }) => {
       const res = await fetch(`${API_URL}/api/maintenances/${data.id}/complete`, {
-        method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify({ notes: data.notes })
+        method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify({ notes: data.notes, realStartDate: data.realStartDate || undefined, realEndDate: data.realEndDate || undefined })
       });
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
@@ -172,8 +179,12 @@ const Maintenances: React.FC = () => {
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ['maintenances'] });
       setShowModal(false);
-      // notificationSent === null → no había colaborador en turno que notificar
-      showWebexFailureModal(confirm, data);
+      if (data?.autoSigned) {
+        toast.success('El activo no tenía colaborador asignado: el acta de mantenimiento se generó y firmó automáticamente (firma forzada por el sistema).', 5000);
+      } else {
+        // notificationSent === null → no había colaborador en turno que notificar
+        showWebexFailureModal(confirm, data);
+      }
     },
     onError: (error: Error) => { setErrorMsg(error.message); }
   });
@@ -192,13 +203,11 @@ const Maintenances: React.FC = () => {
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ['maintenances'] });
       if (!showWebexFailureModal(confirm, data)) {
-        setSuccessMsg(data?.message || 'Firma solicitada correctamente. Se envió la notificación por Webex al colaborador.');
-        setTimeout(() => setSuccessMsg(''), 4000);
+        toast.success(data?.message || 'Firma solicitada correctamente. Se envió la notificación por Webex al colaborador.', 4000);
       }
     },
-    onError: (error: Error) => { 
-      setErrorToast(error.message); 
-      setTimeout(() => setErrorToast(''), 4000);
+    onError: (error: Error) => {
+      toast.error(error.message, 4000);
     }
   });
 
@@ -215,13 +224,11 @@ const Maintenances: React.FC = () => {
     },
     onSuccess: (data: any) => {
       if (!showWebexFailureModal(confirm, data)) {
-        setSuccessMsg(data?.message || 'Recordatorio de mantenimiento enviado por Webex.');
-        setTimeout(() => setSuccessMsg(''), 4000);
+        toast.success(data?.message || 'Recordatorio de mantenimiento enviado por Webex.', 4000);
       }
     },
     onError: (error: Error) => {
-      setErrorToast(error.message);
-      setTimeout(() => setErrorToast(''), 4000);
+      toast.error(error.message, 4000);
     }
   });
 
@@ -241,8 +248,7 @@ const Maintenances: React.FC = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['maintenances'] });
       setShowModal(false);
-      setSuccessMsg('Mantenimiento firmado forzadamente con éxito');
-      setTimeout(() => setSuccessMsg(''), 3000);
+      toast.success('Mantenimiento firmado forzadamente con éxito', 3000);
     },
     onError: (error: Error) => { setErrorMsg(error.message); }
   });
@@ -259,8 +265,9 @@ const Maintenances: React.FC = () => {
 
   const timeFilteredMaintenances = maintenances?.filter(m => {
     if (filterYear !== 'all' || filterMonth !== 'all') {
-      if (!m?.scheduledDate) return false;
-      const date = new Date(m.scheduledDate);
+      const relevantDate = getRelevantDate(m);
+      if (!relevantDate) return false;
+      const date = new Date(relevantDate);
       if (filterYear !== 'all' && date.getFullYear().toString() !== filterYear) return false;
       if (filterMonth !== 'all' && (date.getMonth() + 1).toString() !== filterMonth) return false;
     }
@@ -302,11 +309,15 @@ const Maintenances: React.FC = () => {
     return {
       month: d.toLocaleString('es-CO', { month: 'short' }),
       Preventivo: maintenances?.filter(m => {
-        const md = new Date(m.scheduledDate);
+        const relevantDate = getRelevantDate(m);
+        if (!relevantDate) return false;
+        const md = new Date(relevantDate);
         return m?.type === 'PREVENTIVE' && md.getFullYear() === yr && md.getMonth() === mo;
       }).length || 0,
       Correctivo: maintenances?.filter(m => {
-        const md = new Date(m.scheduledDate);
+        const relevantDate = getRelevantDate(m);
+        if (!relevantDate) return false;
+        const md = new Date(relevantDate);
         return m.type === 'CORRECTIVE' && md.getFullYear() === yr && md.getMonth() === mo;
       }).length || 0,
     };
@@ -396,14 +407,15 @@ const Maintenances: React.FC = () => {
     // 3. Types and Statuses
     if (filterType !== 'all' && m?.type !== filterType) return false;
     if (filterStatus !== 'all' && m?.status !== filterStatus) return false;
-    
+
     if (filterYear !== 'all' || filterMonth !== 'all') {
-      if (!m?.scheduledDate) return false;
-      const date = new Date(m.scheduledDate);
+      const relevantDate = getRelevantDate(m);
+      if (!relevantDate) return false;
+      const date = new Date(relevantDate);
       if (filterYear !== 'all' && date.getFullYear().toString() !== filterYear) return false;
       if (filterMonth !== 'all' && (date.getMonth() + 1).toString() !== filterMonth) return false;
     }
-    
+
     return true;
   }).sort((a, b) => {
     // Agrupar por equipo (assetId) para visualizar juntos sus históricos
@@ -454,7 +466,7 @@ const Maintenances: React.FC = () => {
       submitAction = () => startMutation.mutate({ id: selectedRecord.id, startNote: formData.startNote || '' });
     } else if (modalMode === 'complete' && selectedRecord) {
       title = 'Completar Mantenimiento'; message = '¿Estás seguro de dar por completado este mantenimiento?';
-      submitAction = () => completeMutation.mutate({ id: selectedRecord.id, notes: formData.notes });
+      submitAction = () => completeMutation.mutate({ id: selectedRecord.id, notes: formData.notes, realStartDate: formData.realStartDate, realEndDate: formData.realEndDate });
     } else if (modalMode === 'forceSign' && selectedRecord) {
       title = 'Forzar Firma de Mantenimiento'; message = '¿Estás seguro de forzar la firma de este mantenimiento?';
       submitAction = () => forceSignMutation.mutate({ id: selectedRecord.id, reason: formData.reason });
@@ -472,12 +484,12 @@ const Maintenances: React.FC = () => {
     setModalMode(mode); setSelectedRecord(record || null);
     setErrorMsg('');
     if (mode === 'create') {
-      setFormData({ assetId: '', type: 'PREVENTIVE', scheduledDate: new Date().toISOString().split('T')[0], reason: '', startNote: '', notes: '', executionDate: new Date().toISOString().split('T')[0] });
+      setFormData({ assetId: '', type: 'PREVENTIVE', scheduledDate: new Date().toISOString().split('T')[0], reason: '', startNote: '', notes: '', executionDate: new Date().toISOString().split('T')[0], realStartDate: '', realEndDate: '' });
       setAssetSearchTerm('');
     } else if (mode === 'forceSign') {
       setFormData({ ...formData, reason: '', startNote: '' });
     } else if (record) {
-      setFormData({ ...formData, reason: record.reason || '', startNote: record.startNote || '', notes: record.notes || '' });
+      setFormData({ ...formData, reason: record.reason || '', startNote: record.startNote || '', notes: record.notes || '', realStartDate: '', realEndDate: '' });
     }
     setShowModal(true);
   };
@@ -496,26 +508,6 @@ const Maintenances: React.FC = () => {
           {canCreate && <button className="btn-primary" onClick={() => openModal('create')}><Plus size={18} /> Programar</button>}
         </div>
       </header>
-
-      {successMsg && (
-        <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, backdropFilter: 'blur(6px)' }}>
-          <div className="glass-panel slide-up" style={{ padding: '40px', maxWidth: '420px', width: '100%', textAlign: 'center', background: '#0f172a', border: '1px solid #10b981', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.3)' }}>
-            <CheckCircle size={60} color="#10b981" style={{ marginBottom: '20px' }} />
-            <h2 style={{ color: '#f8fafc', marginBottom: '15px', fontSize: '24px', fontWeight: 'bold' }}>¡Éxito!</h2>
-            <p style={{ color: '#e2e8f0', fontSize: '16px', lineHeight: '1.6', margin: 0 }}>{successMsg}</p>
-          </div>
-        </div>
-      )}
-
-      {errorToast && (
-        <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, backdropFilter: 'blur(6px)' }}>
-          <div className="glass-panel slide-up" style={{ padding: '40px', maxWidth: '420px', width: '100%', textAlign: 'center', background: '#0f172a', border: '1px solid #ef4444', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.3)' }}>
-            <AlertTriangle size={60} color="#ef4444" style={{ marginBottom: '20px' }} />
-            <h2 style={{ color: '#f8fafc', marginBottom: '15px', fontSize: '24px', fontWeight: 'bold' }}>Aviso</h2>
-            <p style={{ color: '#e2e8f0', fontSize: '16px', lineHeight: '1.6', margin: 0 }}>{errorToast}</p>
-          </div>
-        </div>
-      )}
 
       {/* ── Global Coverage KPIs ────────────────────────────────────────────── */}
       <div style={{ marginBottom: '20px' }}>
@@ -1057,6 +1049,19 @@ const Maintenances: React.FC = () => {
                     <label>Notas de Resolución</label>
                     <textarea required className="glass-input" value={formData.notes} onChange={e => setFormData({ ...formData, notes: e.target.value })} placeholder="Ej. Se limpió ventilador y se actualizó BIOS..." style={{ minHeight: '100px', resize: 'vertical' }} />
                   </div>
+                  <div style={{ display: 'flex', gap: '12px' }}>
+                    <div className="form-group" style={{ flex: 1 }}>
+                      <label>Fecha real de inicio (Opcional)</label>
+                      <input type="date" className="glass-input" value={formData.realStartDate} onChange={e => setFormData({ ...formData, realStartDate: e.target.value })} />
+                    </div>
+                    <div className="form-group" style={{ flex: 1 }}>
+                      <label>Fecha real de finalización (Opcional)</label>
+                      <input type="date" className="glass-input" value={formData.realEndDate} onChange={e => setFormData({ ...formData, realEndDate: e.target.value })} />
+                    </div>
+                  </div>
+                  <p style={{ color: 'var(--text-muted)', fontSize: '12px', marginTop: '-8px' }}>
+                    Usa estos campos solo para cargar mantenimientos históricos (ej. desde Excel). Si los dejas vacíos, se usará la fecha y hora actual.
+                  </p>
                 </>
               )}
               {modalMode === 'forceSign' && (

@@ -5,6 +5,7 @@ import { BrowserRouter } from 'react-router-dom'
 import App from './App.tsx'
 import './index.css'
 import { ConfirmProvider } from './context/ConfirmContext.tsx'
+import { ToastProvider } from './context/ToastContext.tsx'
 import axios from 'axios';
 
 // Evitar que Ngrok bloquee las peticiones de la API con error 403 o la pantalla de advertencia
@@ -19,9 +20,11 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <BrowserRouter>
-          <ConfirmProvider>
-            <App />
-          </ConfirmProvider>
+          <ToastProvider>
+            <ConfirmProvider>
+              <App />
+            </ConfirmProvider>
+          </ToastProvider>
         </BrowserRouter>
       </AuthProvider>
     </QueryClientProvider>

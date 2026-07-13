@@ -57,10 +57,12 @@ export class MaintenanceRecord {
         if (startNote) this.props.startNote = startNote;
     }
 
-    public completeMaintenance(executionDate: Date, notes?: string): MaintenanceRecord {
+    public completeMaintenance(executionDate: Date, notes?: string, realStartDate?: Date): MaintenanceRecord {
         if (this.props.status !== 'IN_PROGRESS' && this.props.status !== 'SCHEDULED') {
             throw new Error('Solo se pueden completar mantenimientos en progreso o programados');
         }
+        // Permite cargar historial retroactivo: si se envía una fecha real de inicio, reemplaza el `startedAt` automático.
+        if (realStartDate) this.props.startedAt = realStartDate;
         this.props.status = 'COMPLETED';
         this.props.executionDate = executionDate;
         if (notes) this.props.notes = notes;
