@@ -23,6 +23,34 @@ const createAssetSchema = z.object({
     vendorName: z.string().optional(),
     internalBuyer: z.string().optional(),
 });
+
+const updateAssetSchema = createAssetSchema.omit({ id: true, categoryId: true }).partial();
+
+const categorySchema = z.object({
+    name: z.string().min(1, 'name es requerido'),
+    schema: z.record(z.string(), z.any()).optional().default({}),
+});
+
+const decommissionSchema = z.object({
+    reason: z.string().min(1, 'reason es obligatorio'),
+    blanccoReportId: z.string().optional(),
+    notes: z.string().optional(),
+});
+
+const changeStatusSchema = z.object({
+    status: z.string().min(1, 'status es requerido'),
+    reason: z.string().optional(),
+});
+
+const upgradeSchema = z.object({
+    upgrade_date: z.string().min(1, 'upgrade_date es obligatorio'),
+    component: z.string().min(1, 'component es obligatorio'),
+    old_value: z.string().optional(),
+    new_value: z.string().min(1, 'new_value es obligatorio'),
+    performed_by: z.string().optional(),
+    notes: z.string().optional(),
+});
+
 const upload = multer({ storage: multer.memoryStorage() });
 
 // Inyección de Dependencias Manual (MVP)
@@ -30,7 +58,7 @@ const upload = multer({ storage: multer.memoryStorage() });
 const catalogRepository = new PostgresCatalogRepository();
 const catalogUseCases = new CatalogUseCases(catalogRepository);
 
-router.post('/categories', async (req, res) => {
+router.post('/categories', validateBody(categorySchema), async (req, res) => {
     try {
         const { name, schema } = req.body;
         const category = await catalogUseCases.createCategory(name, schema);
@@ -40,7 +68,7 @@ router.post('/categories', async (req, res) => {
     }
 });
 
-router.put('/categories/:id', async (req, res) => {
+router.put('/categories/:id', validateBody(categorySchema), async (req, res) => {
     try {
         const { name, schema } = req.body;
         const category = await catalogUseCases.updateCategory(Number(req.params.id), name, schema);
@@ -122,7 +150,7 @@ router.post('/assets', validateBody(createAssetSchema), async (req, res) => {
     }
 });
 
-router.put('/assets/:id', async (req, res) => {
+router.put('/assets/:id', validateBody(updateAssetSchema), async (req, res) => {
     try {
         const { serial, dynamicAttributes, purchaseDate, warrantyMonths, depreciationYears, purchasePrice, vendorName, internalBuyer } = req.body;
         const asset = await catalogUseCases.updateAsset(
@@ -155,9 +183,9 @@ router.put('/assets/:id', async (req, res) => {
 });
 
 // Baja definitiva del activo (con referencia al borrado seguro en Blancco)
-router.post('/assets/:id/decommission', async (req, res) => {
+router.post('/assets/:id/decommission', validateBody(decommissionSchema), async (req, res) => {
     try {
-        const { reason, blanccoReportId, notes } = req.body || {};
+        const { reason, blanccoReportId, notes } = req.body;
         const authorizedBy = (req as any).user?.username || 'Administrador TI';
 
         const asset = await catalogUseCases.decommissionAsset(req.params.id, { reason, authorizedBy, blanccoReportId, notes });
@@ -173,7 +201,7 @@ router.post('/assets/:id/decommission', async (req, res) => {
     }
 });
 
-router.put('/assets/:id/status', async (req, res) => {
+router.put('/assets/:id/status', validateBody(changeStatusSchema), async (req, res) => {
     try {
         const { status, reason } = req.body;
         const asset = await catalogUseCases.changeAssetStatus(req.params.id, status as any, reason);
@@ -234,12 +262,9 @@ router.get('/assets/:assetId/upgrades', async (req, res) => {
 });
 
 // POST /api/catalog/assets/:assetId/upgrades — Registrar un nuevo upgrade
-router.post('/assets/:assetId/upgrades', async (req, res) => {
+router.post('/assets/:assetId/upgrades', validateBody(upgradeSchema), async (req, res) => {
     try {
         const { upgrade_date, component, old_value, new_value, performed_by, notes } = req.body;
-        if (!component || !new_value || !upgrade_date) {
-            return res.status(400).json({ error: 'component, new_value y upgrade_date son obligatorios' });
-        }
 
         // 1. Guardar el registro de upgrade
         const upgradeRepo = AppDataSource.getRepository(HardwareUpgradeOrmEntity);

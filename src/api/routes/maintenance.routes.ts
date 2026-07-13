@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { z } from 'zod';
 import { MaintenanceUseCases } from '../../modules/maintenance/application/MaintenanceUseCases';
 import { PostgresMaintenanceRepository } from '../../modules/maintenance/infrastructure/PostgresMaintenanceRepository';
 import { AppDataSource } from '../../shared/infrastructure/database/postgres';
@@ -7,8 +8,35 @@ import { PostgresAssignmentRepository } from '../../modules/assignment/infrastru
 import { WebexNotificationService } from '../../shared/infrastructure/services/WebexNotificationService';
 import { PdfKitService } from '../../shared/infrastructure/services/PdfKitService';
 import { JWT_SECRET } from '../../shared/infrastructure/config/env';
+import { validateBody } from '../middlewares/validate.middleware';
 
 const router = Router();
+
+const createMaintenanceSchema = z.object({
+    assetId: z.string().min(1, 'assetId es requerido'),
+    type: z.string().min(1, 'type es requerido'),
+    scheduledDate: z.string().min(1, 'scheduledDate es requerido'),
+    reason: z.string().optional(),
+});
+
+const startMaintenanceSchema = z.object({
+    startNote: z.string().optional(),
+});
+
+const completeMaintenanceSchema = z.object({
+    notes: z.string().optional(),
+    realStartDate: z.string().optional(),
+    realEndDate: z.string().optional(),
+});
+
+const signSchema = z.object({
+    token: z.string().min(1, 'token es requerido'),
+    signature: z.string().min(1, 'signature es requerida'),
+});
+
+const forceSignSchema = z.object({
+    reason: z.string().min(1, 'reason es obligatorio'),
+});
 
 // Dependencias
 const repo = new PostgresMaintenanceRepository(AppDataSource);
@@ -86,7 +114,7 @@ const serializeRecord = (record: any) => {
 };
 
 // 1. Crear / Agendar mantenimiento
-router.post('/', async (req, res) => {
+router.post('/', validateBody(createMaintenanceSchema), async (req, res) => {
     try {
         const { assetId, type, scheduledDate, reason } = req.body;
         const parsedDate = new Date(scheduledDate.includes('T') ? scheduledDate : `${scheduledDate}T12:00:00Z`);
@@ -98,7 +126,7 @@ router.post('/', async (req, res) => {
 });
 
 // 2. Iniciar mantenimiento
-router.post('/:id/start', async (req, res) => {
+router.post('/:id/start', validateBody(startMaintenanceSchema), async (req, res) => {
     try {
         const { startNote } = req.body;
         const result = await useCases.startMaintenance(req.params.id, startNote);
@@ -109,7 +137,7 @@ router.post('/:id/start', async (req, res) => {
 });
 
 // 3. Completar mantenimiento
-router.post('/:id/complete', async (req, res) => {
+router.post('/:id/complete', validateBody(completeMaintenanceSchema), async (req, res) => {
     try {
         const { notes, realStartDate, realEndDate } = req.body;
         const parsedStart = realStartDate ? new Date(realStartDate.includes('T') ? realStartDate : `${realStartDate}T12:00:00Z`) : undefined;
@@ -326,7 +354,7 @@ router.get('/accept', async (req, res) => {
 });
 
 // 8. Firmar acta (Público - Legacy UI)
-router.post('/sign', async (req, res) => {
+router.post('/sign', validateBody(signSchema), async (req, res) => {
     try {
         const { token, signature } = req.body;
         const jwt = require('jsonwebtoken');
@@ -370,7 +398,7 @@ router.post('/sign', async (req, res) => {
 });
 
 // 9. Firma forzada
-router.post('/:id/force-sign', async (req, res) => {
+router.post('/:id/force-sign', validateBody(forceSignSchema), async (req, res) => {
     try {
         const { reason } = req.body;
         const adminId = 'admin'; // Simulación

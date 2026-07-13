@@ -6,6 +6,8 @@ import { useAuth, usePermission, Role } from '../context/AuthContext';
 import { useConfirm } from '../context/ConfirmContext';
 import { useToast } from '../context/ToastContext';
 import { API_URL } from '../config';
+import { isPasswordValid } from '../utils/passwordPolicy';
+import PasswordChecklist from '../components/PasswordChecklist';
 import './Users.css';
 
 interface UserRow {
@@ -43,7 +45,12 @@ const ROLE_LABELS: Record<string, string> = {
     ESTANDAR: 'Auditor',
 };
 
-const PASSWORD_HINT = 'Mínimo 8 caracteres, con mayúscula, minúscula y número.';
+const FLAG_LABELS: Record<'canRead' | 'canCreate' | 'canEdit' | 'canDelete', string> = {
+    canRead: 'Lectura',
+    canCreate: 'Crear',
+    canEdit: 'Editar',
+    canDelete: 'Eliminar',
+};
 
 const emptyMatrix = (modules: SystemModule[]): MatrixState => {
     const matrix: MatrixState = {};
@@ -209,8 +216,15 @@ export default function Users() {
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (editingUser) updateMutation.mutate();
-        else createMutation.mutate();
+        if (editingUser) {
+            updateMutation.mutate();
+            return;
+        }
+        if (!isPasswordValid(password)) {
+            toast.error('La contraseña no cumple con los requisitos mínimos de seguridad.');
+            return;
+        }
+        createMutation.mutate();
     };
 
     const handleDelete = (u: UserRow) => {
@@ -349,7 +363,7 @@ export default function Users() {
                                         <label>Contraseña *</label>
                                         <input type="password" className="glass-input" value={password}
                                             onChange={e => setPassword(e.target.value)} required />
-                                        <small className="field-hint">{PASSWORD_HINT}</small>
+                                        <PasswordChecklist password={password} />
                                     </div>
                                 )}
                                 <div className="form-group">
@@ -397,9 +411,13 @@ export default function Users() {
                                                         <td>{m.name}</td>
                                                         {(['canRead', 'canCreate', 'canEdit', 'canDelete'] as const).map(flag => {
                                                             const disabled = isFlagDisabled(m, flag);
+                                                            const flagLabel = FLAG_LABELS[flag];
+                                                            const checkboxId = `perm-${m.key}-${flag}`;
                                                             return (
                                                                 <td key={flag}>
+                                                                    <label htmlFor={checkboxId} className="sr-only">{`${m.name} - ${flagLabel}`}</label>
                                                                     <input
+                                                                        id={checkboxId}
                                                                         type="checkbox"
                                                                         checked={matrix[m.key]?.[flag] || false}
                                                                         disabled={disabled}
@@ -440,16 +458,23 @@ export default function Users() {
                             Nueva contraseña para <strong>{resetTarget.fullName}</strong> ({resetTarget.username}).
                             Comunícasela al usuario por un medio seguro.
                         </p>
-                        <form onSubmit={e => { e.preventDefault(); resetMutation.mutate(); }}>
+                        <form onSubmit={e => {
+                            e.preventDefault();
+                            if (!isPasswordValid(newPassword)) {
+                                toast.error('La contraseña no cumple con los requisitos mínimos de seguridad.');
+                                return;
+                            }
+                            resetMutation.mutate();
+                        }}>
                             <div className="form-group">
                                 <label>Nueva contraseña *</label>
                                 <input type="password" className="glass-input" value={newPassword}
                                     onChange={e => setNewPassword(e.target.value)} required autoFocus />
-                                <small className="field-hint">{PASSWORD_HINT}</small>
+                                <PasswordChecklist password={newPassword} />
                             </div>
                             <div className="users-modal-footer">
                                 <button type="button" className="btn-secondary" onClick={() => setResetTarget(null)}>Cancelar</button>
-                                <button type="submit" className="btn-primary" disabled={resetMutation.isPending}>
+                                <button type="submit" className="btn-primary" disabled={resetMutation.isPending || !isPasswordValid(newPassword)}>
                                     {resetMutation.isPending ? 'Guardando...' : 'Restablecer'}
                                 </button>
                             </div>

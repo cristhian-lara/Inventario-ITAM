@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { z } from 'zod';
 import { AssignmentUseCases } from '../../modules/assignment/application/AssignmentUseCases';
 import { PostgresAssignmentRepository } from '../../modules/assignment/infrastructure/PostgresAssignmentRepository';
 import { WebexNotificationService } from '../../shared/infrastructure/services/WebexNotificationService';
@@ -12,8 +13,49 @@ import { PostgresDepartmentRepository } from '../../modules/collaborator/infrast
 import { CollaboratorHistory } from '../../modules/collaborator/domain/CollaboratorHistory';
 import { v4 as uuidv4 } from 'uuid';
 import { AppDataSource } from '../../shared/infrastructure/database/postgres';
+import { validateBody } from '../middlewares/validate.middleware';
 
 const router = Router();
+
+const createAssignmentSchema = z.object({
+    id: z.string().min(1, 'id es requerido'),
+    assetId: z.string().min(1, 'assetId es requerido'),
+    collaboratorId: z.string().min(1, 'collaboratorId es requerido'),
+    collaboratorEmail: z.string().email('collaboratorEmail debe ser un correo válido'),
+    collaboratorName: z.string().optional(),
+    startDate: z.string().min(1, 'startDate es requerido'),
+    assignmentType: z.string().optional(),
+    expectedReturnDate: z.string().optional(),
+});
+
+const extendLoanSchema = z.object({
+    newReturnDate: z.string().min(1, 'newReturnDate es obligatorio.'),
+});
+
+const optionalEmailSchema = z.object({
+    email: z.string().email().optional(),
+});
+
+const returnByAssetSchema = z.object({
+    email: z.string().email().optional(),
+    collaboratorName: z.string().optional(),
+});
+
+const approveReturnSchema = z.object({
+    note: z.string().optional(),
+});
+
+const forceActionSchema = z.object({
+    email: z.string().email().optional(),
+    collaboratorName: z.string().optional(),
+    reason: z.string().optional(),
+});
+
+const batchReturnSchema = z.object({
+    assignmentIds: z.array(z.string().min(1)).min(1, 'assignmentIds no puede estar vacío'),
+    email: z.string().email('email es obligatorio y debe ser válido'),
+    reason: z.string().optional(),
+});
 
 const assignmentRepo = new PostgresAssignmentRepository();
 const mailerService = new WebexNotificationService();
@@ -155,7 +197,7 @@ async function generateDraftPdf(
 }
 
 // 1. Iniciar Asignación
-router.post('/', async (req, res) => {
+router.post('/', validateBody(createAssignmentSchema), async (req, res) => {
     try {
         const { id, assetId, collaboratorId, collaboratorEmail, collaboratorName, startDate, assignmentType, expectedReturnDate } = req.body;
 
@@ -246,12 +288,9 @@ router.get('/loans/due-within', async (req, res) => {
 });
 
 // Extender la fecha de devolución de un préstamo activo (reinicia su alerta de vencimiento)
-router.post('/:id/extend-loan', async (req, res) => {
+router.post('/:id/extend-loan', validateBody(extendLoanSchema), async (req, res) => {
     try {
-        const { newReturnDate } = req.body || {};
-        if (!newReturnDate) {
-            return res.status(400).json({ error: 'newReturnDate es obligatorio.' });
-        }
+        const { newReturnDate } = req.body;
         const assignment = await assignmentUseCases.extendLoanReturnDate(req.params.id, newReturnDate);
         res.json({
             message: 'Fecha de devolución del préstamo extendida.',
@@ -265,9 +304,9 @@ router.post('/:id/extend-loan', async (req, res) => {
 });
 
 // Iniciar devolución
-router.post('/:id/return', async (req, res) => {
+router.post('/:id/return', validateBody(optionalEmailSchema), async (req, res) => {
     try {
-        const { email } = req.body || {};
+        const { email } = req.body;
         const existing = await assignmentRepo.findById(req.params.id);
         const collaborator = existing ? await collaboratorRepo.findById(existing.collaboratorId) : null;
         const realEmail = email || (collaborator ? collaborator.email : 'test@ikusi.com');
@@ -292,10 +331,9 @@ router.post('/:id/return', async (req, res) => {
 });
 
 // Iniciar devolución por Asset ID
-router.post('/return-by-asset/:assetId', async (req, res) => {
+router.post('/return-by-asset/:assetId', validateBody(returnByAssetSchema), async (req, res) => {
     try {
-        const { collaboratorName } = req.body || {};
-        const { email } = req.body || {};
+        const { collaboratorName, email } = req.body;
         const existing = await assignmentRepo.findCurrentByAssetId(req.params.assetId);
         const collaborator = existing ? await collaboratorRepo.findById(existing.collaboratorId) : null;
         const realEmail = email || (collaborator ? collaborator.email : 'test@ikusi.com');
@@ -320,9 +358,9 @@ router.post('/return-by-asset/:assetId', async (req, res) => {
 });
 
 // Visto bueno del administrador sobre una devolución firmada
-router.post('/:id/approve-return', async (req, res) => {
+router.post('/:id/approve-return', validateBody(approveReturnSchema), async (req, res) => {
     try {
-        const { note } = req.body || {};
+        const { note } = req.body;
         const approvedBy = (req as any).user?.username || 'Administrador TI';
 
         const assignment = await assignmentUseCases.approveReturn(req.params.id, approvedBy, note);
@@ -362,9 +400,9 @@ router.post('/:id/approve-return', async (req, res) => {
 });
 
 // Reenviar Link de Firma
-router.post('/:id/resend-link', async (req, res) => {
+router.post('/:id/resend-link', validateBody(optionalEmailSchema), async (req, res) => {
     try {
-        const { email } = req.body || {};
+        const { email } = req.body;
         const existing = await assignmentRepo.findById(req.params.id);
         const collaborator = existing ? await collaboratorRepo.findById(existing.collaboratorId) : null;
         const realEmail = email || (collaborator ? collaborator.email : 'test@ikusi.com');
@@ -389,9 +427,9 @@ router.post('/:id/resend-link', async (req, res) => {
     }
 });
 
-router.post('/resend-link-by-asset/:assetId', async (req, res) => {
+router.post('/resend-link-by-asset/:assetId', validateBody(optionalEmailSchema), async (req, res) => {
     try {
-        const { email } = req.body || {};
+        const { email } = req.body;
         const existing = await assignmentRepo.findCurrentByAssetId(req.params.assetId);
         if (!existing) throw new Error('No se encontró asignación activa');
         const collaborator = await collaboratorRepo.findById(existing.collaboratorId);
@@ -418,7 +456,7 @@ router.post('/resend-link-by-asset/:assetId', async (req, res) => {
 });
 
 // Devolución Forzada (Administrativa)
-router.post('/:id/force-return', async (req, res) => {
+router.post('/:id/force-return', validateBody(forceActionSchema), async (req, res) => {
     try {
         const reason = req.body.reason || 'Firma forzada administrativa';
         const ipAddress = `Firma forzada por administrador.\nMotivo: ${reason}`;
@@ -511,10 +549,10 @@ router.post('/:id/force-return', async (req, res) => {
     }
 });
 
-router.post('/force-return-by-asset/:assetId', async (req, res) => {
+router.post('/force-return-by-asset/:assetId', validateBody(forceActionSchema), async (req, res) => {
     try {
-        const { email, collaboratorName } = req.body || {};
-        const reason = req.body?.reason || 'Firma forzada administrativa';
+        const { email, collaboratorName } = req.body;
+        const reason = req.body.reason || 'Firma forzada administrativa';
         const ipAddress = `Firma forzada por administrador.\nMotivo: ${reason}`;
 
         const { documentPath } = await AppDataSource.manager.transaction(async (manager) => {
@@ -605,79 +643,90 @@ router.post('/force-return-by-asset/:assetId', async (req, res) => {
 });
 
 // Aceptación Forzada (Administrativa)
-router.post('/force-accept-by-asset/:assetId', async (req, res) => {
+router.post('/force-accept-by-asset/:assetId', validateBody(forceActionSchema), async (req, res) => {
     try {
-        const { email, collaboratorName } = req.body || {};
-        const reason = req.body?.reason || 'Firma forzada administrativa';
+        const { email, collaboratorName } = req.body;
+        const reason = req.body.reason || 'Firma forzada administrativa';
         const ipAddress = `Firma forzada por administrador.\nMotivo: ${reason}`;
-        const assignment = await assignmentRepo.findCurrentByAssetId(req.params.assetId);
-        if (!assignment) throw new Error('No se encontró asignación para forzar aceptación');
-        const acceptedAssignment = await assignmentUseCases.forceAccept(assignment.id, ipAddress);
-        
-        await catalogUseCases.changeAssetStatus(acceptedAssignment.assetId, 'IN_USE');
 
-        const asset = await catalogUseCases.getAssetById(acceptedAssignment.assetId);
-        const category = asset ? await catalogRepo.getCategoryById(asset.categoryId) : null;
-        const requiresPlaca = category ? category.schemaDefinition.requiresPlacaIkusi !== false : true;
-        
-        const collaborator = await collaboratorRepo.findById(acceptedAssignment.collaboratorId);
-        const ceco = collaborator && collaborator.dynamicAttributes ? collaborator.dynamicAttributes['CECOS'] || collaborator.dynamicAttributes['cecos'] || collaborator.dynamicAttributes['CECO'] || 'N/A' : 'N/A';
-        const sede = collaborator ? collaborator.location : 'N/A';
-        const realColName = collaborator ? collaborator.name : (collaboratorName || acceptedAssignment.collaboratorId);
-        const realColEmail = collaborator ? collaborator.email : 'test@ikusi.com';
-        let realDept = 'Sistemas';
-        if (collaborator && collaborator.department) {
-            try {
-                const dept = await departmentRepo.findById(Number(collaborator.department));
-                if (dept) realDept = dept.name;
-                else realDept = collaborator.department.toString();
-            } catch(e) {
-                realDept = collaborator.department.toString();
+        const { documentPath } = await AppDataSource.manager.transaction(async (manager) => {
+            const txAssignmentRepo = new PostgresAssignmentRepository(manager);
+            const txAssignmentUseCases = new AssignmentUseCases(txAssignmentRepo, mailerService);
+            const txCatalogRepo = new PostgresCatalogRepository(manager);
+            const txCatalogUseCases = new CatalogUseCases(txCatalogRepo);
+            const txCollaboratorRepo = new PostgresCollaboratorRepository(manager);
+
+            const assignment = await txAssignmentRepo.findCurrentByAssetId(req.params.assetId);
+            if (!assignment) throw new Error('No se encontró asignación para forzar aceptación');
+            const acceptedAssignment = await txAssignmentUseCases.forceAccept(assignment.id, ipAddress);
+
+            await txCatalogUseCases.changeAssetStatus(acceptedAssignment.assetId, 'IN_USE');
+
+            const asset = await txCatalogUseCases.getAssetById(acceptedAssignment.assetId);
+            const category = asset ? await txCatalogRepo.getCategoryById(asset.categoryId) : null;
+            const requiresPlaca = category ? category.schemaDefinition.requiresPlacaIkusi !== false : true;
+
+            const collaborator = await txCollaboratorRepo.findById(acceptedAssignment.collaboratorId);
+            const ceco = collaborator && collaborator.dynamicAttributes ? collaborator.dynamicAttributes['CECOS'] || collaborator.dynamicAttributes['cecos'] || collaborator.dynamicAttributes['CECO'] || 'N/A' : 'N/A';
+            const sede = collaborator ? collaborator.location : 'N/A';
+            const realColName = collaborator ? collaborator.name : (collaboratorName || acceptedAssignment.collaboratorId);
+            const realColEmail = collaborator ? collaborator.email : 'test@ikusi.com';
+            let realDept = 'Sistemas';
+            if (collaborator && collaborator.department) {
+                try {
+                    const dept = await departmentRepo.findById(Number(collaborator.department));
+                    if (dept) realDept = dept.name;
+                    else realDept = collaborator.department.toString();
+                } catch(e) {
+                    realDept = collaborator.department.toString();
+                }
             }
-        }
 
-        const otherAssignedAssets = await getOtherAssignedAssets(acceptedAssignment.collaboratorId, acceptedAssignment.id);
+            const otherAssignedAssets = await getOtherAssignedAssets(acceptedAssignment.collaboratorId, acceptedAssignment.id, txAssignmentRepo, txCatalogUseCases);
 
-        const documentPath = await documentService.generateAssignmentAct({
-            otherAssignedAssets,
-            actType: 'ASSIGNMENT',
-            assignmentId: acceptedAssignment.id,
-            collaboratorName: realColName,
-            collaboratorEmail: realColEmail,
-            department: realDept,
-            ceco: ceco,
-            sede: sede,
-            returnReason: reason,
-            assets: [{
-            assetId: acceptedAssignment.assetId,
-            assignmentDate: acceptedAssignment.startDate,
-            assetSerial: asset ? (asset.serial || 'N/A') : 'N/A',
-            assetType: category ? category.name : 'Laptop',
-            assetBrand: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.marca || asset.dynamicAttributes.Marca || asset.dynamicAttributes.brand || asset.dynamicAttributes.Brand) || 'Generico' : 'Generico',
-            assetHostname: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.hostname || asset.dynamicAttributes.Hostname) || 'N/A' : 'N/A',
-            assetVersionOs: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.versionOs || asset.dynamicAttributes.VersionOS || asset.dynamicAttributes['Version OS'] || asset.dynamicAttributes['Versión OS'] || asset.dynamicAttributes['Sistema Operativo'] || asset.dynamicAttributes['Sistema operativo'] || asset.dynamicAttributes['SistemaOperativo'] || asset.dynamicAttributes['OS'] || asset.dynamicAttributes['os']) || 'N/A' : 'N/A',
-            assetModel: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.modelo || asset.dynamicAttributes.Modelo) || 'Generico' : 'Generico',
-            assetMac: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.macAddress || asset.dynamicAttributes.MacAddress || asset.dynamicAttributes.MAC || asset.dynamicAttributes['MAC Address']) || 'N/A' : 'N/A',
-            assetRam: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.ram || asset.dynamicAttributes.RAM || asset.dynamicAttributes.Ram || asset.dynamicAttributes['Memoria RAM']) || 'N/A' : 'N/A',
-            assetProcessor: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.processor || asset.dynamicAttributes.Processor || asset.dynamicAttributes.Procesador || asset.dynamicAttributes.procesador) || 'N/A' : 'N/A',
-            assetStorage: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.storage || asset.dynamicAttributes.Storage || asset.dynamicAttributes.Almacenamiento || asset.dynamicAttributes.Disco) || 'N/A' : 'N/A',
-            requiresPlacaIkusi: typeof requiresPlaca !== 'undefined' ? requiresPlaca : true
-        }],
-            ipAddress,
-            timestamp: new Date(),
-            isForcedSignature: req.path.includes('force') ? true : false,
-            signatureEmail: req.body && req.body.email ? req.body.email : realColEmail
+            const documentPath = await documentService.generateAssignmentAct({
+                otherAssignedAssets,
+                actType: 'ASSIGNMENT',
+                assignmentId: acceptedAssignment.id,
+                collaboratorName: realColName,
+                collaboratorEmail: realColEmail,
+                department: realDept,
+                ceco: ceco,
+                sede: sede,
+                returnReason: reason,
+                assets: [{
+                assetId: acceptedAssignment.assetId,
+                assignmentDate: acceptedAssignment.startDate,
+                assetSerial: asset ? (asset.serial || 'N/A') : 'N/A',
+                assetType: category ? category.name : 'Laptop',
+                assetBrand: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.marca || asset.dynamicAttributes.Marca || asset.dynamicAttributes.brand || asset.dynamicAttributes.Brand) || 'Generico' : 'Generico',
+                assetHostname: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.hostname || asset.dynamicAttributes.Hostname) || 'N/A' : 'N/A',
+                assetVersionOs: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.versionOs || asset.dynamicAttributes.VersionOS || asset.dynamicAttributes['Version OS'] || asset.dynamicAttributes['Versión OS'] || asset.dynamicAttributes['Sistema Operativo'] || asset.dynamicAttributes['Sistema operativo'] || asset.dynamicAttributes['SistemaOperativo'] || asset.dynamicAttributes['OS'] || asset.dynamicAttributes['os']) || 'N/A' : 'N/A',
+                assetModel: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.modelo || asset.dynamicAttributes.Modelo) || 'Generico' : 'Generico',
+                assetMac: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.macAddress || asset.dynamicAttributes.MacAddress || asset.dynamicAttributes.MAC || asset.dynamicAttributes['MAC Address']) || 'N/A' : 'N/A',
+                assetRam: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.ram || asset.dynamicAttributes.RAM || asset.dynamicAttributes.Ram || asset.dynamicAttributes['Memoria RAM']) || 'N/A' : 'N/A',
+                assetProcessor: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.processor || asset.dynamicAttributes.Processor || asset.dynamicAttributes.Procesador || asset.dynamicAttributes.procesador) || 'N/A' : 'N/A',
+                assetStorage: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.storage || asset.dynamicAttributes.Storage || asset.dynamicAttributes.Almacenamiento || asset.dynamicAttributes.Disco) || 'N/A' : 'N/A',
+                requiresPlacaIkusi: typeof requiresPlaca !== 'undefined' ? requiresPlaca : true
+            }],
+                ipAddress,
+                timestamp: new Date(),
+                isForcedSignature: req.path.includes('force') ? true : false,
+                signatureEmail: req.body && req.body.email ? req.body.email : realColEmail
+            });
+
+            await txAssignmentUseCases.updateDocumentPath(acceptedAssignment.id, documentPath);
+
+            await txCollaboratorRepo.saveHistory(new CollaboratorHistory(
+                uuidv4(),
+                acceptedAssignment.collaboratorId,
+                'ASSET_ASSIGNED' as any,
+                new Date(),
+                `Activo ${acceptedAssignment.assetId} asignado forzadamente`
+            ));
+
+            return { documentPath };
         });
-
-        await assignmentUseCases.updateDocumentPath(acceptedAssignment.id, documentPath);
-        
-        await collaboratorRepo.saveHistory(new CollaboratorHistory(
-            uuidv4(),
-            acceptedAssignment.collaboratorId,
-            'ASSET_ASSIGNED' as any,
-            new Date(),
-            `Activo ${acceptedAssignment.assetId} asignado forzadamente`
-        ));
 
         res.json({ message: 'Aceptación forzada exitosa', documentPath });
     } catch (error: any) {
@@ -1039,12 +1088,9 @@ router.get('/asset/:assetId/history', async (req, res) => {
 });
 
 
-router.post('/batch-return', async (req, res) => {
+router.post('/batch-return', validateBody(batchReturnSchema), async (req, res) => {
     try {
         const { assignmentIds, email, reason } = req.body;
-        if (!assignmentIds || !Array.isArray(assignmentIds) || assignmentIds.length === 0 || !email) {
-            return res.status(400).json({ error: 'Missing required fields (assignmentIds, email)' });
-        }
 
         const { assignments, token } = await assignmentUseCases.initiateBatchReturn(assignmentIds);
 

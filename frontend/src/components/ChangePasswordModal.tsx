@@ -2,6 +2,8 @@ import { useState } from 'react';
 import axios from 'axios';
 import { X } from 'lucide-react';
 import { API_URL } from '../config';
+import { isPasswordValid } from '../utils/passwordPolicy';
+import PasswordChecklist from './PasswordChecklist';
 
 interface Props {
     onClose: () => void;
@@ -20,6 +22,10 @@ export default function ChangePasswordModal({ onClose }: Props) {
         e.preventDefault();
         setError('');
 
+        if (!isPasswordValid(newPassword)) {
+            setError('La nueva contraseña no cumple con los requisitos mínimos de seguridad.');
+            return;
+        }
         if (newPassword !== confirmPassword) {
             setError('La nueva contraseña y su confirmación no coinciden.');
             return;
@@ -59,16 +65,14 @@ export default function ChangePasswordModal({ onClose }: Props) {
                             <label>Nueva contraseña</label>
                             <input type="password" className="glass-input" value={newPassword}
                                 onChange={e => setNewPassword(e.target.value)} required />
-                            <small style={{ color: 'var(--text-muted)', fontSize: '12px' }}>
-                                Mínimo 8 caracteres, con mayúscula, minúscula y número.
-                            </small>
+                            <PasswordChecklist password={newPassword} />
                         </div>
                         <div className="form-group">
                             <label>Confirmar nueva contraseña</label>
                             <input type="password" className="glass-input" value={confirmPassword}
                                 onChange={e => setConfirmPassword(e.target.value)} required />
                         </div>
-                        <button type="submit" className="btn-primary" disabled={saving}>
+                        <button type="submit" className="btn-primary" disabled={saving || !isPasswordValid(newPassword) || newPassword !== confirmPassword}>
                             {saving ? 'Guardando...' : 'Guardar contraseña'}
                         </button>
                     </form>

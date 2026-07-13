@@ -1,8 +1,12 @@
 import { Router, Request, Response } from 'express';
+import { z } from 'zod';
 import { AppDataSource } from '../../shared/infrastructure/database/postgres';
 import { SettingEntity } from '../../modules/settings/infrastructure/orm/Setting.entity';
+import { validateBody } from '../middlewares/validate.middleware';
 
 const router = Router();
+
+const settingsUpdateSchema = z.record(z.string(), z.string());
 
 // GET /api/settings
 router.get('/', async (req: Request, res: Response) => {
@@ -24,12 +28,9 @@ router.get('/', async (req: Request, res: Response) => {
 });
 
 // PUT /api/settings
-router.put('/', async (req: Request, res: Response) => {
+router.put('/', validateBody(settingsUpdateSchema), async (req: Request, res: Response) => {
     try {
         const updates = req.body; // e.g. { ACTA_ASIGNACION_TEXT: '...', ... }
-        if (!updates || typeof updates !== 'object') {
-            return res.status(400).json({ error: 'Invalid payload' });
-        }
 
         const settingRepository = AppDataSource.getRepository(SettingEntity);
 

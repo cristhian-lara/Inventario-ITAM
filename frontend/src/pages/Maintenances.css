@@ -104,6 +104,17 @@
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
 }
 
+/* Reset de estilos nativos de <button> cuando la tarjeta KPI es interactiva */
+button.maint-kpi-card {
+  border-left: none;
+  border-right: none;
+  border-bottom: none;
+  font: inherit;
+  text-align: left;
+  width: 100%;
+  color: inherit;
+}
+
 .maint-kpi-card.kpi-blue   { border-top-color: #3b82f6; }
 .maint-kpi-card.kpi-amber  { border-top-color: #f59e0b; }
 .maint-kpi-card.kpi-red    { border-top-color: #ef4444; }

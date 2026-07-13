@@ -17,6 +17,37 @@ import { CatalogUseCases } from '../../modules/catalog/application/CatalogUseCas
 import { PostgresCatalogRepository } from '../../modules/catalog/infrastructure/PostgresCatalogRepository';
 import { AppDataSource } from '../../shared/infrastructure/database/postgres';
 
+const departmentSchema = z.object({
+    name: z.string().min(1, 'name es requerido'),
+    description: z.string().optional(),
+});
+
+const cecosCreateSchema = z.object({
+    id: z.string().min(1, 'id es requerido'),
+    name: z.string().min(1, 'name es requerido'),
+    description: z.string().optional(),
+});
+
+const cecosUpdateSchema = z.object({
+    name: z.string().min(1, 'name es requerido'),
+    description: z.string().optional(),
+});
+
+const offboardSchema = z.object({
+    reason: z.string().trim().min(1, 'El motivo de la baja es obligatorio.'),
+});
+
+const updateCollaboratorSchema = z.object({
+    name: z.string().min(1).optional(),
+    departmentId: z.coerce.number().optional(),
+    location: z.string().optional(),
+    status: z.string().optional(),
+    isLeader: z.boolean().optional(),
+    leaderId: z.string().nullable().optional(),
+    dynamicAttributes: z.record(z.string(), z.any()).optional(),
+    activationDate: z.union([z.string(), z.date()]).optional(),
+});
+
 export const collaboratorRouter = Router();
 const collaboratorRepository = new PostgresCollaboratorRepository();
 const departmentRepository = new PostgresDepartmentRepository();
@@ -39,12 +70,9 @@ collaboratorRouter.get('/departments', async (req, res) => {
     }
 });
 
-collaboratorRouter.post('/departments', async (req, res) => {
+collaboratorRouter.post('/departments', validateBody(departmentSchema), async (req, res) => {
     try {
         const { name, description } = req.body;
-        if (!name) {
-            return res.status(400).json({ error: 'Missing required fields (name)' });
-        }
         const departmentObj = await useCases.createDepartment({ name, description });
         res.status(201).json(departmentObj);
     } catch (error: any) {
@@ -55,12 +83,9 @@ collaboratorRouter.post('/departments', async (req, res) => {
     }
 });
 
-collaboratorRouter.put('/departments/:id', async (req, res) => {
+collaboratorRouter.put('/departments/:id', validateBody(departmentSchema), async (req, res) => {
     try {
         const { name, description } = req.body;
-        if (!name) {
-            return res.status(400).json({ error: 'Missing required fields (name)' });
-        }
         const departmentObj = await useCases.updateDepartment(Number(req.params.id), name, description);
         res.json(departmentObj);
     } catch (error: any) {
@@ -81,7 +106,7 @@ collaboratorRouter.get('/cecos', async (req, res) => {
     }
 });
 
-collaboratorRouter.post('/cecos', async (req, res) => {
+collaboratorRouter.post('/cecos', validateBody(cecosCreateSchema), async (req, res) => {
     try {
         const { id, name, description } = req.body;
         const cecos = await useCases.createCecos(id, name, description || '');
@@ -91,7 +116,7 @@ collaboratorRouter.post('/cecos', async (req, res) => {
     }
 });
 
-collaboratorRouter.put('/cecos/:id', async (req, res) => {
+collaboratorRouter.put('/cecos/:id', validateBody(cecosUpdateSchema), async (req, res) => {
     try {
         const { name, description } = req.body;
         const cecos = await useCases.updateCecos(req.params.id, name, description || '');
@@ -228,13 +253,10 @@ collaboratorRouter.patch('/:id/toggle-status', async (req, res) => {
  * y generación de un único acta de Paz y Salvo. Operación administrativa
  * inmediata (sin esperar firma del colaborador): pensada para offboarding.
  */
-collaboratorRouter.post('/:id/offboard', async (req, res) => {
+collaboratorRouter.post('/:id/offboard', validateBody(offboardSchema), async (req, res) => {
     try {
         const { id } = req.params;
-        const reason = (req.body?.reason || '').toString().trim();
-        if (!reason) {
-            return res.status(400).json({ error: 'El motivo de la baja es obligatorio.' });
-        }
+        const reason = req.body.reason.trim();
 
         const collaborator = await useCases.getCollaboratorById(id);
         if (!collaborator) return res.status(404).json({ error: 'Colaborador no encontrado' });
@@ -352,7 +374,7 @@ collaboratorRouter.post('/:id/offboard', async (req, res) => {
 
 
 // --- UPDATE COLLABORATOR ---
-collaboratorRouter.put('/:id', async (req, res) => {
+collaboratorRouter.put('/:id', validateBody(updateCollaboratorSchema), async (req, res) => {
     try {
         const { id } = req.params;
         const { name, departmentId, location, status, isLeader, leaderId, dynamicAttributes, activationDate } = req.body;
