@@ -153,7 +153,13 @@ export default function CollaboratorProfile() {
                           <Box size={16} /> 
                           {asset?.id?.startsWith('IKU-') || asset?.id?.startsWith('PLA-') ? `Placa: ${asset?.id}` : `ID: ${asset?.id}`}
                         </h4>
-                        <span className="badge badge-in_use">En Uso</span>
+                        {a.status === 'PENDING_ACCEPTANCE' ? (
+                          <span className="badge badge-status badge-in_use" style={{ background: 'rgba(234, 179, 8, 0.15)', color: '#ca8a04' }}>
+                            Pendiente de Firma
+                          </span>
+                        ) : (
+                          <span className="badge badge-in_use">En Uso</span>
+                        )}
                       </div>
                       <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                         {isIkusi ? (

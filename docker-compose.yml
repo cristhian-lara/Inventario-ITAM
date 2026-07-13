@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: itam-db
+    environment:
+      POSTGRES_USER: ${DB_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-secret}
+      POSTGRES_DB: ${DB_DATABASE:-inventario-ikusi}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: always
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: itam-backend
+    environment:
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_USERNAME=${DB_USERNAME:-postgres}
+      - DB_PASSWORD=${DB_PASSWORD:-secret}
+      - DB_DATABASE=${DB_DATABASE:-inventario-ikusi}
+      - PORT=3000
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost}
+      - BACKEND_URL=${BACKEND_URL:-http://localhost:3000}
+      - JWT_SECRET=${JWT_SECRET:?La variable de entorno JWT_SECRET es obligatoria (sin valor por defecto por seguridad)}
+    ports:
+      - "3000:3000"
+    depends_on:
+      - db
+    volumes:
+      # Montamos la carpeta storage para persistir PDFs y excels generados/subidos
+      - ./storage:/app/storage
+    restart: always
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        # Se debe cambiar esto si se despliega en otra IP (VMware o Nutanix)
+        - VITE_API_URL=${BACKEND_URL:-http://localhost:3000}
+    container_name: itam-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: always
+
+volumes:
+  pgdata:

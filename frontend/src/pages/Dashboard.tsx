@@ -31,7 +31,8 @@ const STATUS_COLORS: Record<string, string> = {
   IN_USE: '#3b82f6',
   PENDING_ACCEPTANCE: '#f59e0b',
   RETIRED: '#94a3b8',
-  MAINTENANCE: '#a855f7',
+  IN_MAINTENANCE: '#a855f7',
+  PENDING_INSPECTION: '#ec4899',
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -39,7 +40,8 @@ const STATUS_LABELS: Record<string, string> = {
   IN_USE: 'En Uso',
   PENDING_ACCEPTANCE: 'Pend. Firma',
   RETIRED: 'Baja',
-  MAINTENANCE: 'Mantenimiento',
+  IN_MAINTENANCE: 'En Mantenimiento',
+  PENDING_INSPECTION: 'Pend. Inspección',
 };
 
 export default function Dashboard() {
