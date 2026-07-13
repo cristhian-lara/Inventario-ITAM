@@ -133,6 +133,13 @@ export class MaintenanceUseCases {
 
         // Solo los preventivos generan el siguiente ciclo automáticamente; los correctivos cierran aquí.
         if (nextPreventive) {
+            // El activo puede seguir asignado al momento de reprogramar; capturamos la foto
+            // del usuario en turno igual que en createManualMaintenance/startMaintenance.
+            const activeAssignment = await this.assignmentService.getActiveAssignmentForAsset(record.assetId);
+            const nextProps = (nextPreventive as any).props;
+            nextProps.collaboratorInTurnId = activeAssignment?.collaboratorId;
+            nextProps.collaboratorInTurnName = activeAssignment?.collaboratorName;
+
             await this.repo.save(nextPreventive);
         }
 

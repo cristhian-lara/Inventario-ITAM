@@ -1,13 +1,21 @@
 import { AppDataSource, initializeDatabase } from '../../../shared/infrastructure/database/postgres';
 import { UserEntity } from './orm/User.entity';
+import { SystemModuleEntity } from './orm/SystemModule.entity';
 import { Role } from '../domain/Role';
 import { BcryptPasswordHasher } from './services/BcryptPasswordHasher';
+import { seedSystemModules } from './systemModulesSeed';
 
 const seed = async () => {
     try {
         await initializeDatabase();
         const userRepository = AppDataSource.getRepository(UserEntity);
+        const moduleRepository = AppDataSource.getRepository(SystemModuleEntity);
         const hasher = new BcryptPasswordHasher();
+
+        // Catálogo de módulos del sistema (necesario para la matriz de permisos
+        // del módulo de Usuarios en instalaciones nuevas, sin datos previos)
+        console.log('→ Sembrando módulos del sistema...');
+        await seedSystemModules(moduleRepository);
 
         // Super Administrador inicial del sistema
         let admin = await userRepository.findOne({ where: { username: 'admin' } });
