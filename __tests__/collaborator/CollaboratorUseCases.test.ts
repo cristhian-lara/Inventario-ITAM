@@ -19,6 +19,7 @@ describe('CollaboratorUseCases', () => {
             findById: jest.fn(),
             findByEmail: jest.fn(),
             findAll: jest.fn(),
+            findAllPaginated: jest.fn(),
             update: jest.fn(),
             saveHistory: jest.fn(),
             getHistory: jest.fn(),

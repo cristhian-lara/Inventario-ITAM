@@ -100,7 +100,7 @@ describe('MaintenanceUseCases', () => {
 
             expect(maint.completeMaintenance).toHaveBeenCalled();
             expect(mockRepo.save).toHaveBeenCalledTimes(2); // saves current and next scheduled
-            expect(mockMailerService.sendMaintenanceSignatureEmail).toHaveBeenCalledWith('juan@ikusi.com', 'm1', 'mock-token');
+            expect(mockMailerService.sendMaintenanceSignatureEmail).toHaveBeenCalledWith('juan@ikusi.com', 'm1', 'mock-token', undefined);
         });
     });
 

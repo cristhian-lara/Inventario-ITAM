@@ -15,6 +15,7 @@ describe('CatalogUseCases', () => {
             saveAsset: jest.fn(),
             getAssetById: jest.fn(),
             getAllAssets: jest.fn(),
+            getAssetsPaginated: jest.fn(),
             generateIncrementalId: jest.fn(),
         };
 

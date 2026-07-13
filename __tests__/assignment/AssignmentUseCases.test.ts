@@ -18,12 +18,14 @@ describe('AssignmentUseCases', () => {
             findAllActive: jest.fn(),
             findActiveByAssetId: jest.fn(),
             findCurrentByAssetId: jest.fn(),
+            findLoansDueWithinDays: jest.fn(),
         };
 
         mockMailer = {
             sendAssignmentEmail: jest.fn(),
             sendReturnEmail: jest.fn(),
             sendMaintenanceSignatureEmail: jest.fn(),
+            sendFinalPdfEmail: jest.fn(),
         };
 
         (jwt.sign as jest.Mock).mockReturnValue('mock-token');
@@ -43,12 +45,13 @@ describe('AssignmentUseCases', () => {
         it('should create an assignment and send email successfully', async () => {
             mockRepo.findCurrentByAssetId.mockResolvedValue(null);
 
-            const assignment = await useCases.createAssignment('1', 'a1', 'c1', 'test@ikusi.com');
+            const { assignment } = await useCases.createAssignment('1', 'a1', 'c1', 'test@ikusi.com');
 
             expect(assignment.id).toBe('1');
             expect(assignment.status).toBe('PENDING_ACCEPTANCE');
             expect(mockRepo.save).toHaveBeenCalledTimes(1);
-            expect(mockMailer.sendAssignmentEmail).toHaveBeenCalledWith('test@ikusi.com', '1', 'mock-token');
+            // El envío de correo se movió a la capa de rutas; el use case solo persiste y devuelve el token.
+            expect(mockMailer.sendAssignmentEmail).not.toHaveBeenCalled();
         });
     });
 
@@ -79,7 +82,7 @@ describe('AssignmentUseCases', () => {
     });
 
     describe('initiateReturn', () => {
-        it('should initiate return and send email', async () => {
+        it('should initiate return', async () => {
             const assignment = new Assignment({ id: '1', assetId: 'a1', collaboratorId: 'c1', status: 'ACCEPTED', startDate: new Date() });
             mockRepo.findById.mockResolvedValue(assignment);
 
@@ -87,7 +90,8 @@ describe('AssignmentUseCases', () => {
 
             expect(assignment.status).toBe('PENDING_RETURN');
             expect(mockRepo.save).toHaveBeenCalledWith(assignment);
-            expect(mockMailer.sendReturnEmail).toHaveBeenCalledWith('test@ikusi.com', '1', 'mock-token');
+            // El envío de correo se movió a la capa de rutas; el use case solo persiste y devuelve el token.
+            expect(mockMailer.sendReturnEmail).not.toHaveBeenCalled();
         });
     });
 });
