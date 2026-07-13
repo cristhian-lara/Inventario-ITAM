@@ -53,6 +53,10 @@ export class MaintenanceOrmEntity {
     @Column({ nullable: true })
     pdf_url?: string;
 
+    /** Última vez que se notificó por Webex el vencimiento próximo de este mantenimiento (job diario) */
+    @Column({ type: 'timestamp', nullable: true })
+    last_alert_sent_at?: Date;
+
     @CreateDateColumn()
     created_at!: Date;
 }

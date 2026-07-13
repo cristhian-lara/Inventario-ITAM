@@ -8,6 +8,7 @@ import './AssetProfile.css';
 import { API_URL } from '../config';
 import { usePermission } from '../context/AuthContext';
 import AssetSideCard from '../components/asset-profile/AssetSideCard';
+import UnifiedTimelineSection from '../components/asset-profile/UnifiedTimelineSection';
 import MaintenanceTimelineSection from '../components/asset-profile/MaintenanceTimelineSection';
 import HardwareUpgradesSection from '../components/asset-profile/HardwareUpgradesSection';
 import AssignmentHistorySection from '../components/asset-profile/AssignmentHistorySection';
@@ -404,6 +405,16 @@ export default function AssetProfile() {
                             </div>
                         </div>
                     )}
+
+                    <UnifiedTimelineSection
+                        maintenances={maintenances}
+                        upgrades={upgrades}
+                        assignmentHistory={assignmentHistory}
+                        loading={loadingMaint || loadingUpgrades || loadingHistory}
+                        maintTypeLabel={maintTypeLabel}
+                        maintStatusLabel={maintStatusLabel}
+                        assignmentStatusLabel={assignmentStatusLabel}
+                    />
 
                     <MaintenanceTimelineSection
                         maintenances={maintenances}

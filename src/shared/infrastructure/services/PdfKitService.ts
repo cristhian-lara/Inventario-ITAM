@@ -1,5 +1,6 @@
 import PDFDocument from 'pdfkit-table';
 import * as fs from 'fs';
+import * as QRCode from 'qrcode';
 import { AppDataSource } from '../database/postgres';
 import { SettingEntity } from '../../../modules/settings/infrastructure/orm/Setting.entity';
 import * as path from 'path';
@@ -13,6 +14,15 @@ export class PdfKitService implements IDocumentService {
         if (!fs.existsSync(this.storageDir)) {
             fs.mkdirSync(this.storageDir, { recursive: true });
         }
+    }
+
+    /**
+     * Genera el QR (PNG en memoria) que se imprime en el footer del acta y apunta
+     * a la copia digital oficial del documento, para verificar su autenticidad
+     * a partir de una copia impresa/escaneada.
+     */
+    private async generateActQrCode(publicUrl: string): Promise<Buffer> {
+        return QRCode.toBuffer(publicUrl, { type: 'png', width: 100, margin: 1 });
     }
 
     /**
@@ -192,23 +202,35 @@ Este documento cancela la responsiva firmada en el momento de la asignación ori
                 const cryptoId = `${cryptoType}-${userNameNormalized}`;
                 const signedBy = data.isForcedSignature ? 'Firmada por IT (firma forzada)' : (data.signatureEmail || data.collaboratorEmail || 'N/A');
 
+                // QR de verificación: apunta a la copia digital oficial de este acta.
+                const publicUrl = `${process.env.BACKEND_URL || 'http://localhost:3000'}/pdfs/${encodeURIComponent(fileName)}`;
+                let qrBuffer: Buffer | null = null;
+                try {
+                    qrBuffer = await this.generateActQrCode(publicUrl);
+                } catch (e) { console.error('No se pudo generar el QR del acta:', e); }
+
                 for (let i = range.start; i < range.start + range.count; i++) {
                     doc.switchToPage(i);
                     const bottom = doc.page.margins.bottom;
                     doc.page.margins.bottom = 0;
-                    
+
                     const footerY = doc.page.height - 130;
                     doc.fontSize(10).font('Helvetica-Bold').fillColor('#00a650');
                     doc.text('DOCUMENTO FIRMADO DIGITALMENTE', 70, footerY, { lineBreak: false });
-                    
+
                     doc.fontSize(9).fillColor('#000000').font('Helvetica');
                     doc.moveDown(1);
                     doc.text(`ID Asignación criptográfica: ${cryptoId}`, 70, doc.y);
                     doc.text(`Sede: ${data.sede || 'N/A'}`, 70, doc.y);
                     doc.text(`Firmada por: ${signedBy}`, 70, doc.y);
-                    
+
                     if (data.ipAddress) {
                         doc.text(`IP / Metadatos: ${data.ipAddress}`, 70, doc.y);
+                    }
+
+                    if (qrBuffer) {
+                        doc.image(qrBuffer, doc.page.width - 130, footerY - 5, { width: 70 });
+                        doc.fontSize(7).fillColor('#999999').text('Escanea para verificar', doc.page.width - 130, footerY + 68, { width: 70, align: 'center', lineBreak: false });
                     }
 
                     doc.save();
@@ -347,16 +369,24 @@ Este documento cancela la responsiva firmada en el momento de la asignación ori
                         : 'Registrada en firma electrónica');
                 
                 const range = doc.bufferedPageRange();
+
+                // QR de verificación: apunta a la copia digital oficial de esta acta.
+                const publicUrl = `${process.env.BACKEND_URL || 'http://localhost:3000'}/pdfs/${encodeURIComponent(fileName)}`;
+                let qrBuffer: Buffer | null = null;
+                try {
+                    qrBuffer = await this.generateActQrCode(publicUrl);
+                } catch (e) { console.error('No se pudo generar el QR del acta:', e); }
+
                 for (let i = range.start; i < range.start + range.count; i++) {
                     doc.switchToPage(i);
-                    
+
                     const bottom = doc.page.margins.bottom;
                     doc.page.margins.bottom = 0;
-                    
+
                     const footerY = doc.page.height - 130;
                     doc.fontSize(10).font('Helvetica-Bold').fillColor('#00a650');
                     doc.text('DOCUMENTO FIRMADO DIGITALMENTE', 70, footerY, { lineBreak: false });
-                    
+
                     doc.fontSize(9).fillColor('#000000').font('Helvetica');
                     doc.moveDown(1);
                     const userNameNormalized = record.collaboratorInTurnName || 'Usuario Asignado';
@@ -364,13 +394,18 @@ Este documento cancela la responsiva firmada en el momento de la asignación ori
                     doc.text(`ID Mantenimiento criptográfico: ${cryptoId}`, 70, doc.y);
                     doc.text(`Sede: ${record.collaboratorLocation || 'Bogotá'}`, 70, doc.y);
                     const isForced = signatureBase64 && signatureBase64.startsWith('Firma forzada');
-                    const signedByText = isForced 
-                        ? `${record.collaboratorInTurnName || 'Usuario Asignado'} (Firma Forzada por Administrador)` 
+                    const signedByText = isForced
+                        ? `${record.collaboratorInTurnName || 'Usuario Asignado'} (Firma Forzada por Administrador)`
                         : (record.collaboratorInTurnName || 'Usuario Asignado');
                     doc.text(`Firmada por: ${signedByText}`, 70, doc.y);
-                    
+
                     if (ipAddress) {
                         doc.text(`IP / Metadatos: ${ipAddress}`, 70, doc.y);
+                    }
+
+                    if (qrBuffer) {
+                        doc.image(qrBuffer, doc.page.width - 130, footerY - 5, { width: 70 });
+                        doc.fontSize(7).fillColor('#999999').text('Escanea para verificar', doc.page.width - 130, footerY + 68, { width: 70, align: 'center', lineBreak: false });
                     }
 
                     // Marca de agua lateral

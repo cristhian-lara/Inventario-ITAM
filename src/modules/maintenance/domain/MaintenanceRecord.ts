@@ -18,6 +18,7 @@ export interface MaintenanceRecordProps {
     signedAt?: Date;
     signatureMetadata?: any;
     pdfUrl?: string;
+    lastAlertSentAt?: Date;
 }
 
 export class MaintenanceRecord {
@@ -46,6 +47,11 @@ export class MaintenanceRecord {
     get signedAt(): Date | undefined { return this.props.signedAt; }
     get signatureMetadata(): any { return this.props.signatureMetadata; }
     get pdfUrl(): string | undefined { return this.props.pdfUrl; }
+    get lastAlertSentAt(): Date | undefined { return this.props.lastAlertSentAt; }
+
+    public registerAlertSent(sentAt: Date): void {
+        this.props.lastAlertSentAt = sentAt;
+    }
 
     public startMaintenance(startNote?: string): void {
         if (this.props.status === 'COMPLETED' || this.props.status === 'CANCELLED') {
@@ -57,7 +63,7 @@ export class MaintenanceRecord {
         if (startNote) this.props.startNote = startNote;
     }
 
-    public completeMaintenance(executionDate: Date, notes?: string, realStartDate?: Date): MaintenanceRecord {
+    public completeMaintenance(executionDate: Date, notes?: string, realStartDate?: Date): MaintenanceRecord | null {
         if (this.props.status !== 'IN_PROGRESS' && this.props.status !== 'SCHEDULED') {
             throw new Error('Solo se pueden completar mantenimientos en progreso o programados');
         }
@@ -67,7 +73,12 @@ export class MaintenanceRecord {
         this.props.executionDate = executionDate;
         if (notes) this.props.notes = notes;
 
-        // Regla: Se crea un nuevo registro preventivo para +1 año
+        // Regla de negocio: solo los preventivos se reprograman automáticamente para +1 año.
+        // Los correctivos cierran su ciclo al completarse (no generan seguimiento).
+        if (this.props.type !== 'PREVENTIVE') {
+            return null;
+        }
+
         const nextScheduledDate = new Date(executionDate);
         nextScheduledDate.setFullYear(nextScheduledDate.getFullYear() + 1);
 

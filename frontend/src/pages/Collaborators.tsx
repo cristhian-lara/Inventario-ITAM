@@ -1,11 +1,12 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
-import { Search, UserPlus, Upload } from 'lucide-react';
+import { Search, UserPlus, Upload, Download } from 'lucide-react';
 import { useConfirm } from '../context/ConfirmContext';
 import { useToast } from '../context/ToastContext';
 import { usePermission } from '../context/AuthContext';
 import { showWebexFailureModal } from '../utils/notificationNotice';
+import { exportToCSV } from '../utils/exportCsv';
 import CollaboratorFormModal from '../components/collaborators/CollaboratorFormModal';
 import BatchReturnModal from '../components/collaborators/BatchReturnModal';
 import OffboardModal from '../components/collaborators/OffboardModal';
@@ -291,6 +292,13 @@ export default function Collaborators() {
 
   const paginated = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
+  const exportCSV = () => {
+    const headers = ['ID', 'Nombre', 'Correo', 'Departamento', 'Sede', 'Estado', 'Líder', 'Activos Asignados'];
+    exportToCSV('reporte_colaboradores', headers, filtered, (c: any) => [
+      c.id, c.name, c.email, c.department, c.location, c.status === 'ACTIVE' ? 'Activo' : 'Inactivo', c.isLeader ? 'Sí' : 'No', c.assignedAssetsCount ?? 0
+    ]);
+  };
+
   return (
     <div className="catalog-container">
       <header className="catalog-header">
@@ -305,8 +313,12 @@ export default function Collaborators() {
           </h1>
           <p className="page-subtitle">Gestión de personal para asignación de equipos</p>
         </div>
-        {collabPerms.create && (
-        <div style={{ display: 'flex', gap: '10px' }}>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+          <button className="btn-glass" style={{ display: 'flex', alignItems: 'center', gap: '8px' }} onClick={exportCSV}>
+            <Download size={18} /> Exportar CSV
+          </button>
+          {collabPerms.create && (
+          <div style={{ display: 'flex', gap: '10px' }}>
           <input
             type="file"
             ref={fileInputRef}
@@ -327,8 +339,9 @@ export default function Collaborators() {
             <UserPlus size={20} />
             Nuevo Colaborador
           </button>
+          </div>
+          )}
         </div>
-        )}
       </header>
 
       <div className="glass-panel table-container">

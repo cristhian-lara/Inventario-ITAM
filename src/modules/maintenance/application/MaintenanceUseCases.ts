@@ -24,13 +24,15 @@ export class MaintenanceUseCases {
 
     async createManualMaintenance(dto: { assetId: string, type: MaintenanceType, scheduledDate: Date, reason?: string }): Promise<MaintenanceRecord> {
         const existingMaintenances = await this.repo.findByAssetId(dto.assetId);
-        const activeMaintenance = existingMaintenances.find(m => (m.status === 'SCHEDULED' || m.status === 'IN_PROGRESS') && m.type === dto.type);
-        
+        // Regla de negocio: un activo no puede tener más de un mantenimiento activo a la vez,
+        // sin importar el tipo (preventivo o correctivo) del existente o del que se intenta crear.
+        const activeMaintenance = existingMaintenances.find(m => m.status === 'SCHEDULED' || m.status === 'IN_PROGRESS');
+
         if (activeMaintenance) {
             const d = new Date(activeMaintenance.scheduledDate);
             const dateStr = d.toISOString().split('T')[0];
             const typeStr = activeMaintenance.type === 'PREVENTIVE' ? 'Preventivo' : 'Correctivo';
-            throw new Error(`El equipo ya cuenta con un mantenimiento programado (${typeStr}) para la fecha ${dateStr}.`);
+            throw new Error(`El equipo ya cuenta con un mantenimiento activo (${typeStr}) programado para la fecha ${dateStr}. Debe completarse antes de programar uno nuevo.`);
         }
 
         const id = `maint-${Date.now()}-${Math.floor(Math.random()*1000)}`;
@@ -129,8 +131,10 @@ export class MaintenanceUseCases {
 
         await this.repo.save(record);
 
-        // Guardamos el próximo programado.
-        await this.repo.save(nextPreventive);
+        // Solo los preventivos generan el siguiente ciclo automáticamente; los correctivos cierran aquí.
+        if (nextPreventive) {
+            await this.repo.save(nextPreventive);
+        }
 
         return { record, notification };
     }
@@ -190,5 +194,22 @@ export class MaintenanceUseCases {
     
     async getAssetMaintenances(assetId: string): Promise<MaintenanceRecord[]> {
         return this.repo.findByAssetId(assetId);
+    }
+
+    /**
+     * Mantenimientos programados que vencen dentro de `days` días (incluye los ya vencidos).
+     */
+    async getMaintenancesDueWithinDays(days: number): Promise<MaintenanceRecord[]> {
+        return this.repo.findMaintenancesDueWithinDays(days);
+    }
+
+    /**
+     * Registra que se notificó hoy el vencimiento de varios mantenimientos (job diario de alertas),
+     * para que no se vuelvan a incluir en el digest hasta el día siguiente.
+     */
+    async registerMaintenanceAlertsSent(maintenanceIds: string[], sentAt: Date = new Date()): Promise<void> {
+        const records = await this.repo.findByIds(maintenanceIds);
+        records.forEach(record => record.registerAlertSent(sentAt));
+        await Promise.all(records.map(record => this.repo.save(record)));
     }
 }

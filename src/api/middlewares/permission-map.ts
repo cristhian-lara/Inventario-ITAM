@@ -39,6 +39,9 @@ export const ROUTE_PERMISSIONS: RoutePermission[] = [
     { method: 'POST', pattern: /^\/auth\/change-password$/, authOnly: true },
     { method: 'POST', pattern: /^\/auth\/logout$/, authOnly: true },
 
+    // ── Notificaciones (resumen de pendientes, cualquier usuario autenticado) ──
+    { method: 'GET', pattern: /^\/notifications\/summary$/, authOnly: true },
+
     // ── Usuarios ────────────────────────────────────────────────────────────
     { method: 'GET', pattern: /^\/users\/modules$/, anyOf: [req('users', 'read')] },
     { method: 'GET', pattern: /^\/users/, anyOf: [req('users', 'read')] },

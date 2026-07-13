@@ -151,6 +151,69 @@
     margin: 0;
 }
 
+/* ── Unified Audit Timeline ──────────────────── */
+.unified-timeline {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-height: 480px;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.unified-timeline-item {
+    display: flex;
+    gap: 14px;
+    padding: 10px 0;
+    border-bottom: 1px dashed var(--border-subtle);
+}
+
+.unified-timeline-item:last-child {
+    border-bottom: none;
+}
+
+.unified-timeline-dot {
+    flex-shrink: 0;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+}
+
+.timeline-icon-maintenance { background: #f59e0b; }
+.timeline-icon-upgrade { background: #a855f7; }
+.timeline-icon-assignment { background: #3b82f6; }
+.timeline-icon-assignment-return { background: #64748b; }
+
+.unified-timeline-content {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.unified-timeline-date {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    font-weight: 600;
+}
+
+.unified-timeline-title {
+    font-size: 14px;
+    color: var(--text-main);
+    font-weight: 500;
+}
+
+.unified-timeline-subtitle {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
 /* ── Specs Grid (current specs) ──────────────── */
 .specs-grid {
     display: grid;

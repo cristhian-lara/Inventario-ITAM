@@ -1,4 +1,4 @@
-import { Calendar, Wrench, CheckCircle } from 'lucide-react';
+import { Calendar, Wrench, CheckCircle, Info } from 'lucide-react';
 
 export interface MaintenanceFormData {
   assetId: string;
@@ -57,7 +57,7 @@ export default function MaintenanceModal({
   return (
     <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(4px)' }}>
       <div className="glass-panel" style={{ padding: '30px', maxWidth: '500px', width: '100%' }}>
-        <h3 style={{ marginBottom: '20px', color: 'white' }}>
+        <h3 style={{ marginBottom: '20px', color: 'var(--text-main)' }}>
           {mode === 'create' ? 'Programar Mantenimiento' : mode === 'start' ? 'Iniciar Mantenimiento' : mode === 'view' ? 'Historial de Mantenimiento' : mode === 'forceSign' ? 'Firmar Forzadamente' : 'Completar Mantenimiento'}
         </h3>
         {errorMsg && (
@@ -65,7 +65,7 @@ export default function MaintenanceModal({
             {errorMsg}
           </div>
         )}
-        <form onSubmit={onSubmit}>
+        <form onSubmit={onSubmit} className="maint-modal-form">
           {mode === 'create' && (
             <>
               <div className="form-group" style={{ position: 'relative' }}>
@@ -168,24 +168,29 @@ export default function MaintenanceModal({
           )}
           {mode === 'complete' && (
             <>
-              <p style={{ color: 'var(--text-muted)', marginBottom: '15px' }}>
-                Al completar, <b>se programará automáticamente el siguiente servicio preventivo</b> para dentro de un año.
-              </p>
+              <div className="maint-info-banner">
+                <Info size={18} />
+                <p>
+                  {selectedRecord?.type === 'CORRECTIVE'
+                    ? <>Este mantenimiento <b>correctivo</b> cierra su ciclo al completarse. No se programará uno nuevo automáticamente.</>
+                    : <>Al completar, <b>se programará automáticamente el siguiente servicio preventivo</b> para dentro de un año.</>}
+                </p>
+              </div>
               <div className="form-group">
                 <label>Notas de Resolución</label>
                 <textarea required className="glass-input" value={formData.notes} onChange={e => setFormData({ ...formData, notes: e.target.value })} placeholder="Ej. Se limpió ventilador y se actualizó BIOS..." style={{ minHeight: '100px', resize: 'vertical' }} />
               </div>
-              <div style={{ display: 'flex', gap: '12px' }}>
-                <div className="form-group" style={{ flex: 1 }}>
+              <div className="form-row-split">
+                <div className="form-group">
                   <label>Fecha real de inicio (Opcional)</label>
                   <input type="date" className="glass-input" value={formData.realStartDate} onChange={e => setFormData({ ...formData, realStartDate: e.target.value })} />
                 </div>
-                <div className="form-group" style={{ flex: 1 }}>
+                <div className="form-group">
                   <label>Fecha real de finalización (Opcional)</label>
                   <input type="date" className="glass-input" value={formData.realEndDate} onChange={e => setFormData({ ...formData, realEndDate: e.target.value })} />
                 </div>
               </div>
-              <p style={{ color: 'var(--text-muted)', fontSize: '12px', marginTop: '-8px' }}>
+              <p className="maint-field-hint">
                 Usa estos campos solo para cargar mantenimientos históricos (ej. desde Excel). Si los dejas vacíos, se usará la fecha y hora actual.
               </p>
             </>

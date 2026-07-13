@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { PackageSearch, Users, Activity, LogOut, Settings as SettingsIcon, Menu, X, FileText, UserCog, KeyRound, ChevronDown } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import ChangePasswordModal from './ChangePasswordModal';
+import NotificationBell from './NotificationBell';
 import { APP_VERSION } from '../version';
 import './TopNavbar.css';
 
@@ -80,6 +81,8 @@ export default function TopNavbar() {
         </div>
 
         <div className="navbar-right">
+          {user && <NotificationBell />}
+
           {/* Desktop user */}
           <div className="user-menu" ref={userMenuRef}>
             <button

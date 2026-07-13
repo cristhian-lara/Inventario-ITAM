@@ -1,4 +1,4 @@
-import { DataSource, Repository, LessThan } from 'typeorm';
+import { DataSource, Repository, LessThan, LessThanOrEqual, In } from 'typeorm';
 import { IMaintenanceRepository } from '../domain/IMaintenanceRepository';
 import { MaintenanceRecord } from '../domain/MaintenanceRecord';
 import { MaintenanceOrmEntity } from './orm/Maintenance.entity';
@@ -28,7 +28,8 @@ export class PostgresMaintenanceRepository implements IMaintenanceRepository {
             signatureToken: orm.signature_token || undefined,
             signatureMetadata: orm.signature_metadata || undefined,
             signedAt: orm.signed_at || undefined,
-            pdfUrl: orm.pdf_url || undefined
+            pdfUrl: orm.pdf_url || undefined,
+            lastAlertSentAt: orm.last_alert_sent_at || undefined
         });
         return record;
     }
@@ -53,6 +54,7 @@ export class PostgresMaintenanceRepository implements IMaintenanceRepository {
         orm.signature_metadata = props.signatureMetadata;
         orm.signed_at = props.signedAt;
         orm.pdf_url = props.pdfUrl;
+        orm.last_alert_sent_at = props.lastAlertSentAt;
         return orm;
     }
 
@@ -80,6 +82,20 @@ export class PostgresMaintenanceRepository implements IMaintenanceRepository {
             query.status = 'SCHEDULED';
         }
         const orms = await this.repo.find({ where: query, order: { scheduled_date: 'ASC' } });
+        return orms.map(o => this.toDomain(o));
+    }
+
+    async findByIds(ids: string[]): Promise<MaintenanceRecord[]> {
+        if (ids.length === 0) return [];
+        const orms = await this.repo.findBy({ id: In(ids) });
+        return orms.map(o => this.toDomain(o));
+    }
+
+    /** Mantenimientos programados que vencen dentro de `days` días (incluye los ya vencidos). */
+    async findMaintenancesDueWithinDays(days: number): Promise<MaintenanceRecord[]> {
+        const limit = new Date();
+        limit.setDate(limit.getDate() + days);
+        const orms = await this.repo.find({ where: { status: 'SCHEDULED', scheduled_date: LessThanOrEqual(limit) } });
         return orms.map(o => this.toDomain(o));
     }
 }

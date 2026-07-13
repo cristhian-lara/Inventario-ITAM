@@ -6,9 +6,11 @@ import assignmentRoutes from './routes/assignment.routes';
 import { collaboratorRouter } from './routes/collaborator.routes';
 import dashboardRouter from './routes/dashboard.routes';
 import { maintenanceRouter } from './routes/maintenance.routes';
+import { notificationRouter } from './routes/notification.routes';
 import settingsRoutes from './routes/settings.routes';
 import { initializeDatabase } from '../shared/infrastructure/database/postgres';
 import { scheduleLoanExpiryAlertJob } from '../modules/assignment/infrastructure/LoanAlertJob';
+import { scheduleMaintenanceAlertJob } from '../modules/maintenance/infrastructure/MaintenanceAlertJob';
 import path from 'path';
 
 const app = express();
@@ -68,6 +70,7 @@ app.use('/api/assignments', assignmentRoutes);
 app.use('/api/collaborators', collaboratorRouter);
 app.use('/api/dashboard', dashboardRouter);
 app.use('/api/maintenances', maintenanceRouter);
+app.use('/api/notifications', notificationRouter);
 app.use('/api/settings', settingsRoutes);
 
 // Manejador de errores global: última red de seguridad para excepciones no
@@ -85,6 +88,7 @@ initializeDatabase().then(() => {
     console.log(`Server is running on http://localhost:${PORT}`);
   });
   scheduleLoanExpiryAlertJob();
+  scheduleMaintenanceAlertJob();
 }).catch((error) => {
   console.error('Failed to start server:', error);
 });

@@ -184,6 +184,54 @@ button.maint-kpi-card {
 }
 
 
+/* ── Maintenance Modal (create/start/complete/forceSign) ─ */
+.maint-modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.maint-info-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: var(--ikusi-green-light, #e5f6ed);
+  border: 1px solid rgba(0, 166, 80, 0.25);
+  border-radius: 10px;
+  padding: 12px 14px;
+  color: var(--text-secondary, #475569);
+}
+
+.maint-info-banner svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--ikusi-green, #00a650);
+}
+
+.maint-info-banner p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.form-row-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+@media (max-width: 640px) {
+  .form-row-split {
+    grid-template-columns: 1fr;
+  }
+}
+
+.maint-field-hint {
+  color: var(--text-muted);
+  font-size: 12px;
+  margin: 0;
+}
+
 /* ── History Timeline Modal ──────────────────────────── */
 .history-timeline {
   border-left: 2px dashed rgba(0, 0, 0, 0.15);

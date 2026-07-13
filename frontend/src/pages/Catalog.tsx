@@ -10,11 +10,12 @@ import AssetFormModal from '../components/catalog/AssetFormModal';
 import RetireAssetModal from '../components/catalog/RetireAssetModal';
 import Pagination from '../components/Pagination';
 import axios from 'axios';
-import { Plus, Search, MonitorSmartphone, RefreshCw, CheckCircle2, Upload } from 'lucide-react';
+import { Plus, Search, MonitorSmartphone, RefreshCw, CheckCircle2, Upload, Download } from 'lucide-react';
 import { useConfirm } from '../context/ConfirmContext';
 import { useToast } from '../context/ToastContext';
 import { usePermission } from '../context/AuthContext';
 import { showWebexFailureModal } from '../utils/notificationNotice';
+import { exportToCSV } from '../utils/exportCsv';
 import './Catalog.css';
 import { API_URL } from '../config';
 
@@ -491,6 +492,17 @@ export default function Catalog() {
 
   const paginatedAssets = filteredAssets?.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
+  const exportCSV = () => {
+    const headers = ['Placa Ikusi', 'Categoría', 'Serial', 'Estado', 'Hostname', 'Colaborador Asignado'];
+    exportToCSV('reporte_activos', headers, filteredAssets || [], (asset: any) => {
+      const categoryName = categories?.find((c: any) => c.id === asset.categoryId)?.name || asset.categoryId;
+      const hostname = asset.dynamicAttributes?.HOSTNAME || asset.dynamicAttributes?.Hostname || asset.dynamicAttributes?.hostname || '';
+      const activeAssignment = getActiveAssignmentForAsset(asset.id);
+      const collaboratorName = activeAssignment ? getCollaboratorName(activeAssignment.collaboratorId) || '' : '';
+      return [asset.id, categoryName, asset.serial || '', asset.status, hostname, collaboratorName];
+    });
+  };
+
   return (
     <div className="catalog-page">
       <header className="catalog-header">
@@ -505,8 +517,12 @@ export default function Catalog() {
           </h1>
           <p style={{ color: 'var(--text-muted)' }}>Visualiza y administra todos los equipos registrados en el inventario.</p>
         </div>
-        {assetPerms.create && (
-        <div style={{ display: 'flex', gap: '10px' }}>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+          <button className="btn-glass" style={{ display: 'flex', alignItems: 'center', gap: '8px' }} onClick={exportCSV}>
+            <Download size={18} /> Exportar CSV
+          </button>
+          {assetPerms.create && (
+          <div style={{ display: 'flex', gap: '10px' }}>
           <input
             type="file"
             accept=".xlsx, .xls, .csv"
@@ -536,8 +552,9 @@ export default function Catalog() {
           }}>
             <Plus size={20} /> Nuevo Activo
           </button>
+          </div>
+          )}
         </div>
-        )}
       </header>
 
       {importResult && (

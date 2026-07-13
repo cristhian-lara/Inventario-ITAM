@@ -179,4 +179,36 @@ export class WebexNotificationService implements IMailerService {
         const markdown = `**📦 Préstamos de Equipos Próximos a Vencer**\n\nHola, este es el resumen diario de préstamos que requieren atención (a ${alertThresholdDays} días o menos de su devolución, o ya vencidos):\n\n${lines}\n\nGestiona la devolución o extiende la fecha desde el Catálogo de Activos. Este aviso se repetirá a diario hasta que el equipo sea devuelto o se extienda su fecha.`;
         await this.sendMessage(to, markdown);
     }
+
+    /**
+     * Digest diario a un administrador con TODOS los mantenimientos programados que están a
+     * `alertThresholdDays` días de vencer o ya vencidos. Disparado por el job de alertas de
+     * mantenimiento (no por acción manual de un usuario).
+     */
+    async sendMaintenanceExpiryDigest(
+        to: string,
+        items: Array<{ assetId: string; hostname?: string; type: string; scheduledDate: Date | string; daysLeft: number }>,
+        alertThresholdDays: number
+    ): Promise<void> {
+        const lines = [...items]
+            .sort((a, b) => a.daysLeft - b.daysLeft)
+            .map(item => {
+                const dateStr = typeof item.scheduledDate === 'string'
+                    ? item.scheduledDate.split('T')[0].split('-').reverse().join('/')
+                    : item.scheduledDate.toLocaleDateString('es-CO', { timeZone: 'America/Bogota' });
+                const equipo = item.hostname ? `${item.assetId} (${item.hostname})` : item.assetId;
+                const typeStr = item.type === 'PREVENTIVE' ? 'Preventivo' : 'Correctivo';
+                const abs = Math.abs(item.daysLeft);
+                const estado = item.daysLeft < 0
+                    ? `🔴 Vencido hace ${abs} día${abs === 1 ? '' : 's'}`
+                    : item.daysLeft === 0
+                        ? `🟠 Vence HOY`
+                        : `🟡 Vence en ${abs} día${abs === 1 ? '' : 's'}`;
+                return `- **${equipo}** — Tipo: ${typeStr} — Fecha programada: ${dateStr} (${estado})`;
+            })
+            .join('\n');
+
+        const markdown = `**🔧 Mantenimientos Próximos a Vencer**\n\nHola, este es el resumen diario de mantenimientos que requieren atención (a ${alertThresholdDays} días o menos de su fecha programada, o ya vencidos):\n\n${lines}\n\nGestiona el inicio o cierre del mantenimiento desde el Dashboard de Mantenimientos. Este aviso se repetirá a diario hasta que el mantenimiento sea iniciado o completado.`;
+        await this.sendMessage(to, markdown);
+    }
 }

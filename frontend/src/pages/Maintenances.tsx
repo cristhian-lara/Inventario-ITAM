@@ -8,6 +8,7 @@ import { showWebexFailureModal } from '../utils/notificationNotice';
 import { authHeaders } from '../utils/authHeaders';
 import './Maintenances.css';
 import { API_URL } from '../config';
+import { exportToCSV } from '../utils/exportCsv';
 import LoadingState from '../components/LoadingState';
 import MaintenanceKpiCards from '../components/maintenances/MaintenanceKpiCards';
 import MaintenanceChartsSidebar from '../components/maintenances/MaintenanceChartsSidebar';
@@ -417,10 +418,9 @@ const Maintenances: React.FC = () => {
   });
 
   // ── CSV Export ─────────────────────────────────────────────────────────────
-  const exportToCSV = () => {
-    if (!filteredData || filteredData.length === 0) return;
+  const exportCSV = () => {
     const headers = ['ID Mantenimiento', 'Placa Ikusi', 'Hostname', 'Tipo', 'Estado', 'Fecha Programada', 'Fecha Ejecución', 'Dias Retraso', 'Usuario en Turno', 'Motivo', 'Notas Resolución'];
-    const rows = filteredData.map(m => {
+    exportToCSV('reporte_mantenimientos', headers, filteredData || [], (m) => {
       let delayDays = 0;
       if (m?.status === 'COMPLETED' && m?.executionDate && m?.scheduledDate) {
         delayDays = Math.max(0, Math.floor((new Date(m.executionDate).getTime() - new Date(m.scheduledDate).getTime()) / (1000 * 3600 * 24)));
@@ -429,18 +429,8 @@ const Maintenances: React.FC = () => {
       }
       const asset = assets?.find(a => a.id === m.assetId);
       const hostname = asset?.dynamicAttributes?.Hostname || asset?.dynamicAttributes?.hostname || 'N/A';
-      return [m.id, m.assetId, hostname, m?.type === 'PREVENTIVE' ? 'Preventivo' : 'Correctivo', m.status, m.scheduledDate.split('T')[0], m.executionDate ? m.executionDate.split('T')[0] : 'N/A', delayDays.toString(), m?.collaboratorInTurnName || 'N/A', `"${(m.reason || '').replace(/"/g, '""')}"`, `"${(m.notes || '').replace(/"/g, '""')}"`];
+      return [m.id, m.assetId, hostname, m?.type === 'PREVENTIVE' ? 'Preventivo' : 'Correctivo', m.status, m.scheduledDate.split('T')[0], m.executionDate ? m.executionDate.split('T')[0] : 'N/A', delayDays, m?.collaboratorInTurnName || 'N/A', m.reason || '', m.notes || ''];
     });
-    const csvContent = [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
-    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `reporte_mantenimientos_${new Date().toISOString().split('T')[0]}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -492,7 +482,7 @@ const Maintenances: React.FC = () => {
           <p style={{ color: 'var(--text-muted)', margin: 0, fontSize: '14px' }}>Gestión y auditoría del ciclo de vida de los equipos</p>
         </div>
         <div className="header-actions" style={{ display: 'flex', gap: '10px' }}>
-          <button className="btn-glass" onClick={exportToCSV}>Exportar CSV</button>
+          <button className="btn-glass" onClick={exportCSV}>Exportar CSV</button>
           {canCreate && <button className="btn-primary" onClick={() => openModal('create')}><Plus size={18} /> Programar</button>}
         </div>
       </header>
