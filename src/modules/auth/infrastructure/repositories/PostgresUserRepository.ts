@@ -44,9 +44,14 @@ export class PostgresUserRepository implements IUserRepository {
             fullName: user.fullName,
             email: user.email,
             isActive: user.isActive,
+            tokenVersion: user.tokenVersion,
         });
         const saved = await this.repository.save(entity);
         return this.toDomain(saved);
+    }
+
+    async incrementTokenVersion(id: string): Promise<void> {
+        await this.repository.increment({ id }, 'tokenVersion', 1);
     }
 
     async create(data: {
@@ -83,7 +88,8 @@ export class PostgresUserRepository implements IUserRepository {
             entity.email,
             entity.isActive,
             entity.createdAt,
-            entity.updatedAt
+            entity.updatedAt,
+            entity.tokenVersion
         );
     }
 }

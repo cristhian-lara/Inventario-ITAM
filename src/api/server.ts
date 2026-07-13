@@ -28,13 +28,16 @@ app.use(helmet({
 // CORS con lista de orígenes permitidos (configurable por env).
 // En desarrollo se acepta cualquier puerto de localhost / red local (Vite puede
 // arrancar en un puerto distinto a 5173 cuando el predeterminado está ocupado).
+// En producción esto quedaría abierto a toda la subred 192.168.x.x, así que el
+// patrón solo se evalúa fuera de NODE_ENV=production.
 // Las peticiones sin cabecera Origin (curl, enlaces de firma, misma-origin vía proxy) se permiten.
 const allowedOrigins = (process.env.CORS_ORIGINS || '')
     .split(',').map(o => o.trim()).filter(Boolean);
+const isProduction = process.env.NODE_ENV === 'production';
 const DEV_ORIGIN_PATTERN = /^http:\/\/(localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3}):\d+$/;
 app.use(cors({
     origin: (origin, callback) => {
-        if (!origin || allowedOrigins.includes(origin) || DEV_ORIGIN_PATTERN.test(origin)) return callback(null, true);
+        if (!origin || allowedOrigins.includes(origin) || (!isProduction && DEV_ORIGIN_PATTERN.test(origin))) return callback(null, true);
         callback(new Error('Origen no permitido por CORS'));
     }
 }));

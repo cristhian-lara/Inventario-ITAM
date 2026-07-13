@@ -29,8 +29,9 @@ const userManagement = new UserManagementUseCases(userRepository, permissionRepo
 const authController = new AuthController(loginUseCase, userManagement, userRepository, permissionRepository);
 
 authRouter.post('/login', loginRateLimit, (req, res) => authController.login(req, res));
-// El apiGuard exige sesión activa para estos dos (entradas authOnly del mapa de permisos)
+// El apiGuard exige sesión activa para estos (entradas authOnly del mapa de permisos)
 authRouter.get('/me', (req, res) => authController.me(req as any, res));
 authRouter.post('/change-password', (req, res) => authController.changePassword(req as any, res));
+authRouter.post('/logout', (req, res) => authController.logout(req as any, res));
 
 export default authRouter;

@@ -177,6 +177,8 @@ export class UserManagementUseCases {
         this.validatePassword(newPassword);
         user.passwordHash = await this.passwordHasher.hash(newPassword);
         await this.userRepository.save(user);
+        // Invalida cualquier sesión abierta con la contraseña anterior.
+        await this.userRepository.incrementTokenVersion(user.id);
     }
 
     async changeOwnPassword(actorId: string, currentPassword: string, newPassword: string): Promise<void> {
@@ -191,6 +193,8 @@ export class UserManagementUseCases {
         this.validatePassword(newPassword);
         user.passwordHash = await this.passwordHasher.hash(newPassword);
         await this.userRepository.save(user);
+        // Invalida cualquier otra sesión abierta con la contraseña anterior.
+        await this.userRepository.incrementTokenVersion(user.id);
     }
 
     // ── Reglas y validaciones ────────────────────────────────────────────────

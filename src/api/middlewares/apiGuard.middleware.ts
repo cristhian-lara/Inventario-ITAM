@@ -54,7 +54,8 @@ export const apiGuard = (req: AuthRequest, res: Response, next: NextFunction): v
 
     authenticateJWT(req, res, () => {
         authorizeAgainstDatabase(req, res, next).catch(err => {
-            console.error('Error en autorización RBAC:', err);
+            // Solo mensaje/nombre: err puede traer detalles de la query SQL (pg) que no deben ir a logs.
+            console.error('Error en autorización RBAC:', err?.name, err?.message);
             res.status(500).json({ error: 'Error interno al validar permisos' });
         });
     });
@@ -66,6 +67,13 @@ const authorizeAgainstDatabase = async (req: AuthRequest, res: Response, next: N
 
     if (!user || !user.isActive) {
         res.status(401).json({ error: 'Tu cuenta está inactiva o ya no existe. Contacta al administrador.' });
+        return;
+    }
+
+    // El token trae la versión vigente al momento de emitirse; si no coincide con la
+    // BD, la sesión fue invalidada explícitamente (logout o cambio de contraseña).
+    if (req.user?.tokenVersion !== user.tokenVersion) {
+        res.status(401).json({ error: 'Sesión invalidada. Inicia sesión de nuevo.' });
         return;
     }
 

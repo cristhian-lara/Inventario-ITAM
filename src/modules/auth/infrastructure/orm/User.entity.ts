@@ -27,6 +27,11 @@ export class UserEntity {
     @Column({ name: 'is_active', default: true })
     isActive!: boolean;
 
+    // Se incrementa en logout y cambio de contraseña; los JWT emitidos con una
+    // versión anterior se rechazan en apiGuard aunque no hayan expirado.
+    @Column({ name: 'token_version', default: 0 })
+    tokenVersion!: number;
+
     @CreateDateColumn({ name: 'created_at' })
     createdAt!: Date;
 

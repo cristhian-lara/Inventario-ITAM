@@ -31,7 +31,8 @@ export class AuthController {
             } else if (error.message === 'Cuenta inactiva') {
                 res.status(401).json({ error: 'Tu cuenta está desactivada. Contacta al administrador.' });
             } else {
-                console.error('Error in login:', error);
+                // Solo mensaje/nombre: el error puede traer detalles de conexión/query que no deben ir a logs.
+                console.error('Error in login:', error?.name, error?.message);
                 res.status(500).json({ error: 'Error interno del servidor' });
             }
         }
@@ -53,8 +54,18 @@ export class AuthController {
                 role: user.role,
                 permissions
             });
-        } catch (error) {
-            console.error('Error in /auth/me:', error);
+        } catch (error: any) {
+            console.error('Error in /auth/me:', error?.name, error?.message);
+            res.status(500).json({ error: 'Error interno del servidor' });
+        }
+    }
+
+    async logout(req: AuthRequest, res: Response): Promise<void> {
+        try {
+            await this.userRepository.incrementTokenVersion(req.user.id);
+            res.json({ message: 'Sesión cerrada correctamente' });
+        } catch (error: any) {
+            console.error('Error in logout:', error?.name, error?.message);
             res.status(500).json({ error: 'Error interno del servidor' });
         }
     }
@@ -69,7 +80,7 @@ export class AuthController {
                 res.status(error.status).json({ error: error.message });
                 return;
             }
-            console.error('Error in change-password:', error);
+            console.error('Error in change-password:', error?.name, error?.message);
             res.status(500).json({ error: 'Error interno del servidor' });
         }
     }

@@ -10,6 +10,7 @@ export class User {
         public email: string,
         public isActive: boolean,
         public readonly createdAt: Date,
-        public updatedAt: Date
+        public updatedAt: Date,
+        public tokenVersion: number = 0
     ) {}
 }

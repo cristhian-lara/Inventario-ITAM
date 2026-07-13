@@ -37,6 +37,7 @@ export const ROUTE_PERMISSIONS: RoutePermission[] = [
     // ── Auth (cualquier usuario autenticado activo) ─────────────────────────
     { method: 'GET', pattern: /^\/auth\/me$/, authOnly: true },
     { method: 'POST', pattern: /^\/auth\/change-password$/, authOnly: true },
+    { method: 'POST', pattern: /^\/auth\/logout$/, authOnly: true },
 
     // ── Usuarios ────────────────────────────────────────────────────────────
     { method: 'GET', pattern: /^\/users\/modules$/, anyOf: [req('users', 'read')] },

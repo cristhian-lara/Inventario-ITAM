@@ -10,7 +10,8 @@ export class JwtTokenService implements ITokenService {
         const payload = {
             id: user.id,
             username: user.username,
-            role: user.role
+            role: user.role,
+            tokenVersion: user.tokenVersion
         };
         // 8 horas de expiración
         return jwt.sign(payload, this.secret, { expiresIn: '8h' });

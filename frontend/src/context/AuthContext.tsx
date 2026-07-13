@@ -86,6 +86,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
 
     const logout = () => {
+        // Invalida el token en el servidor (best-effort); la limpieza local no espera la respuesta.
+        axios.post(`${API_URL}/api/auth/logout`).catch(() => { /* sesión ya inválida o sin red: se limpia igual */ });
         setToken(null);
         setUser(null);
         localStorage.removeItem('token');

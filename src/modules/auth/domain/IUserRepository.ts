@@ -15,4 +15,6 @@ export interface IUserRepository {
         isActive: boolean;
     }): Promise<User>;
     delete(id: string): Promise<void>;
+    /** Invalida todos los JWT emitidos previamente para este usuario (logout, cambio de contraseña). */
+    incrementTokenVersion(id: string): Promise<void>;
 }
