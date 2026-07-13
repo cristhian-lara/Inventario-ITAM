@@ -480,12 +480,12 @@ const Maintenances: React.FC = () => {
     setCoverageFilter(coverageFilter === type ? 'all' : type);
   };
 
-  const openModal = (mode: 'create' | 'start' | 'complete' | 'view' | 'forceSign', record?: MaintenanceRecord) => {
+  const openModal = (mode: 'create' | 'start' | 'complete' | 'view' | 'forceSign', record?: MaintenanceRecord, presetAsset?: { assetId: string; displayName: string }) => {
     setModalMode(mode); setSelectedRecord(record || null);
     setErrorMsg('');
     if (mode === 'create') {
-      setFormData({ assetId: '', type: 'PREVENTIVE', scheduledDate: new Date().toISOString().split('T')[0], reason: '', startNote: '', notes: '', executionDate: new Date().toISOString().split('T')[0], realStartDate: '', realEndDate: '' });
-      setAssetSearchTerm('');
+      setFormData({ assetId: presetAsset?.assetId || '', type: 'PREVENTIVE', scheduledDate: new Date().toISOString().split('T')[0], reason: '', startNote: '', notes: '', executionDate: new Date().toISOString().split('T')[0], realStartDate: '', realEndDate: '' });
+      setAssetSearchTerm(presetAsset?.displayName || '');
     } else if (mode === 'forceSign') {
       setFormData({ ...formData, reason: '', startNote: '' });
     } else if (record) {
@@ -767,15 +767,17 @@ const Maintenances: React.FC = () => {
                         </td>
                         <td>
                           {m?.isDummy ? (
-                            canCreate && <button className="btn-action" style={{ borderColor: '#3b82f6', color: '#3b82f6' }} title="Programar Mantenimiento" onClick={() => {
-                               const asset = assets?.find(a => a.id === m?.assetId);
-                               const displayName = asset ? `${asset.id} - ${asset.dynamicAttributes?.HOSTNAME || asset.dynamicAttributes?.Hostname || asset.dynamicAttributes?.hostname || 'Sin Hostname'}` : m.assetId;
-                               setFormData({ ...formData, assetId: m.assetId });
-                               setAssetSearchTerm(displayName);
-                               openModal('create');
-                            }}>
-                              <Plus size={16} /> Programar
-                            </button>
+                            canCreate && (
+                              <ActionMenu>
+                                <button className="btn-action" style={{ borderColor: '#3b82f6', color: '#3b82f6' }} title="Programar Mantenimiento" onClick={() => {
+                                  const asset = assets?.find(a => a.id === m?.assetId);
+                                  const displayName = asset ? `${asset.id} - ${asset.dynamicAttributes?.HOSTNAME || asset.dynamicAttributes?.Hostname || asset.dynamicAttributes?.hostname || 'Sin Hostname'}` : m.assetId;
+                                  openModal('create', undefined, { assetId: m.assetId, displayName });
+                                }}>
+                                  <Plus size={16} /> Programar
+                                </button>
+                              </ActionMenu>
+                            )
                           ) : (
                             <ActionMenu>
                               <button className="btn-action" style={{ borderColor: '#8b5cf6', color: '#8b5cf6' }} title="Ver Historial" onClick={() => openModal('view', m)}>
