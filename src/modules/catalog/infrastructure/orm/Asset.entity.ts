@@ -30,6 +30,14 @@ export class AssetOrmEntity {
     @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
     purchase_price?: number;
 
+    /** Proveedor externo al que se le compró el equipo */
+    @Column({ type: 'varchar', nullable: true })
+    vendor_name?: string;
+
+    /** Comprador interno (colaborador/área) que gestionó la compra */
+    @Column({ type: 'varchar', nullable: true })
+    internal_buyer?: string;
+
     /** Datos de la baja: { reason, disposalDate, authorizedBy, blanccoReportId, notes } */
     @Column({ type: 'jsonb', nullable: true })
     disposal?: any;

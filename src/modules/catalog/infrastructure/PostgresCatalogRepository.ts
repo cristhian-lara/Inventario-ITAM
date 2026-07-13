@@ -49,6 +49,8 @@ export class PostgresCatalogRepository implements ICatalogRepository {
             warranty_months: asset.warrantyMonths,
             depreciation_years: asset.depreciationYears,
             purchase_price: asset.purchasePrice,
+            vendor_name: asset.vendorName,
+            internal_buyer: asset.internalBuyer,
             disposal: asset.disposal
         });
         await this.assetRepo.save(ormEntity);
@@ -73,6 +75,8 @@ export class PostgresCatalogRepository implements ICatalogRepository {
             warrantyMonths: ormEntity.warranty_months,
             depreciationYears: ormEntity.depreciation_years,
             purchasePrice: ormEntity.purchase_price ? parseFloat(ormEntity.purchase_price as any) : undefined,
+            vendorName: ormEntity.vendor_name,
+            internalBuyer: ormEntity.internal_buyer,
             disposal: ormEntity.disposal
         });
     }
@@ -92,6 +96,8 @@ export class PostgresCatalogRepository implements ICatalogRepository {
                 warrantyMonths: orm.warranty_months,
                 depreciationYears: orm.depreciation_years,
                 purchasePrice: orm.purchase_price ? parseFloat(orm.purchase_price as any) : undefined,
+                vendorName: orm.vendor_name,
+                internalBuyer: orm.internal_buyer,
                 disposal: orm.disposal
             }));
         }

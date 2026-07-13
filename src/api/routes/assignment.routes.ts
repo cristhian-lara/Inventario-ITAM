@@ -314,6 +314,9 @@ router.post('/:id/approve-return', async (req, res) => {
 
         const assignment = await assignmentUseCases.approveReturn(req.params.id, approvedBy, note);
 
+        // Visto Bueno otorgado: el activo se libera y vuelve a estar disponible.
+        await catalogUseCases.changeAssetStatus(assignment.assetId, 'AVAILABLE');
+
         // Regenerar el acta de devolución incluyendo el visto bueno.
         // Se conserva la evidencia de firma original (metadata almacenada).
         const collaborator = await collaboratorRepo.findById(assignment.collaboratorId);
@@ -407,9 +410,9 @@ router.post('/:id/force-return', async (req, res) => {
         const reason = req.body.reason || 'Firma forzada administrativa';
         const ipAddress = `Firma forzada por administrador.\nMotivo: ${reason}`;
         const returnedAssignment = await assignmentUseCases.forceReturn(req.params.id, ipAddress);
-        
-        // Actualizar el estado del activo en el Catálogo a AVAILABLE
-        await catalogUseCases.changeAssetStatus(returnedAssignment.assetId, 'AVAILABLE');
+
+        // El activo queda bloqueado hasta que TI otorgue el Visto Bueno (approve-return)
+        await catalogUseCases.changeAssetStatus(returnedAssignment.assetId, 'PENDING_INSPECTION');
 
         // Generar PDF de Paz y Salvo Administrativo
                 const asset = await catalogUseCases.getAssetById(returnedAssignment.assetId);
@@ -489,8 +492,9 @@ router.post('/force-return-by-asset/:assetId', async (req, res) => {
         const assignment = await assignmentRepo.findCurrentByAssetId(req.params.assetId);
         if (!assignment) throw new Error('No se encontró asignación activa o pendiente');
         const returnedAssignment = await assignmentUseCases.forceReturn(assignment.id, ipAddress);
-        
-        await catalogUseCases.changeAssetStatus(returnedAssignment.assetId, 'AVAILABLE');
+
+        // El activo queda bloqueado hasta que TI otorgue el Visto Bueno (approve-return)
+        await catalogUseCases.changeAssetStatus(returnedAssignment.assetId, 'PENDING_INSPECTION');
 
                 const asset = await catalogUseCases.getAssetById(returnedAssignment.assetId);
         const category = asset ? await catalogRepo.getCategoryById(asset.categoryId) : null;
@@ -656,9 +660,9 @@ router.get('/:id/confirm-return', async (req, res) => {
         }
 
         const returnedAssignment = await assignmentUseCases.confirmReturn(assignmentId, token, ipAddress, userAgent);
-        
-        // Actualizar el estado del activo en el Catálogo a AVAILABLE
-        await catalogUseCases.changeAssetStatus(returnedAssignment.assetId, 'AVAILABLE');
+
+        // El activo queda bloqueado hasta que TI otorgue el Visto Bueno (approve-return)
+        await catalogUseCases.changeAssetStatus(returnedAssignment.assetId, 'PENDING_INSPECTION');
 
         // Buscar activo para poblar el PDF
                 const asset = await catalogUseCases.getAssetById(returnedAssignment.assetId);
@@ -779,7 +783,7 @@ router.get('/:id/confirm-return', async (req, res) => {
                         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
                     </div>
                     <h1>¡Paz y Salvo Generado!</h1>
-                    <p>El equipo ha sido devuelto satisfactoriamente. El activo vuelve a estar disponible en el inventario general.</p>
+                    <p>El equipo ha sido devuelto satisfactoriamente. Quedará bloqueado en el inventario hasta que TI otorgue el Visto Bueno de la devolución.</p>
                     <div class="details">
                         <strong>Fecha:</strong> ${new Date().toLocaleDateString('es-CO')}
                     </div>
@@ -1119,7 +1123,8 @@ router.get('/batch-accept-return', async (req, res) => {
                 });
 
                 if (asset) {
-                    await catalogUseCases.changeAssetStatus(asset.id, 'AVAILABLE');
+                    // El activo queda bloqueado hasta que TI otorgue el Visto Bueno (approve-return)
+                    await catalogUseCases.changeAssetStatus(asset.id, 'PENDING_INSPECTION');
                 }
             }
 

@@ -25,7 +25,7 @@ export class CatalogUseCases {
         return updatedCategory;
     }
 
-    async createAsset(id: string, categoryId: number, serial: string, dynamicAttributes: Record<string, any>, purchaseDate?: Date, warrantyMonths?: number, depreciationYears?: number, purchasePrice?: number): Promise<Asset> {
+    async createAsset(id: string, categoryId: number, serial: string, dynamicAttributes: Record<string, any>, purchaseDate?: Date, warrantyMonths?: number, depreciationYears?: number, purchasePrice?: number, vendorName?: string, internalBuyer?: string): Promise<Asset> {
         const category = await this.repository.getCategoryById(categoryId);
         if (!category) {
             throw new Error(`La categoría con ID ${categoryId} no existe.`);
@@ -49,7 +49,9 @@ export class CatalogUseCases {
             purchaseDate,
             warrantyMonths,
             depreciationYears,
-            purchasePrice
+            purchasePrice,
+            vendorName,
+            internalBuyer
         }, category);
 
         await this.repository.saveAsset(asset);
@@ -77,14 +79,14 @@ export class CatalogUseCases {
         return this.repository.getAssetById(assetId);
     }
 
-    async updateAsset(assetId: string, serial: string | undefined, dynamicAttributes: Record<string, any>, purchaseDate?: Date, warrantyMonths?: number, depreciationYears?: number, purchasePrice?: number): Promise<Asset> {
+    async updateAsset(assetId: string, serial: string | undefined, dynamicAttributes: Record<string, any>, purchaseDate?: Date, warrantyMonths?: number, depreciationYears?: number, purchasePrice?: number, vendorName?: string, internalBuyer?: string): Promise<Asset> {
         const asset = await this.repository.getAssetById(assetId);
         if (!asset) throw new Error(`El activo con ID ${assetId} no existe.`);
 
         const category = await this.repository.getCategoryById(asset.categoryId);
         if (!category) throw new Error('Categoría no encontrada');
 
-        asset.updateBaseData(serial, purchaseDate, warrantyMonths, depreciationYears, purchasePrice);
+        asset.updateBaseData(serial, purchaseDate, warrantyMonths, depreciationYears, purchasePrice, vendorName, internalBuyer);
         asset.updateAttributes(dynamicAttributes, category);
 
         await this.repository.saveAsset(asset);
@@ -122,6 +124,8 @@ export class CatalogUseCases {
                 const purchaseDateRaw = record['Fecha de Compra'] || record.PurchaseDate || record.purchaseDate;
                 const warrantyMonthsRaw = record['Meses Garantía'] || record.WarrantyMonths || record.warrantyMonths;
                 const depreciationYearsRaw = record['Años Depreciación'] || record.DepreciationYears || record.depreciationYears;
+                const vendorNameRaw = record['Proveedor'] || record.Vendor || record.vendorName;
+                const internalBuyerRaw = record['Comprador Interno'] || record.InternalBuyer || record.internalBuyer;
 
                 if (!categoryRaw || !serial) {
                     throw new Error('Faltan campos obligatorios (Categoría, Serial)');
@@ -133,7 +137,7 @@ export class CatalogUseCases {
                 }
 
                 // Dynamic attributes
-                const knownKeys = ['Placa Ikusi', 'PlacaIkusi', 'ID', 'id', 'Categoría', 'Categoria', 'Category', 'category', 'categoryId', 'Serial', 'serial', 'SerialNumber', 'Fecha de Compra', 'PurchaseDate', 'purchaseDate', 'Meses Garantía', 'WarrantyMonths', 'warrantyMonths', 'Años Depreciación', 'DepreciationYears', 'depreciationYears', 'Precio Compra', 'PurchasePrice', 'purchasePrice'];
+                const knownKeys = ['Placa Ikusi', 'PlacaIkusi', 'ID', 'id', 'Categoría', 'Categoria', 'Category', 'category', 'categoryId', 'Serial', 'serial', 'SerialNumber', 'Fecha de Compra', 'PurchaseDate', 'purchaseDate', 'Meses Garantía', 'WarrantyMonths', 'warrantyMonths', 'Años Depreciación', 'DepreciationYears', 'depreciationYears', 'Precio Compra', 'PurchasePrice', 'purchasePrice', 'Proveedor', 'Vendor', 'vendorName', 'Comprador Interno', 'InternalBuyer', 'internalBuyer'];
                 const dynamicAttributes: Record<string, any> = {};
                 
                 // Copy all unknown keys first
@@ -196,7 +200,10 @@ export class CatalogUseCases {
                     dynamicAttributes,
                     purchaseDate,
                     warrantyMonths,
-                    depreciationYears
+                    depreciationYears,
+                    undefined,
+                    vendorNameRaw ? String(vendorNameRaw).trim() : undefined,
+                    internalBuyerRaw ? String(internalBuyerRaw).trim() : undefined
                 );
                 
                 successful++;

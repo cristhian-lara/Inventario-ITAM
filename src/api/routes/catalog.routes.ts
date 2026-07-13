@@ -76,16 +76,18 @@ router.post('/assets/import', upload.single('file'), async (req, res) => {
 
 router.post('/assets', async (req, res) => {
     try {
-        const { id, categoryId, serial, dynamicAttributes, purchaseDate, warrantyMonths, depreciationYears, purchasePrice } = req.body;
+        const { id, categoryId, serial, dynamicAttributes, purchaseDate, warrantyMonths, depreciationYears, purchasePrice, vendorName, internalBuyer } = req.body;
         const asset = await catalogUseCases.createAsset(
-            id, 
-            Number(categoryId), 
-            serial, 
+            id,
+            Number(categoryId),
+            serial,
             dynamicAttributes,
             purchaseDate ? new Date(`${purchaseDate.split('T')[0]}T12:00:00`) : undefined,
             warrantyMonths,
             depreciationYears,
-            purchasePrice !== undefined && purchasePrice !== null && purchasePrice !== '' ? Number(purchasePrice) : undefined
+            purchasePrice !== undefined && purchasePrice !== null && purchasePrice !== '' ? Number(purchasePrice) : undefined,
+            vendorName || undefined,
+            internalBuyer || undefined
         );
         res.status(201).json({
             id: asset.id,
@@ -96,7 +98,9 @@ router.post('/assets', async (req, res) => {
             purchaseDate: asset.purchaseDate,
             warrantyMonths: asset.warrantyMonths,
             depreciationYears: asset.depreciationYears,
-            purchasePrice: asset.purchasePrice
+            purchasePrice: asset.purchasePrice,
+            vendorName: asset.vendorName,
+            internalBuyer: asset.internalBuyer
         });
     } catch (error: any) {
         res.status(400).json({ error: error.message });
@@ -105,7 +109,7 @@ router.post('/assets', async (req, res) => {
 
 router.put('/assets/:id', async (req, res) => {
     try {
-        const { serial, dynamicAttributes, purchaseDate, warrantyMonths, depreciationYears, purchasePrice } = req.body;
+        const { serial, dynamicAttributes, purchaseDate, warrantyMonths, depreciationYears, purchasePrice, vendorName, internalBuyer } = req.body;
         const asset = await catalogUseCases.updateAsset(
             req.params.id,
             serial,
@@ -113,7 +117,9 @@ router.put('/assets/:id', async (req, res) => {
             purchaseDate ? new Date(`${purchaseDate.split('T')[0]}T12:00:00`) : undefined,
             warrantyMonths,
             depreciationYears,
-            purchasePrice
+            purchasePrice,
+            vendorName || undefined,
+            internalBuyer || undefined
         );
         res.json({
             id: asset.id,
@@ -124,7 +130,9 @@ router.put('/assets/:id', async (req, res) => {
             purchaseDate: asset.purchaseDate,
             warrantyMonths: asset.warrantyMonths,
             depreciationYears: asset.depreciationYears,
-            purchasePrice: asset.purchasePrice
+            purchasePrice: asset.purchasePrice,
+            vendorName: asset.vendorName,
+            internalBuyer: asset.internalBuyer
         });
     } catch (error: any) {
         res.status(400).json({ error: error.message });
@@ -176,6 +184,8 @@ router.get('/assets', async (req, res) => {
         warrantyMonths: a.warrantyMonths,
         depreciationYears: a.depreciationYears,
         purchasePrice: a.purchasePrice,
+        vendorName: a.vendorName,
+        internalBuyer: a.internalBuyer,
         disposal: a.disposal
     })));
 });

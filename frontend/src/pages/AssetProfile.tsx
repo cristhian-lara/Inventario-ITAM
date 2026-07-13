@@ -17,6 +17,8 @@ import {
     User,
     Mail,
     Tag,
+    Building2,
+    UserCheck,
     Hash,
     ArrowRight,
     Plus,
@@ -39,6 +41,8 @@ interface Asset {
     warrantyMonths?: number;
     depreciationYears?: number;
     purchasePrice?: number;
+    vendorName?: string;
+    internalBuyer?: string;
     disposal?: {
         reason: string;
         disposalDate: string;
@@ -118,6 +122,7 @@ const statusLabel = (s: string) => {
         AVAILABLE: 'Disponible',
         IN_USE: 'En Uso',
         IN_MAINTENANCE: 'En Mantenimiento',
+        PENDING_INSPECTION: 'Pendiente Visto Bueno',
         RETIRED: 'Baja',
         LOST: 'Perdido',
     };
@@ -129,6 +134,7 @@ const statusClass = (s: string) => {
         AVAILABLE: 'badge-available',
         IN_USE: 'badge-in_use',
         IN_MAINTENANCE: 'badge-in_maintenance',
+        PENDING_INSPECTION: 'badge-pending_inspection',
         RETIRED: 'badge-retired',
         LOST: 'badge-lost',
     };
@@ -300,9 +306,11 @@ export default function AssetProfile() {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['asset-assignment-history', id] });
+            queryClient.invalidateQueries({ queryKey: ['asset', id] });
+            queryClient.invalidateQueries({ queryKey: ['assets'] });
             setApprovalTarget(null);
             setApprovalNote('');
-            confirm({ title: 'Visto Bueno Registrado', message: 'La devolución fue aprobada y el acta se actualizó con el visto bueno de TI.', type: 'success', confirmText: 'Entendido', hideCancel: true, onConfirm: () => {} });
+            confirm({ title: 'Visto Bueno Registrado', message: 'La devolución fue aprobada: el activo quedó Disponible y el acta se actualizó con el visto bueno de TI.', type: 'success', confirmText: 'Entendido', hideCancel: true, onConfirm: () => {} });
         },
         onError: (err: any) => {
             confirm({ title: 'Error', message: err.response?.data?.error || err.message, type: 'danger', confirmText: 'Entendido', hideCancel: true, onConfirm: () => {} });
@@ -438,6 +446,26 @@ export default function AssetProfile() {
                                 </div>
                             );
                         })()}
+
+                        {asset.vendorName && (
+                            <div className="asset-detail-item">
+                                <Building2 size={16} color="var(--ikusi-green)" style={{ flexShrink: 0, marginTop: '2px' }} />
+                                <div className="asset-detail-block">
+                                    <span className="detail-label">Proveedor</span>
+                                    <span className="detail-value">{asset.vendorName}</span>
+                                </div>
+                            </div>
+                        )}
+
+                        {asset.internalBuyer && (
+                            <div className="asset-detail-item">
+                                <UserCheck size={16} color="var(--ikusi-green)" style={{ flexShrink: 0, marginTop: '2px' }} />
+                                <div className="asset-detail-block">
+                                    <span className="detail-label">Comprador Interno</span>
+                                    <span className="detail-value">{asset.internalBuyer}</span>
+                                </div>
+                            </div>
+                        )}
 
                         {/* Información de la baja (activos retirados) */}
                         {asset.status === 'RETIRED' && asset.disposal && (

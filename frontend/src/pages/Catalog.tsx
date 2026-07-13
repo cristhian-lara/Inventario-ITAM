@@ -58,7 +58,7 @@ export default function Catalog() {
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [newAsset, setNewAsset] = useState<{ id: string; categoryId: number | ''; serial: string; dynamicAttributes: any; purchaseDate?: string; warrantyMonths?: number; depreciationYears?: number; purchasePrice?: number }>({
+  const [newAsset, setNewAsset] = useState<{ id: string; categoryId: number | ''; serial: string; dynamicAttributes: any; purchaseDate?: string; warrantyMonths?: number; depreciationYears?: number; purchasePrice?: number; vendorName?: string; internalBuyer?: string }>({
     id: '',
     categoryId: '',
     serial: '',
@@ -241,7 +241,9 @@ export default function Catalog() {
         purchaseDate: assetData.purchaseDate,
         warrantyMonths: assetData.warrantyMonths,
         purchasePrice: assetData.purchasePrice,
-        depreciationYears: assetData.depreciationYears
+        depreciationYears: assetData.depreciationYears,
+        vendorName: assetData.vendorName,
+        internalBuyer: assetData.internalBuyer
       });
       return response.data;
     },
@@ -428,7 +430,9 @@ export default function Catalog() {
       purchaseDate: asset.purchaseDate ? asset.purchaseDate.split('T')[0] : '',
       warrantyMonths: asset.warrantyMonths || 0,
       depreciationYears: asset.depreciationYears || 0,
-      purchasePrice: asset.purchasePrice || undefined
+      purchasePrice: asset.purchasePrice || undefined,
+      vendorName: asset.vendorName || '',
+      internalBuyer: asset.internalBuyer || ''
     });
     setShowAddModal(true);
   };
@@ -479,12 +483,19 @@ export default function Catalog() {
     const pendingAssignment = assignments?.find((a: any) => a.assetId === asset.id && a.status === 'PENDING_ACCEPTANCE');
     const isPendingFirma = !!pendingAssignment;
 
+    // Determine if this asset is currently on loan (active assignment of type LOAN)
+    const activeAssignmentForLoan = assignments?.find((a: any) => a.assetId === asset.id && ['ACCEPTED', 'PENDING_ACCEPTANCE', 'PENDING_RETURN'].includes(a.status));
+    const isOnLoan = activeAssignmentForLoan?.assignmentType === 'LOAN';
+
     if (filterStatus === 'PENDING_ACCEPTANCE') {
       // Show ONLY assets pending signature
       if (!isPendingFirma) return false;
     } else if (filterStatus === 'AVAILABLE') {
       // Show only truly available (not pending signature)
       if (asset.status !== 'AVAILABLE' || isPendingFirma) return false;
+    } else if (filterStatus === 'LOAN') {
+      // Show only assets currently on loan
+      if (!isOnLoan) return false;
     } else if (filterStatus !== 'all') {
       if (asset.status !== filterStatus) return false;
     }
@@ -608,24 +619,24 @@ export default function Catalog() {
             />
           </div>
           <select
-            className="glass-input"
+            className="glass-input filter-select"
             value={filterCategory}
             onChange={(e) => setFilterCategory(e.target.value)}
-            style={{ width: 'auto' }}
           >
             <option value="all">Todas las Categorías</option>
             {categories?.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
           <select
-            className="glass-input"
+            className="glass-input filter-select"
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
-            style={{ width: 'auto' }}
           >
             <option value="all">Todos los Estados</option>
             <option value="AVAILABLE">Disponible</option>
             <option value="IN_USE">En Uso</option>
-            <option value="PENDING_ACCEPTANCE">⏳ Pendiente de Firma</option>
+            <option value="PENDING_ACCEPTANCE">Pendiente de Firma</option>
+            <option value="PENDING_INSPECTION">Pendiente de Visto Bueno</option>
+            <option value="LOAN">En Préstamo</option>
             <option value="MAINTENANCE">En Mantenimiento</option>
             <option value="RETIRED">Baja</option>
           </select>
@@ -800,7 +811,8 @@ export default function Catalog() {
                       return (
                         <span className={`badge badge-status badge-${asset.status.toLowerCase()}`}>
                           {asset.status === 'AVAILABLE' ? 'Disponible' :
-                            asset.status === 'IN_USE' ? 'En Uso' : asset.status}
+                            asset.status === 'IN_USE' ? 'En Uso' :
+                            asset.status === 'PENDING_INSPECTION' ? 'Pendiente Visto Bueno' : asset.status}
                         </span>
                       );
                     })()}
@@ -1322,6 +1334,14 @@ export default function Catalog() {
                       <option value="3">3 Años</option>
                       <option value="5">5 Años</option>
                     </select>
+                  </div>
+                  <div className="form-group">
+                    <label>Proveedor (Opcional)</label>
+                    <input type="text" className="glass-input" value={newAsset.vendorName || ''} onChange={e => setNewAsset({ ...newAsset, vendorName: e.target.value })} placeholder="Ej. CompuMundo S.A.S" />
+                  </div>
+                  <div className="form-group">
+                    <label>Comprador Interno (Opcional)</label>
+                    <input type="text" className="glass-input" value={newAsset.internalBuyer || ''} onChange={e => setNewAsset({ ...newAsset, internalBuyer: e.target.value })} placeholder="Ej. Juan Pérez (Compras)" />
                   </div>
 
                   {Object.keys(newAsset.dynamicAttributes).map((attrName) => {
