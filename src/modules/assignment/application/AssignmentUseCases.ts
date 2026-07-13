@@ -128,23 +128,21 @@ export class AssignmentUseCases {
     }
 
     async initiateBatchReturn(assignmentIds: string[]): Promise<{ assignments: Assignment[]; token: string }> {
-        const assignments: Assignment[] = [];
-        for (const id of assignmentIds) {
-            const assignment = await this.repository.findById(id);
-            if (!assignment) throw new Error(`Asignación ${id} no encontrada`);
-            assignment.initiateReturn();
-            assignments.push(assignment);
+        const assignments = await this.repository.findByIds(assignmentIds);
+        if (assignments.length !== assignmentIds.length) {
+            const foundIds = new Set(assignments.map(a => a.id));
+            const missing = assignmentIds.find(id => !foundIds.has(id));
+            throw new Error(`Asignación ${missing} no encontrada`);
         }
+        assignments.forEach(assignment => assignment.initiateReturn());
 
         const secret = JWT_SECRET;
         const token = jwt.sign({ assignmentIds }, secret, { expiresIn: '24h' });
 
-        for (const assignment of assignments) {
-            // We just store the single token across all of them or don't use the domain logic for batch token creation,
-            // we manually set the token or just save the state change
-            assignment.generateToken(() => token);
-            await this.repository.save(assignment);
-        }
+        // We just store the single token across all of them or don't use the domain logic for batch token creation,
+        // we manually set the token or just save the state change
+        assignments.forEach(assignment => assignment.generateToken(() => token));
+        await Promise.all(assignments.map(assignment => this.repository.save(assignment)));
 
         return { assignments, token };
     }
@@ -278,11 +276,8 @@ export class AssignmentUseCases {
      * para que no se vuelvan a incluir en el digest hasta el día siguiente.
      */
     async registerLoanAlertsSent(assignmentIds: string[], sentAt: Date = new Date()): Promise<void> {
-        for (const id of assignmentIds) {
-            const assignment = await this.repository.findById(id);
-            if (!assignment) continue;
-            assignment.registerAlertSent(sentAt);
-            await this.repository.save(assignment);
-        }
+        const assignments = await this.repository.findByIds(assignmentIds);
+        assignments.forEach(assignment => assignment.registerAlertSent(sentAt));
+        await Promise.all(assignments.map(assignment => this.repository.save(assignment)));
     }
 }

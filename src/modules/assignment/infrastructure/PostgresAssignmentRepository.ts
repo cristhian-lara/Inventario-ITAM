@@ -32,65 +32,25 @@ export class PostgresAssignmentRepository implements IAssignmentRepository {
 
     async findById(id: string): Promise<Assignment | null> {
         const ormEntity = await this.repo.findOneBy({ id });
-        if (!ormEntity) return null;
+        return ormEntity ? this.mapToDomain(ormEntity) : null;
+    }
 
-        return new Assignment({
-            id: ormEntity.id,
-            assetId: ormEntity.asset_id,
-            collaboratorId: ormEntity.collaborator_id,
-            status: ormEntity.status as AssignmentStatus,
-            assignmentType: (ormEntity.assignment_type || 'PERMANENT') as AssignmentType,
-            startDate: ormEntity.start_date,
-            endDate: ormEntity.end_date,
-            expectedReturnDate: ormEntity.expected_return_date,
-            lastAlertSentAt: ormEntity.last_alert_sent_at,
-            signatureToken: ormEntity.signature_token,
-            signatureMetadata: ormEntity.signature_metadata,
-            documentPath: ormEntity.document_path,
-            adminApproval: ormEntity.admin_approval
-        });
+    async findByIds(ids: string[]): Promise<Assignment[]> {
+        if (ids.length === 0) return [];
+        const ormEntities = await this.repo.findBy({ id: In(ids) });
+        return ormEntities.map(e => this.mapToDomain(e));
     }
 
     async findAllActive(): Promise<Assignment[]> {
-        const ormEntities = await this.repo.find({ 
-            where: { status: In(['ACCEPTED', 'PENDING_ACCEPTANCE', 'PENDING_RETURN']) } 
+        const ormEntities = await this.repo.find({
+            where: { status: In(['ACCEPTED', 'PENDING_ACCEPTANCE', 'PENDING_RETURN']) }
         });
-        return ormEntities.map(ormEntity => new Assignment({
-            id: ormEntity.id,
-            assetId: ormEntity.asset_id,
-            collaboratorId: ormEntity.collaborator_id,
-            status: ormEntity.status as AssignmentStatus,
-            assignmentType: (ormEntity.assignment_type || 'PERMANENT') as AssignmentType,
-            startDate: ormEntity.start_date,
-            endDate: ormEntity.end_date,
-            expectedReturnDate: ormEntity.expected_return_date,
-            lastAlertSentAt: ormEntity.last_alert_sent_at,
-            signatureToken: ormEntity.signature_token,
-            signatureMetadata: ormEntity.signature_metadata,
-            documentPath: ormEntity.document_path,
-            adminApproval: ormEntity.admin_approval
-        }));
+        return ormEntities.map(e => this.mapToDomain(e));
     }
 
     async findActiveByAssetId(assetId: string): Promise<Assignment | null> {
         const ormEntity = await this.repo.findOne({ where: { asset_id: assetId, status: 'ACCEPTED' } });
-        if (!ormEntity) return null;
-
-        return new Assignment({
-            id: ormEntity.id,
-            assetId: ormEntity.asset_id,
-            collaboratorId: ormEntity.collaborator_id,
-            status: ormEntity.status as AssignmentStatus,
-            assignmentType: (ormEntity.assignment_type || 'PERMANENT') as AssignmentType,
-            startDate: ormEntity.start_date,
-            endDate: ormEntity.end_date,
-            expectedReturnDate: ormEntity.expected_return_date,
-            lastAlertSentAt: ormEntity.last_alert_sent_at,
-            signatureToken: ormEntity.signature_token,
-            signatureMetadata: ormEntity.signature_metadata,
-            documentPath: ormEntity.document_path,
-            adminApproval: ormEntity.admin_approval
-        });
+        return ormEntity ? this.mapToDomain(ormEntity) : null;
     }
 
     async findCurrentByAssetId(assetId: string): Promise<Assignment | null> {
@@ -98,24 +58,8 @@ export class PostgresAssignmentRepository implements IAssignmentRepository {
             .where('assignment.asset_id = :assetId', { assetId })
             .andWhere('assignment.status IN (:...statuses)', { statuses: ['PENDING_ACCEPTANCE', 'ACCEPTED', 'PENDING_RETURN'] })
             .getOne();
-            
-        if (!ormEntity) return null;
 
-        return new Assignment({
-            id: ormEntity.id,
-            assetId: ormEntity.asset_id,
-            collaboratorId: ormEntity.collaborator_id,
-            status: ormEntity.status as AssignmentStatus,
-            assignmentType: (ormEntity.assignment_type || 'PERMANENT') as AssignmentType,
-            startDate: ormEntity.start_date,
-            endDate: ormEntity.end_date,
-            expectedReturnDate: ormEntity.expected_return_date,
-            lastAlertSentAt: ormEntity.last_alert_sent_at,
-            signatureToken: ormEntity.signature_token,
-            signatureMetadata: ormEntity.signature_metadata,
-            documentPath: ormEntity.document_path,
-            adminApproval: ormEntity.admin_approval
-        });
+        return ormEntity ? this.mapToDomain(ormEntity) : null;
     }
 
     async findLoansDueWithinDays(days: number): Promise<Assignment[]> {
@@ -128,7 +72,11 @@ export class PostgresAssignmentRepository implements IAssignmentRepository {
             .andWhere('assignment.expected_return_date <= :limit', { limit })
             .getMany();
 
-        return ormEntities.map(ormEntity => new Assignment({
+        return ormEntities.map(e => this.mapToDomain(e));
+    }
+
+    private mapToDomain(ormEntity: AssignmentOrmEntity): Assignment {
+        return new Assignment({
             id: ormEntity.id,
             assetId: ormEntity.asset_id,
             collaboratorId: ormEntity.collaborator_id,
@@ -142,6 +90,6 @@ export class PostgresAssignmentRepository implements IAssignmentRepository {
             signatureMetadata: ormEntity.signature_metadata,
             documentPath: ormEntity.document_path,
             adminApproval: ormEntity.admin_approval
-        }));
+        });
     }
 }

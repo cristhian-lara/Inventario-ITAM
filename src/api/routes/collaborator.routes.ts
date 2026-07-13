@@ -16,6 +16,7 @@ import { PdfKitService } from '../../shared/infrastructure/services/PdfKitServic
 import { CatalogUseCases } from '../../modules/catalog/application/CatalogUseCases';
 import { PostgresCatalogRepository } from '../../modules/catalog/infrastructure/PostgresCatalogRepository';
 import { AppDataSource } from '../../shared/infrastructure/database/postgres';
+import { buildAssetActItem, resolveDepartmentName, extractCeco } from './helpers/assignmentActHelpers';
 
 const departmentSchema = z.object({
     name: z.string().min(1, 'name es requerido'),
@@ -295,33 +296,11 @@ collaboratorRouter.post('/:id/offboard', validateBody(offboardSchema), async (re
                 for (const assign of returnedAssignments) {
                     const asset = await txCatalogUseCases.getAssetById(assign.assetId);
                     const category = asset ? await txCatalogRepo.getCategoryById(asset.categoryId) : null;
-                    assetsDetails.push({
-                        assetId: assign.assetId,
-                        assignmentDate: assign.startDate,
-                        assetSerial: asset ? (asset.serial || 'N/A') : 'N/A',
-                        assetType: category ? category.name : 'Laptop',
-                        assetBrand: asset?.dynamicAttributes?.marca || asset?.dynamicAttributes?.Marca || 'Generico',
-                        assetHostname: asset?.dynamicAttributes?.hostname || asset?.dynamicAttributes?.Hostname || 'N/A',
-                        assetVersionOs: asset?.dynamicAttributes?.versionOs || 'N/A',
-                        assetModel: asset?.dynamicAttributes?.modelo || asset?.dynamicAttributes?.Modelo || 'Generico',
-                        assetMac: asset?.dynamicAttributes?.macAddress || 'N/A',
-                        assetRam: asset?.dynamicAttributes?.ram || 'N/A',
-                        assetProcessor: asset?.dynamicAttributes?.processor || 'N/A',
-                        assetStorage: asset?.dynamicAttributes?.storage || 'N/A',
-                        requiresPlacaIkusi: true
-                    });
+                    assetsDetails.push(buildAssetActItem(asset, category, assign));
                 }
 
-                let realDept = 'Sistemas';
-                if (collaborator.department) {
-                    try {
-                        const dept = await departmentRepository.findById(Number(collaborator.department));
-                        realDept = dept ? dept.name : collaborator.department.toString();
-                    } catch (e) {
-                        realDept = collaborator.department.toString();
-                    }
-                }
-                const ceco = collaborator.dynamicAttributes?.CECOS || collaborator.dynamicAttributes?.cecos || collaborator.dynamicAttributes?.CECO || 'N/A';
+                const realDept = await resolveDepartmentName(collaborator.department, departmentRepository);
+                const ceco = extractCeco(collaborator.dynamicAttributes);
 
                 // Generación del PDF dentro de la transacción a propósito: si falla,
                 // el rollback deshace las devoluciones y los cambios de estado de activos.

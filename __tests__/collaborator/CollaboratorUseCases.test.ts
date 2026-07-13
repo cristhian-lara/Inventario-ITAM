@@ -20,6 +20,7 @@ describe('CollaboratorUseCases', () => {
             findByEmail: jest.fn(),
             findAll: jest.fn(),
             findAllPaginated: jest.fn(),
+            findActiveLeaderInDepartment: jest.fn(),
             update: jest.fn(),
             saveHistory: jest.fn(),
             getHistory: jest.fn(),
@@ -66,7 +67,7 @@ describe('CollaboratorUseCases', () => {
             
             const existingLeader = Collaborator.create('1', 'Leader1', 'l1@ikusi.com', 1, 'Loc');
             Object.defineProperty(existingLeader, 'isLeader', { value: true, writable: true });
-            mockCollabRepo.findAll.mockResolvedValue([existingLeader]);
+            mockCollabRepo.findActiveLeaderInDepartment.mockResolvedValue(existingLeader);
 
             await expect(useCases.createCollaborator({ name: 'Leader2', email: 'l2@ikusi.com', department: 1, location: 'Loc', isLeader: true }))
                 .rejects.toThrow();

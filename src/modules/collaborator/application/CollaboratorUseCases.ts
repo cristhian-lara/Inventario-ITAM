@@ -37,8 +37,7 @@ export class CollaboratorUseCases {
         }
 
         if (data.isLeader) {
-            const allCollabs = await this.collaboratorRepo.findAll();
-            const existingLeader = allCollabs.find(c => Number(c.department) === Number(department.id) && c.isLeader && c.status === 'ACTIVE');
+            const existingLeader = await this.collaboratorRepo.findActiveLeaderInDepartment(Number(department.id));
             if (existingLeader) {
                 throw new Error(`El departamento '${department.name}' ya tiene un líder asignado.`);
             }
@@ -189,8 +188,7 @@ export class CollaboratorUseCases {
         }
 
         if (isLeader) {
-            const allCollabs = await this.collaboratorRepo.findAll();
-            const existingLeader = allCollabs.find(c => Number(c.department) === Number(department.id) && c.isLeader && c.status === 'ACTIVE' && c.id !== collaborator.id);
+            const existingLeader = await this.collaboratorRepo.findActiveLeaderInDepartment(Number(department.id), collaborator.id);
             if (existingLeader) {
                 throw new Error(`El departamento '${department.name}' ya tiene un líder asignado.`);
             }

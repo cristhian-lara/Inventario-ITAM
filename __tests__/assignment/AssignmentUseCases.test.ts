@@ -15,6 +15,7 @@ describe('AssignmentUseCases', () => {
         mockRepo = {
             save: jest.fn(),
             findById: jest.fn(),
+            findByIds: jest.fn(),
             findAllActive: jest.fn(),
             findActiveByAssetId: jest.fn(),
             findCurrentByAssetId: jest.fn(),

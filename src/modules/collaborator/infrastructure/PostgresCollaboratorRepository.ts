@@ -62,6 +62,18 @@ export class PostgresCollaboratorRepository implements ICollaboratorRepository {
         return { items: ormEntities.map(ormEntity => this.mapToDomain(ormEntity)), total };
     }
 
+    async findActiveLeaderInDepartment(department: number, excludeId?: string): Promise<Collaborator | null> {
+        const qb = this.repo.createQueryBuilder('c')
+            .where('c.department = :department', { department })
+            .andWhere('c.is_leader = true')
+            .andWhere('c.status = :status', { status: 'ACTIVE' });
+        if (excludeId) {
+            qb.andWhere('c.id != :excludeId', { excludeId });
+        }
+        const ormEntity = await qb.getOne();
+        return ormEntity ? this.mapToDomain(ormEntity) : null;
+    }
+
     async saveHistory(history: CollaboratorHistory): Promise<void> {
         const ormEntity = this.historyRepo.create({
             id: history.id,

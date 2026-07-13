@@ -14,6 +14,7 @@ import { CollaboratorHistory } from '../../modules/collaborator/domain/Collabora
 import { v4 as uuidv4 } from 'uuid';
 import { AppDataSource } from '../../shared/infrastructure/database/postgres';
 import { validateBody } from '../middlewares/validate.middleware';
+import { buildAssetActItem, resolveCollaboratorActContext, resolveDepartmentName, extractCeco } from './helpers/assignmentActHelpers';
 
 const router = Router();
 
@@ -139,24 +140,11 @@ async function generateDraftPdf(
 ): Promise<string> {
     const asset = await catalogUseCases.getAssetById(assignment.assetId);
     const allCategories = await catalogUseCases.getAllCategories();
-    const category = asset ? allCategories.find(c => c.id === asset.categoryId) : null;
-    const requiresPlaca = category ? category.schemaDefinition.requiresPlacaIkusi !== false : true;
-    
-    const collaborator = await collaboratorRepo.findById(assignment.collaboratorId);
-    const ceco = collaborator && collaborator.dynamicAttributes ? collaborator.dynamicAttributes['CECOS'] || collaborator.dynamicAttributes['cecos'] || collaborator.dynamicAttributes['CECO'] || 'N/A' : 'N/A';
-    const sede = collaborator ? collaborator.location : 'N/A';
-    const realColName = collaborator ? collaborator.name : (fallbackName || assignment.collaboratorId);
-    const realColEmail = collaborator ? collaborator.email : 'test@ikusi.com';
-    let realDept = 'Sistemas';
-    if (collaborator && collaborator.department) {
-        try {
-            const dept = await departmentRepo.findById(Number(collaborator.department));
-            if (dept) realDept = dept.name;
-            else realDept = collaborator.department.toString();
-        } catch(e) {
-            realDept = collaborator.department.toString();
-        }
-    }
+    const category = asset ? allCategories.find(c => c.id === asset.categoryId) || null : null;
+
+    const { ceco, sede, realColName, realColEmail, realDept } = await resolveCollaboratorActContext(
+        assignment.collaboratorId, collaboratorRepo, departmentRepo, fallbackName
+    );
 
     const otherAssignedAssets = await getOtherAssignedAssets(assignment.collaboratorId, assignment.id);
     const returnMode = actType === 'RETURN'
@@ -173,21 +161,7 @@ async function generateDraftPdf(
         department: realDept,
         ceco: ceco,
         sede: sede,
-        assets: [{
-            assetId: assignment.assetId,
-            assignmentDate: assignment.startDate,
-            assetSerial: asset ? (asset.serial || 'N/A') : 'N/A',
-            assetType: category ? category.name : 'Laptop',
-            assetBrand: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.marca || asset.dynamicAttributes.Marca || asset.dynamicAttributes.brand || asset.dynamicAttributes.Brand) || 'Generico' : 'Generico',
-            assetHostname: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.hostname || asset.dynamicAttributes.Hostname) || 'N/A' : 'N/A',
-            assetVersionOs: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.versionOs || asset.dynamicAttributes.VersionOS || asset.dynamicAttributes['Version OS'] || asset.dynamicAttributes['Versión OS'] || asset.dynamicAttributes['Sistema Operativo'] || asset.dynamicAttributes['Sistema operativo'] || asset.dynamicAttributes['SistemaOperativo'] || asset.dynamicAttributes['OS'] || asset.dynamicAttributes['os']) || 'N/A' : 'N/A',
-            assetModel: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.modelo || asset.dynamicAttributes.Modelo) || 'Generico' : 'Generico',
-            assetMac: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.macAddress || asset.dynamicAttributes.MacAddress || asset.dynamicAttributes.MAC || asset.dynamicAttributes['MAC Address']) || 'N/A' : 'N/A',
-            assetRam: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.ram || asset.dynamicAttributes.RAM || asset.dynamicAttributes.Ram || asset.dynamicAttributes['Memoria RAM']) || 'N/A' : 'N/A',
-            assetProcessor: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.processor || asset.dynamicAttributes.Processor || asset.dynamicAttributes.Procesador || asset.dynamicAttributes.procesador) || 'N/A' : 'N/A',
-            assetStorage: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.storage || asset.dynamicAttributes.Storage || asset.dynamicAttributes.Almacenamiento || asset.dynamicAttributes.Disco) || 'N/A' : 'N/A',
-            requiresPlacaIkusi: typeof requiresPlaca !== 'undefined' ? requiresPlaca : true
-        }],
+        assets: [buildAssetActItem(asset, category, assignment)],
         ipAddress: overrides?.ipAddress ?? 'PENDIENTE DE FIRMA',
         timestamp: new Date(),
         isForcedSignature: overrides?.isForcedSignature ?? false,
@@ -479,22 +453,9 @@ router.post('/:id/force-return', validateBody(forceActionSchema), async (req, re
             // Generar PDF de Paz y Salvo Administrativo
             const asset = await txCatalogUseCases.getAssetById(returnedAssignment.assetId);
             const category = asset ? await txCatalogRepo.getCategoryById(asset.categoryId) : null;
-            const requiresPlaca = category ? category.schemaDefinition.requiresPlacaIkusi !== false : true;
-            const collaborator = await txCollaboratorRepo.findById(returnedAssignment.collaboratorId);
-            const ceco = collaborator && collaborator.dynamicAttributes ? collaborator.dynamicAttributes['CECOS'] || collaborator.dynamicAttributes['cecos'] || collaborator.dynamicAttributes['CECO'] || 'N/A' : 'N/A';
-            const sede = collaborator ? collaborator.location : 'N/A';
-            const realColName = collaborator ? collaborator.name : returnedAssignment.collaboratorId;
-            const realColEmail = collaborator ? collaborator.email : 'test@ikusi.com';
-            let realDept = 'Sistemas';
-            if (collaborator && collaborator.department) {
-                try {
-                    const dept = await departmentRepo.findById(Number(collaborator.department));
-                    if (dept) realDept = dept.name;
-                    else realDept = collaborator.department.toString();
-                } catch(e) {
-                    realDept = collaborator.department.toString();
-                }
-            }
+            const { ceco, sede, realColName, realColEmail, realDept } = await resolveCollaboratorActContext(
+                returnedAssignment.collaboratorId, txCollaboratorRepo, departmentRepo
+            );
 
             const otherAssignedAssets = await getOtherAssignedAssets(returnedAssignment.collaboratorId, returnedAssignment.id, txAssignmentRepo, txCatalogUseCases);
             const returnMode = await resolveReturnMode(returnedAssignment.collaboratorId, [returnedAssignment.id], txAssignmentRepo);
@@ -509,21 +470,7 @@ router.post('/:id/force-return', validateBody(forceActionSchema), async (req, re
                 department: realDept,
                 ceco: ceco,
                 sede: sede,
-                assets: [{
-                assetId: returnedAssignment.assetId,
-                assignmentDate: returnedAssignment.startDate,
-                assetSerial: asset ? (asset.serial || 'N/A') : 'N/A',
-                assetType: category ? category.name : 'Laptop',
-                assetBrand: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.marca || asset.dynamicAttributes.Marca || asset.dynamicAttributes.brand || asset.dynamicAttributes.Brand) || 'Generico' : 'Generico',
-                assetHostname: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.hostname || asset.dynamicAttributes.Hostname) || 'N/A' : 'N/A',
-                assetVersionOs: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.versionOs || asset.dynamicAttributes.VersionOS || asset.dynamicAttributes['Version OS'] || asset.dynamicAttributes['Versión OS'] || asset.dynamicAttributes['Sistema Operativo'] || asset.dynamicAttributes['Sistema operativo'] || asset.dynamicAttributes['SistemaOperativo'] || asset.dynamicAttributes['OS'] || asset.dynamicAttributes['os']) || 'N/A' : 'N/A',
-                assetModel: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.modelo || asset.dynamicAttributes.Modelo) || 'Generico' : 'Generico',
-                assetMac: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.macAddress || asset.dynamicAttributes.MacAddress || asset.dynamicAttributes.MAC || asset.dynamicAttributes['MAC Address']) || 'N/A' : 'N/A',
-                assetRam: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.ram || asset.dynamicAttributes.RAM || asset.dynamicAttributes.Ram || asset.dynamicAttributes['Memoria RAM']) || 'N/A' : 'N/A',
-                assetProcessor: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.processor || asset.dynamicAttributes.Processor || asset.dynamicAttributes.Procesador || asset.dynamicAttributes.procesador) || 'N/A' : 'N/A',
-                assetStorage: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.storage || asset.dynamicAttributes.Storage || asset.dynamicAttributes.Almacenamiento || asset.dynamicAttributes.Disco) || 'N/A' : 'N/A',
-                requiresPlacaIkusi: typeof requiresPlaca !== 'undefined' ? requiresPlaca : true
-            }],
+                assets: [buildAssetActItem(asset, category, returnedAssignment)],
                 ipAddress,
                 timestamp: new Date(),
                 isForcedSignature: req.path.includes('force') ? true : false,
@@ -571,22 +518,9 @@ router.post('/force-return-by-asset/:assetId', validateBody(forceActionSchema), 
 
             const asset = await txCatalogUseCases.getAssetById(returnedAssignment.assetId);
             const category = asset ? await txCatalogRepo.getCategoryById(asset.categoryId) : null;
-            const requiresPlaca = category ? category.schemaDefinition.requiresPlacaIkusi !== false : true;
-            const collaborator = await txCollaboratorRepo.findById(returnedAssignment.collaboratorId);
-            const ceco = collaborator && collaborator.dynamicAttributes ? collaborator.dynamicAttributes['CECOS'] || collaborator.dynamicAttributes['cecos'] || collaborator.dynamicAttributes['CECO'] || 'N/A' : 'N/A';
-            const sede = collaborator ? collaborator.location : 'N/A';
-            const realColName = collaborator ? collaborator.name : (collaboratorName || returnedAssignment.collaboratorId);
-            const realColEmail = collaborator ? collaborator.email : 'test@ikusi.com';
-            let realDept = 'Sistemas';
-            if (collaborator && collaborator.department) {
-                try {
-                    const dept = await departmentRepo.findById(Number(collaborator.department));
-                    if (dept) realDept = dept.name;
-                    else realDept = collaborator.department.toString();
-                } catch(e) {
-                    realDept = collaborator.department.toString();
-                }
-            }
+            const { ceco, sede, realColName, realColEmail, realDept } = await resolveCollaboratorActContext(
+                returnedAssignment.collaboratorId, txCollaboratorRepo, departmentRepo, collaboratorName
+            );
 
             const otherAssignedAssets = await getOtherAssignedAssets(returnedAssignment.collaboratorId, returnedAssignment.id, txAssignmentRepo, txCatalogUseCases);
             const returnMode = await resolveReturnMode(returnedAssignment.collaboratorId, [returnedAssignment.id], txAssignmentRepo);
@@ -602,21 +536,7 @@ router.post('/force-return-by-asset/:assetId', validateBody(forceActionSchema), 
                 ceco: ceco,
                 sede: sede,
                 returnReason: reason,
-                assets: [{
-                assetId: returnedAssignment.assetId,
-                assignmentDate: returnedAssignment.startDate,
-                assetSerial: asset ? (asset.serial || 'N/A') : 'N/A',
-                assetType: category ? category.name : 'Laptop',
-                assetBrand: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.marca || asset.dynamicAttributes.Marca || asset.dynamicAttributes.brand || asset.dynamicAttributes.Brand) || 'Generico' : 'Generico',
-                assetHostname: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.hostname || asset.dynamicAttributes.Hostname) || 'N/A' : 'N/A',
-                assetVersionOs: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.versionOs || asset.dynamicAttributes.VersionOS || asset.dynamicAttributes['Version OS'] || asset.dynamicAttributes['Versión OS'] || asset.dynamicAttributes['Sistema Operativo'] || asset.dynamicAttributes['Sistema operativo'] || asset.dynamicAttributes['SistemaOperativo'] || asset.dynamicAttributes['OS'] || asset.dynamicAttributes['os']) || 'N/A' : 'N/A',
-                assetModel: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.modelo || asset.dynamicAttributes.Modelo) || 'Generico' : 'Generico',
-                assetMac: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.macAddress || asset.dynamicAttributes.MacAddress || asset.dynamicAttributes.MAC || asset.dynamicAttributes['MAC Address']) || 'N/A' : 'N/A',
-                assetRam: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.ram || asset.dynamicAttributes.RAM || asset.dynamicAttributes.Ram || asset.dynamicAttributes['Memoria RAM']) || 'N/A' : 'N/A',
-                assetProcessor: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.processor || asset.dynamicAttributes.Processor || asset.dynamicAttributes.Procesador || asset.dynamicAttributes.procesador) || 'N/A' : 'N/A',
-                assetStorage: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.storage || asset.dynamicAttributes.Storage || asset.dynamicAttributes.Almacenamiento || asset.dynamicAttributes.Disco) || 'N/A' : 'N/A',
-                requiresPlacaIkusi: typeof requiresPlaca !== 'undefined' ? requiresPlaca : true
-            }],
+                assets: [buildAssetActItem(asset, category, returnedAssignment)],
                 ipAddress,
                 timestamp: new Date(),
                 isForcedSignature: req.path.includes('force') ? true : false,
@@ -664,23 +584,9 @@ router.post('/force-accept-by-asset/:assetId', validateBody(forceActionSchema), 
 
             const asset = await txCatalogUseCases.getAssetById(acceptedAssignment.assetId);
             const category = asset ? await txCatalogRepo.getCategoryById(asset.categoryId) : null;
-            const requiresPlaca = category ? category.schemaDefinition.requiresPlacaIkusi !== false : true;
-
-            const collaborator = await txCollaboratorRepo.findById(acceptedAssignment.collaboratorId);
-            const ceco = collaborator && collaborator.dynamicAttributes ? collaborator.dynamicAttributes['CECOS'] || collaborator.dynamicAttributes['cecos'] || collaborator.dynamicAttributes['CECO'] || 'N/A' : 'N/A';
-            const sede = collaborator ? collaborator.location : 'N/A';
-            const realColName = collaborator ? collaborator.name : (collaboratorName || acceptedAssignment.collaboratorId);
-            const realColEmail = collaborator ? collaborator.email : 'test@ikusi.com';
-            let realDept = 'Sistemas';
-            if (collaborator && collaborator.department) {
-                try {
-                    const dept = await departmentRepo.findById(Number(collaborator.department));
-                    if (dept) realDept = dept.name;
-                    else realDept = collaborator.department.toString();
-                } catch(e) {
-                    realDept = collaborator.department.toString();
-                }
-            }
+            const { ceco, sede, realColName, realColEmail, realDept } = await resolveCollaboratorActContext(
+                acceptedAssignment.collaboratorId, txCollaboratorRepo, departmentRepo, collaboratorName
+            );
 
             const otherAssignedAssets = await getOtherAssignedAssets(acceptedAssignment.collaboratorId, acceptedAssignment.id, txAssignmentRepo, txCatalogUseCases);
 
@@ -694,21 +600,7 @@ router.post('/force-accept-by-asset/:assetId', validateBody(forceActionSchema), 
                 ceco: ceco,
                 sede: sede,
                 returnReason: reason,
-                assets: [{
-                assetId: acceptedAssignment.assetId,
-                assignmentDate: acceptedAssignment.startDate,
-                assetSerial: asset ? (asset.serial || 'N/A') : 'N/A',
-                assetType: category ? category.name : 'Laptop',
-                assetBrand: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.marca || asset.dynamicAttributes.Marca || asset.dynamicAttributes.brand || asset.dynamicAttributes.Brand) || 'Generico' : 'Generico',
-                assetHostname: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.hostname || asset.dynamicAttributes.Hostname) || 'N/A' : 'N/A',
-                assetVersionOs: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.versionOs || asset.dynamicAttributes.VersionOS || asset.dynamicAttributes['Version OS'] || asset.dynamicAttributes['Versión OS'] || asset.dynamicAttributes['Sistema Operativo'] || asset.dynamicAttributes['Sistema operativo'] || asset.dynamicAttributes['SistemaOperativo'] || asset.dynamicAttributes['OS'] || asset.dynamicAttributes['os']) || 'N/A' : 'N/A',
-                assetModel: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.modelo || asset.dynamicAttributes.Modelo) || 'Generico' : 'Generico',
-                assetMac: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.macAddress || asset.dynamicAttributes.MacAddress || asset.dynamicAttributes.MAC || asset.dynamicAttributes['MAC Address']) || 'N/A' : 'N/A',
-                assetRam: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.ram || asset.dynamicAttributes.RAM || asset.dynamicAttributes.Ram || asset.dynamicAttributes['Memoria RAM']) || 'N/A' : 'N/A',
-                assetProcessor: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.processor || asset.dynamicAttributes.Processor || asset.dynamicAttributes.Procesador || asset.dynamicAttributes.procesador) || 'N/A' : 'N/A',
-                assetStorage: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.storage || asset.dynamicAttributes.Storage || asset.dynamicAttributes.Almacenamiento || asset.dynamicAttributes.Disco) || 'N/A' : 'N/A',
-                requiresPlacaIkusi: typeof requiresPlaca !== 'undefined' ? requiresPlaca : true
-            }],
+                assets: [buildAssetActItem(asset, category, acceptedAssignment)],
                 ipAddress,
                 timestamp: new Date(),
                 isForcedSignature: req.path.includes('force') ? true : false,
@@ -752,26 +644,13 @@ router.get('/:id/confirm-return', async (req, res) => {
         await catalogUseCases.changeAssetStatus(returnedAssignment.assetId, 'PENDING_INSPECTION');
 
         // Buscar activo para poblar el PDF
-                const asset = await catalogUseCases.getAssetById(returnedAssignment.assetId);
+        const asset = await catalogUseCases.getAssetById(returnedAssignment.assetId);
         const category = asset ? await catalogRepo.getCategoryById(asset.categoryId) : null;
-        const requiresPlaca = category ? category.schemaDefinition.requiresPlacaIkusi !== false : true;
-        
+
         // Generar PDF de Paz y Salvo
-        const collaborator = await collaboratorRepo.findById(returnedAssignment.collaboratorId);
-        const ceco = collaborator && collaborator.dynamicAttributes ? collaborator.dynamicAttributes['CECOS'] || collaborator.dynamicAttributes['cecos'] || collaborator.dynamicAttributes['CECO'] || 'N/A' : 'N/A';
-        const sede = collaborator ? collaborator.location : 'N/A';
-        const realColName = collaborator ? collaborator.name : returnedAssignment.collaboratorId;
-        const realColEmail = collaborator ? collaborator.email : 'test@ikusi.com';
-        let realDept = 'Sistemas';
-        if (collaborator && collaborator.department) {
-            try {
-                const dept = await departmentRepo.findById(Number(collaborator.department));
-                if (dept) realDept = dept.name;
-                else realDept = collaborator.department.toString();
-            } catch(e) {
-                realDept = collaborator.department.toString();
-            }
-        }
+        const { ceco, sede, realColName, realColEmail, realDept } = await resolveCollaboratorActContext(
+            returnedAssignment.collaboratorId, collaboratorRepo, departmentRepo
+        );
 
         const otherAssignedAssets = await getOtherAssignedAssets(returnedAssignment.collaboratorId, returnedAssignment.id);
         const returnMode = await resolveReturnMode(returnedAssignment.collaboratorId, [returnedAssignment.id]);
@@ -786,21 +665,7 @@ router.get('/:id/confirm-return', async (req, res) => {
             department: realDept,
             ceco: ceco,
             sede: sede,
-            assets: [{
-            assetId: returnedAssignment.assetId,
-            assignmentDate: returnedAssignment.startDate,
-            assetSerial: asset ? (asset.serial || 'N/A') : 'N/A',
-            assetType: category ? category.name : 'Laptop',
-            assetBrand: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.marca || asset.dynamicAttributes.Marca || asset.dynamicAttributes.brand || asset.dynamicAttributes.Brand) || 'Generico' : 'Generico',
-            assetHostname: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.hostname || asset.dynamicAttributes.Hostname) || 'N/A' : 'N/A',
-            assetVersionOs: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.versionOs || asset.dynamicAttributes.VersionOS || asset.dynamicAttributes['Version OS'] || asset.dynamicAttributes['Versión OS'] || asset.dynamicAttributes['Sistema Operativo'] || asset.dynamicAttributes['Sistema operativo'] || asset.dynamicAttributes['SistemaOperativo'] || asset.dynamicAttributes['OS'] || asset.dynamicAttributes['os']) || 'N/A' : 'N/A',
-            assetModel: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.modelo || asset.dynamicAttributes.Modelo) || 'Generico' : 'Generico',
-            assetMac: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.macAddress || asset.dynamicAttributes.MacAddress || asset.dynamicAttributes.MAC || asset.dynamicAttributes['MAC Address']) || 'N/A' : 'N/A',
-            assetRam: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.ram || asset.dynamicAttributes.RAM || asset.dynamicAttributes.Ram || asset.dynamicAttributes['Memoria RAM']) || 'N/A' : 'N/A',
-            assetProcessor: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.processor || asset.dynamicAttributes.Processor || asset.dynamicAttributes.Procesador || asset.dynamicAttributes.procesador) || 'N/A' : 'N/A',
-            assetStorage: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.storage || asset.dynamicAttributes.Storage || asset.dynamicAttributes.Almacenamiento || asset.dynamicAttributes.Disco) || 'N/A' : 'N/A',
-            requiresPlacaIkusi: typeof requiresPlaca !== 'undefined' ? requiresPlaca : true
-        }],
+            assets: [buildAssetActItem(asset, category, returnedAssignment)],
             ipAddress,
             timestamp: new Date(),
             isForcedSignature: req.path.includes('force') ? true : false,
@@ -809,7 +674,7 @@ router.get('/:id/confirm-return', async (req, res) => {
 
         // Actualizar assignment con el path
         await assignmentUseCases.updateDocumentPath(returnedAssignment.id, documentPath);
-        
+
         await collaboratorRepo.saveHistory(new CollaboratorHistory(
             uuidv4(),
             returnedAssignment.collaboratorId,
@@ -904,26 +769,13 @@ router.get('/:id/accept', async (req, res) => {
         await catalogUseCases.changeAssetStatus(acceptedAssignment.assetId, 'IN_USE');
 
         // Buscar activo para poblar el PDF
-                const asset = await catalogUseCases.getAssetById(acceptedAssignment.assetId);
+        const asset = await catalogUseCases.getAssetById(acceptedAssignment.assetId);
         const category = asset ? await catalogRepo.getCategoryById(asset.categoryId) : null;
-        const requiresPlaca = category ? category.schemaDefinition.requiresPlacaIkusi !== false : true;
-        
+
         // Generar PDF
-        const collaborator = await collaboratorRepo.findById(acceptedAssignment.collaboratorId);
-        const ceco = collaborator && collaborator.dynamicAttributes ? collaborator.dynamicAttributes['CECOS'] || collaborator.dynamicAttributes['cecos'] || collaborator.dynamicAttributes['CECO'] || 'N/A' : 'N/A';
-        const sede = collaborator ? collaborator.location : 'N/A';
-        const realColName = collaborator ? collaborator.name : acceptedAssignment.collaboratorId;
-        const realColEmail = collaborator ? collaborator.email : 'test@ikusi.com';
-        let realDept = 'Sistemas';
-        if (collaborator && collaborator.department) {
-            try {
-                const dept = await departmentRepo.findById(Number(collaborator.department));
-                if (dept) realDept = dept.name;
-                else realDept = collaborator.department.toString();
-            } catch(e) {
-                realDept = collaborator.department.toString();
-            }
-        }
+        const { ceco, sede, realColName, realColEmail, realDept } = await resolveCollaboratorActContext(
+            acceptedAssignment.collaboratorId, collaboratorRepo, departmentRepo
+        );
 
         const otherAssignedAssets = await getOtherAssignedAssets(acceptedAssignment.collaboratorId, acceptedAssignment.id);
 
@@ -936,21 +788,7 @@ router.get('/:id/accept', async (req, res) => {
             department: realDept,
             ceco: ceco,
             sede: sede,
-            assets: [{
-            assetId: acceptedAssignment.assetId,
-            assignmentDate: acceptedAssignment.startDate,
-            assetSerial: asset ? (asset.serial || 'N/A') : 'N/A',
-            assetType: category ? category.name : 'Laptop',
-            assetBrand: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.marca || asset.dynamicAttributes.Marca || asset.dynamicAttributes.brand || asset.dynamicAttributes.Brand) || 'Generico' : 'Generico',
-            assetHostname: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.hostname || asset.dynamicAttributes.Hostname) || 'N/A' : 'N/A',
-            assetVersionOs: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.versionOs || asset.dynamicAttributes.VersionOS || asset.dynamicAttributes['Version OS'] || asset.dynamicAttributes['Versión OS'] || asset.dynamicAttributes['Sistema Operativo'] || asset.dynamicAttributes['Sistema operativo'] || asset.dynamicAttributes['SistemaOperativo'] || asset.dynamicAttributes['OS'] || asset.dynamicAttributes['os']) || 'N/A' : 'N/A',
-            assetModel: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.modelo || asset.dynamicAttributes.Modelo) || 'Generico' : 'Generico',
-            assetMac: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.macAddress || asset.dynamicAttributes.MacAddress || asset.dynamicAttributes.MAC || asset.dynamicAttributes['MAC Address']) || 'N/A' : 'N/A',
-            assetRam: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.ram || asset.dynamicAttributes.RAM || asset.dynamicAttributes.Ram || asset.dynamicAttributes['Memoria RAM']) || 'N/A' : 'N/A',
-            assetProcessor: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.processor || asset.dynamicAttributes.Processor || asset.dynamicAttributes.Procesador || asset.dynamicAttributes.procesador) || 'N/A' : 'N/A',
-            assetStorage: asset && asset.dynamicAttributes ? (asset.dynamicAttributes.storage || asset.dynamicAttributes.Storage || asset.dynamicAttributes.Almacenamiento || asset.dynamicAttributes.Disco) || 'N/A' : 'N/A',
-            requiresPlacaIkusi: typeof requiresPlaca !== 'undefined' ? requiresPlaca : true
-        }],
+            assets: [buildAssetActItem(asset, category, acceptedAssignment)],
             ipAddress,
             timestamp: new Date(),
             isForcedSignature: req.path.includes('force') ? true : false,
@@ -959,7 +797,7 @@ router.get('/:id/accept', async (req, res) => {
 
         // Actualizar assignment con el path
         await assignmentUseCases.updateDocumentPath(acceptedAssignment.id, documentPath);
-        
+
         await collaboratorRepo.saveHistory(new CollaboratorHistory(
             uuidv4(),
             acceptedAssignment.collaboratorId,
@@ -1096,44 +934,19 @@ router.post('/batch-return', validateBody(batchReturnSchema), async (req, res) =
 
         const firstAssignment = assignments[0];
         const collaborator = await collaboratorRepo.findById(firstAssignment.collaboratorId);
-        
-        let assetsDetails = [];
+
+        const assetsDetails = [];
         for (const id of assignmentIds) {
             const assign = assignments.find(a => a.id === id);
             if (assign) {
                 const asset = await catalogUseCases.getAssetById(assign.assetId);
-                let category;
-                if (asset) category = await catalogRepo.getCategoryById(asset.categoryId);
-                
-                assetsDetails.push({
-                    assetId: assign.assetId,
-                    assignmentDate: assign.startDate,
-                    assetSerial: asset ? (asset.serial || 'N/A') : 'N/A',
-                    assetType: category ? category.name : 'Laptop',
-                    assetBrand: asset?.dynamicAttributes?.marca || asset?.dynamicAttributes?.Marca || 'Generico',
-                    assetHostname: asset?.dynamicAttributes?.hostname || asset?.dynamicAttributes?.Hostname || 'N/A',
-                    assetVersionOs: asset?.dynamicAttributes?.versionOs || 'N/A',
-                    assetModel: asset?.dynamicAttributes?.modelo || asset?.dynamicAttributes?.Modelo || 'Generico',
-                    assetMac: asset?.dynamicAttributes?.macAddress || 'N/A',
-                    assetRam: asset?.dynamicAttributes?.ram || 'N/A',
-                    assetProcessor: asset?.dynamicAttributes?.processor || 'N/A',
-                    assetStorage: asset?.dynamicAttributes?.storage || 'N/A',
-                    requiresPlacaIkusi: true
-                });
+                const category = asset ? await catalogRepo.getCategoryById(asset.categoryId) : null;
+                assetsDetails.push(buildAssetActItem(asset, category, assign));
             }
         }
 
-        let realDept = 'Sistemas';
-        if (collaborator && collaborator.department) {
-            try {
-                const dept = await departmentRepo.findById(Number(collaborator.department));
-                if (dept) realDept = dept.name;
-                else realDept = collaborator.department.toString();
-            } catch (e) {
-                realDept = collaborator.department.toString();
-            }
-        }
-        const ceco = collaborator && collaborator.dynamicAttributes ? collaborator.dynamicAttributes['CECOS'] || collaborator.dynamicAttributes['cecos'] || collaborator.dynamicAttributes['CECO'] || 'N/A' : 'N/A';
+        const realDept = await resolveDepartmentName(collaborator?.department, departmentRepo);
+        const ceco = extractCeco(collaborator?.dynamicAttributes);
 
         const documentPath = await documentService.generateAssignmentAct({
             actType: 'RETURN',
@@ -1183,28 +996,12 @@ router.get('/batch-accept-return', async (req, res) => {
         if (assignments.length > 0) {
             const firstAssignment = assignments[0];
             const collaborator = await collaboratorRepo.findById(firstAssignment.collaboratorId);
-            
-            let assetsDetails = [];
+
+            const assetsDetails = [];
             for (const assign of assignments) {
                 const asset = await catalogUseCases.getAssetById(assign.assetId);
-                let category;
-                if (asset) category = await catalogRepo.getCategoryById(asset.categoryId);
-                
-                assetsDetails.push({
-                    assetId: assign.assetId,
-                    assignmentDate: assign.startDate,
-                    assetSerial: asset ? (asset.serial || 'N/A') : 'N/A',
-                    assetType: category ? category.name : 'Laptop',
-                    assetBrand: asset?.dynamicAttributes?.marca || asset?.dynamicAttributes?.Marca || 'Generico',
-                    assetHostname: asset?.dynamicAttributes?.hostname || asset?.dynamicAttributes?.Hostname || 'N/A',
-                    assetVersionOs: asset?.dynamicAttributes?.versionOs || 'N/A',
-                    assetModel: asset?.dynamicAttributes?.modelo || asset?.dynamicAttributes?.Modelo || 'Generico',
-                    assetMac: asset?.dynamicAttributes?.macAddress || 'N/A',
-                    assetRam: asset?.dynamicAttributes?.ram || 'N/A',
-                    assetProcessor: asset?.dynamicAttributes?.processor || 'N/A',
-                    assetStorage: asset?.dynamicAttributes?.storage || 'N/A',
-                    requiresPlacaIkusi: true
-                });
+                const category = asset ? await catalogRepo.getCategoryById(asset.categoryId) : null;
+                assetsDetails.push(buildAssetActItem(asset, category, assign));
 
                 if (asset) {
                     // El activo queda bloqueado hasta que TI otorgue el Visto Bueno (approve-return)
@@ -1212,17 +1009,8 @@ router.get('/batch-accept-return', async (req, res) => {
                 }
             }
 
-            let realDept = 'Sistemas';
-            if (collaborator && collaborator.department) {
-                try {
-                    const dept = await departmentRepo.findById(Number(collaborator.department));
-                    if (dept) realDept = dept.name;
-                    else realDept = collaborator.department.toString();
-                } catch (e) {
-                    realDept = collaborator.department.toString();
-                }
-            }
-            const ceco = collaborator && collaborator.dynamicAttributes ? collaborator.dynamicAttributes['CECOS'] || collaborator.dynamicAttributes['cecos'] || collaborator.dynamicAttributes['CECO'] || 'N/A' : 'N/A';
+            const realDept = await resolveDepartmentName(collaborator?.department, departmentRepo);
+            const ceco = extractCeco(collaborator?.dynamicAttributes);
 
             documentPath = await documentService.generateAssignmentAct({
                 actType: 'RETURN',
