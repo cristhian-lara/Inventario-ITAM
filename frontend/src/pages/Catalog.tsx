@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router-dom';
 import ActionMenu from '../components/ActionMenu';
+import LoadingState from '../components/LoadingState';
 import axios from 'axios';
 import { Plus, Search, Tag, Cpu, HardDrive, Wifi, PlusCircle, MonitorSmartphone, RefreshCw, CheckCircle2, AlertCircle, AlertTriangle, UserCheck, Send, Upload, Trash2, CalendarClock } from 'lucide-react';
 import { useConfirm } from '../context/ConfirmContext';
@@ -421,12 +422,7 @@ export default function Catalog() {
     setShowAddModal(true);
   };
 
-  if (isLoading) return (
-    <div className="loading-container">
-      <div className="spinner"></div>
-      <p className="title-glow">Cargando inventario...</p>
-    </div>
-  );
+  if (isLoading) return <LoadingState message="Cargando inventario..." />;
 
   if (error) return <div className="error-glass">Error al cargar el inventario: {(error as Error).message}</div>;
 
@@ -610,6 +606,20 @@ export default function Catalog() {
             <option value="MAINTENANCE">En Mantenimiento</option>
             <option value="RETIRED">Baja</option>
           </select>
+          <button
+            type="button"
+            className="btn-glass"
+            onClick={() => setFilterStatus(filterStatus === 'AVAILABLE' ? 'all' : 'AVAILABLE')}
+            title="Mostrar solo activos disponibles para asignar"
+            aria-pressed={filterStatus === 'AVAILABLE'}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '6px',
+              ...(filterStatus === 'AVAILABLE' ? { background: 'var(--ikusi-green)', color: '#fff', borderColor: 'var(--ikusi-green)' } : {})
+            }}
+          >
+            <CheckCircle2 size={16} />
+            Solo disponibles
+          </button>
           {(filterCategory !== 'all' || filterStatus !== 'all' || searchTerm !== '' || filterRisk) && (
             <button
               className="btn-glass"

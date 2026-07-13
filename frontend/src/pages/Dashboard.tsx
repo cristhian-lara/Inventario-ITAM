@@ -7,6 +7,7 @@ import './Dashboard.css';
 import { API_URL } from '../config';
 import { useConfirm } from '../context/ConfirmContext';
 import { useAuth, usePermission } from '../context/AuthContext';
+import LoadingState from '../components/LoadingState';
 
 interface DashboardMetrics {
   totalAssets: number;
@@ -105,8 +106,8 @@ export default function Dashboard() {
   );
 
   if (isLoading) return (
-    <div className="dashboard-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
-      <p className="title-glow">Cargando métricas...</p>
+    <div className="dashboard-container">
+      <LoadingState message="Cargando métricas..." />
     </div>
   );
 

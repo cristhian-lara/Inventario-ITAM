@@ -28,6 +28,7 @@ import {
 import './AssetProfile.css';
 import { API_URL } from '../config';
 import { usePermission } from '../context/AuthContext';
+import LoadingState from '../components/LoadingState';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -560,7 +561,7 @@ export default function AssetProfile() {
                         </div>
 
                         {loadingMaint ? (
-                            <div className="ap-empty">Cargando mantenimientos...</div>
+                            <div className="ap-empty"><LoadingState message="Cargando mantenimientos..." inline /></div>
                         ) : !maintenances || maintenances.length === 0 ? (
                             <p className="ap-empty">No hay registros de mantenimiento para este equipo.</p>
                         ) : (
@@ -639,7 +640,7 @@ export default function AssetProfile() {
                         </div>
 
                         {loadingUpgrades ? (
-                            <div className="ap-empty">Cargando upgrades...</div>
+                            <div className="ap-empty"><LoadingState message="Cargando upgrades..." inline /></div>
                         ) : !upgrades || upgrades.length === 0 ? (
                             <div style={{ textAlign: 'center', padding: '20px 0' }}>
                                 <p className="ap-empty">No hay actualizaciones de hardware registradas.</p>
@@ -725,7 +726,7 @@ export default function AssetProfile() {
                         </div>
 
                         {loadingHistory ? (
-                            <div className="ap-empty">Cargando historial...</div>
+                            <div className="ap-empty"><LoadingState message="Cargando historial..." inline /></div>
                         ) : !assignmentHistory || assignmentHistory.length === 0 ? (
                             <p className="ap-empty">Este equipo no ha sido asignado a ningún colaborador.</p>
                         ) : (

@@ -11,6 +11,7 @@ import { showWebexFailureModal } from '../utils/notificationNotice';
 import { authHeaders } from '../utils/authHeaders';
 import './Maintenances.css';
 import { API_URL } from '../config';
+import LoadingState from '../components/LoadingState';
 
 interface MaintenanceRecord {
   id: string;
@@ -253,7 +254,7 @@ const Maintenances: React.FC = () => {
     onError: (error: Error) => { setErrorMsg(error.message); }
   });
 
-  if (isLoading) return <div style={{ padding: '40px', color: 'var(--text-main)' }}>Cargando módulo de mantenimientos...</div>;
+  if (isLoading) return <LoadingState message="Cargando módulo de mantenimientos..." />;
 
   const now = new Date();
   const getTargetMidnight = (d: string | Date) => {

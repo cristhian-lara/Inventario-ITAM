@@ -8,6 +8,7 @@ import { useToast } from '../context/ToastContext';
 import { API_URL } from '../config';
 import { isPasswordValid } from '../utils/passwordPolicy';
 import PasswordChecklist from '../components/PasswordChecklist';
+import LoadingState from '../components/LoadingState';
 import './Users.css';
 
 interface UserRow {
@@ -281,7 +282,7 @@ export default function Users() {
                         </thead>
                         <tbody>
                             {isLoading && (
-                                <tr><td colSpan={6}>Cargando usuarios...</td></tr>
+                                <tr><td colSpan={6}><LoadingState message="Cargando usuarios..." inline /></td></tr>
                             )}
                             {!isLoading && users.map(u => (
                                 <tr key={u.id} className={u.isActive ? '' : 'user-inactive'}>

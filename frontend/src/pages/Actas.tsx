@@ -4,6 +4,7 @@ import { FileDown, Calendar, FileText, CheckCircle, Search } from 'lucide-react'
 import './Actas.css';
 import { API_URL } from '../config';
 import axios from 'axios';
+import LoadingState from '../components/LoadingState';
 
 interface DocumentInfo {
   filename: string;
@@ -31,8 +32,8 @@ export default function Actas() {
 
   if (isLoading) {
     return (
-      <div className="actas-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
-        <p className="title-glow">Cargando documentos...</p>
+      <div className="actas-container">
+        <LoadingState message="Cargando documentos..." />
       </div>
     );
   }

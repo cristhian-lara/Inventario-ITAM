@@ -4,6 +4,7 @@ import axios from 'axios';
 import { Plus, Settings as SettingsIcon, Building, Briefcase, Tag, CheckCircle2, AlertCircle, Trash2, Database, Edit, X, FileText, Save } from 'lucide-react';
 import { useConfirm } from '../context/ConfirmContext';
 import { usePermission } from '../context/AuthContext';
+import LoadingState from '../components/LoadingState';
 import './Settings.css';
 import { API_URL } from '../config';
 
@@ -386,7 +387,7 @@ export default function Settings() {
                 </button>
                 )}
               </div>
-              {loadingCat ? <p>Cargando...</p> : (
+              {loadingCat ? <LoadingState inline /> : (
                 <div className="list-grid">
                   {categories?.length === 0 ? (
                     <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '40px', color: 'var(--text-muted)', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px dashed var(--border-glass)' }}>
@@ -435,7 +436,7 @@ export default function Settings() {
                 </button>
                 )}
               </div>
-              {loadingDep ? <p>Cargando...</p> : (
+              {loadingDep ? <LoadingState inline /> : (
                 <div className="list-grid">
                   {departments?.length === 0 ? (
                     <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '40px', color: 'var(--text-muted)', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px dashed var(--border-glass)' }}>
@@ -483,7 +484,7 @@ export default function Settings() {
             </div>
             
             {loadingCecos ? (
-              <div className="loading-spinner">Cargando...</div>
+              <LoadingState inline />
             ) : (
               <div className="list-grid">
                 {cecosList?.length === 0 ? (
@@ -524,7 +525,7 @@ export default function Settings() {
             </div>
             
             {loadingSettings ? (
-              <div className="loading-spinner">Cargando...</div>
+              <LoadingState inline />
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                 <div style={{ background: 'rgba(255,255,255,0.02)', padding: '20px', borderRadius: '12px', border: '1px dashed var(--border-glass)' }}>

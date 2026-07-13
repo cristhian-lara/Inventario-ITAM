@@ -8,6 +8,7 @@ import { useConfirm } from '../context/ConfirmContext';
 import { useToast } from '../context/ToastContext';
 import { usePermission } from '../context/AuthContext';
 import { showWebexFailureModal } from '../utils/notificationNotice';
+import Modal from '../components/Modal';
 import './Collaborators.css';
 import { API_URL } from '../config';
 
@@ -660,27 +661,20 @@ export default function Collaborators() {
         const collabAssignments = assignmentsList.filter((a: any) => a.collaboratorId === selectedCollabForReturn.id && (a.status === 'ACCEPTED' || a.status === 'PENDING_ACCEPTANCE'));
         const allSelected = collabAssignments.length > 0 && collabAssignments.every((a: any) => selectedAssignmentIds.includes(a.id));
         return (
-          <div 
-            onClick={() => setBatchReturnModalOpen(false)}
-            style={{
-              position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
-              background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(8px)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              zIndex: 1200, padding: '20px'
+          <Modal
+            onClose={() => setBatchReturnModalOpen(false)}
+            zIndex={1200}
+            overlayStyle={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(8px)' }}
+            panelStyle={{
+              background: '#ffffff',
+              borderRadius: '20px',
+              boxShadow: '0 25px 60px rgba(0,0,0,0.2), 0 8px 20px rgba(0,0,0,0.1)',
+              width: '100%',
+              maxWidth: '580px',
+              overflow: 'hidden',
+              animation: 'slideUp 0.25s cubic-bezier(0.34,1.56,0.64,1)'
             }}
           >
-            <div 
-              onClick={e => e.stopPropagation()}
-              style={{
-                background: '#ffffff',
-                borderRadius: '20px',
-                boxShadow: '0 25px 60px rgba(0,0,0,0.2), 0 8px 20px rgba(0,0,0,0.1)',
-                width: '100%',
-                maxWidth: '580px',
-                overflow: 'hidden',
-                animation: 'slideUp 0.25s cubic-bezier(0.34,1.56,0.64,1)'
-              }}
-            >
               {/* Header */}
               <div style={{
                 background: 'linear-gradient(135deg, #00a650 0%, #008a42 100%)',
@@ -921,35 +915,28 @@ export default function Collaborators() {
                   </button>
                 </div>
               </div>
-            </div>
-          </div>
+          </Modal>
         );
       })()}
 
       {offboardTarget && (() => {
         const collabAssignments = assignmentsList.filter((a: any) => a.collaboratorId === offboardTarget.id && (a.status === 'ACCEPTED' || a.status === 'PENDING_ACCEPTANCE'));
         return (
-          <div
-            onClick={() => !isOffboarding && setOffboardTarget(null)}
-            style={{
-              position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
-              background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(8px)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              zIndex: 1200, padding: '20px'
+          <Modal
+            onClose={() => setOffboardTarget(null)}
+            disableClose={isOffboarding}
+            zIndex={1200}
+            overlayStyle={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(8px)' }}
+            panelStyle={{
+              background: '#ffffff',
+              borderRadius: '20px',
+              boxShadow: '0 25px 60px rgba(0,0,0,0.2), 0 8px 20px rgba(0,0,0,0.1)',
+              width: '100%',
+              maxWidth: '580px',
+              overflow: 'hidden',
+              animation: 'slideUp 0.25s cubic-bezier(0.34,1.56,0.64,1)'
             }}
           >
-            <div
-              onClick={e => e.stopPropagation()}
-              style={{
-                background: '#ffffff',
-                borderRadius: '20px',
-                boxShadow: '0 25px 60px rgba(0,0,0,0.2), 0 8px 20px rgba(0,0,0,0.1)',
-                width: '100%',
-                maxWidth: '580px',
-                overflow: 'hidden',
-                animation: 'slideUp 0.25s cubic-bezier(0.34,1.56,0.64,1)'
-              }}
-            >
               {/* Header */}
               <div style={{
                 background: 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)',
@@ -1104,8 +1091,7 @@ export default function Collaborators() {
                   )}
                 </button>
               </div>
-            </div>
-          </div>
+          </Modal>
         );
       })()}
     </div>
