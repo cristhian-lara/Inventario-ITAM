@@ -1,9 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Settings, Wrench, CheckCircle, AlertTriangle, Calendar, Plus, Clock, X, Mail, Edit3, Search, Server, Bell } from 'lucide-react';
-import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, Legend } from 'recharts';
-import { Link } from 'react-router-dom';
-import ActionMenu from '../components/ActionMenu';
+import { Plus, X, Search, Calendar } from 'lucide-react';
 import { useConfirm } from '../context/ConfirmContext';
 import { useToast } from '../context/ToastContext';
 import { usePermission } from '../context/AuthContext';
@@ -12,6 +9,10 @@ import { authHeaders } from '../utils/authHeaders';
 import './Maintenances.css';
 import { API_URL } from '../config';
 import LoadingState from '../components/LoadingState';
+import MaintenanceKpiCards from '../components/maintenances/MaintenanceKpiCards';
+import MaintenanceChartsSidebar from '../components/maintenances/MaintenanceChartsSidebar';
+import MaintenanceTableRow from '../components/maintenances/MaintenanceTableRow';
+import MaintenanceModal from '../components/maintenances/MaintenanceModal';
 
 interface MaintenanceRecord {
   id: string;
@@ -30,17 +31,6 @@ interface MaintenanceRecord {
   signatureToken?: string;
   pdfUrl?: string;
 }
-
-const TYPE_LABELS: Record<string, string> = {
-  PREVENTIVE: 'Preventivo',
-  CORRECTIVE: 'Correctivo',
-};
-const STATUS_LABELS: Record<string, string> = {
-  SCHEDULED: 'Programado',
-  IN_PROGRESS: 'En Progreso',
-  COMPLETED: 'Completado',
-  CANCELLED: 'Cancelado',
-};
 
 // Para completados, la fecha que importa para ubicarlos en el tiempo es la de ejecución real
 // (puede ser muy distinta de la programada cuando se carga historial retroactivo), no la programada.
@@ -103,8 +93,6 @@ const Maintenances: React.FC = () => {
       return res.json();
     }
   });
-
-  const { data: categories } = useQuery<any[]>({ queryKey: ['categories'], queryFn: async () => { const res = await fetch(`${API_URL}/api/catalog/categories`, { headers: authHeaders() }); if (!res.ok) return []; return res.json(); } });
 
   const { data: assignments } = useQuery<any[]>({
     queryKey: ['assignments'],
@@ -293,7 +281,6 @@ const Maintenances: React.FC = () => {
     { name: 'Preventivo', value: preventiveCount },
     { name: 'Correctivo', value: correctiveCount }
   ];
-  const COLORS_TYPE = ['#14b8a6', '#a855f7'];
 
   const statusData = [
     { status: 'Programado', count: totalScheduled },
@@ -510,107 +497,27 @@ const Maintenances: React.FC = () => {
         </div>
       </header>
 
-      {/* ── Global Coverage KPIs ────────────────────────────────────────────── */}
-      <div style={{ marginBottom: '20px' }}>
-        <h3 style={{ color: 'var(--text-main)', marginBottom: '15px', fontSize: '18px', fontWeight: 600 }}>Cobertura Global del Inventario</h3>
-        <div className="maint-kpi-row">
-          <div className="maint-kpi-card" style={{ flex: '1 1 200px', cursor: 'default' }}>
-            <div className="kpi-icon" style={{ background: 'rgba(71,85,105,0.12)', color: '#475569' }}><Server size={22} /></div>
-            <div className="kpi-body">
-              <span className="kpi-label">Equipos en Inventario</span>
-              <span className="kpi-value" style={{ color: '#475569' }}>{totalAssetsCount}</span>
-              <span className="kpi-sub">Total de activos</span>
-            </div>
-          </div>
-
-          <button type="button" className="maint-kpi-card kpi-green" style={{ flex: '1 1 200px', cursor: 'pointer', outline: coverageFilter === 'completed' ? '2px solid #22c55e' : 'none' }} aria-pressed={coverageFilter === 'completed'} onClick={() => handleCoverageClick('completed')}>
-            <div className="kpi-icon" style={{ background: 'rgba(34,197,94,0.12)', color: '#22c55e' }}><CheckCircle size={22} /></div>
-            <div className="kpi-body">
-              <span className="kpi-label">Con Mantenimiento</span>
-              <span className="kpi-value" style={{ color: '#22c55e' }}>{assetsWithCompletedCount}</span>
-              <span className="kpi-sub">Realizado ({(assetsWithCompletedCount / (totalAssetsCount || 1) * 100).toFixed(1)}%)</span>
-            </div>
-          </button>
-
-          <button type="button" className="maint-kpi-card kpi-blue" style={{ flex: '1 1 200px', cursor: 'pointer', outline: coverageFilter === 'scheduled' ? '2px solid #3b82f6' : 'none' }} aria-pressed={coverageFilter === 'scheduled'} onClick={() => handleCoverageClick('scheduled')}>
-            <div className="kpi-icon" style={{ background: 'rgba(59,130,246,0.12)', color: '#3b82f6' }}><Calendar size={22} /></div>
-            <div className="kpi-body">
-              <span className="kpi-label">Ya Programados</span>
-              <span className="kpi-value" style={{ color: '#3b82f6' }}>{scheduledWithoutCompletedCount}</span>
-              </div>
-          </button>
-
-          <button type="button" className="maint-kpi-card kpi-red" style={{ flex: '1 1 200px', cursor: 'pointer', outline: coverageFilter === 'pending' ? '2px solid #ef4444' : 'none' }} aria-pressed={coverageFilter === 'pending'} onClick={() => handleCoverageClick('pending')}>
-            <div className="kpi-icon" style={{ background: 'rgba(239,68,68,0.12)', color: '#ef4444' }}><AlertTriangle size={22} /></div>
-            <div className="kpi-body">
-              <span className="kpi-label">Pendientes de Programar</span>
-              <span className="kpi-value" style={{ color: '#ef4444' }}>{pendingSchedulingCount}</span>
-              <span className="kpi-sub" style={{ fontWeight: 600 }}>Requieren atención</span>
-            </div>
-          </button>
-        </div>
-      </div>
-
-      {/* ── Date-Filtered KPI Cards ─────────────────────────────────────────── */}
-      <div className="maint-kpi-row" style={{ marginBottom: '20px' }}>
-        <div className="maint-kpi-card" style={{ cursor: 'default' }}>
-          <div className="kpi-icon" style={{ background: 'rgba(71,85,105,0.12)', color: '#475569' }}><Calendar size={22} /></div>
-          <div className="kpi-body">
-            <span className="kpi-label">Total Mantenimientos</span>
-            <span className="kpi-value" style={{ color: '#475569' }}>{totalCount}</span>
-            </div>
-        </div>
-
-        <button type="button" className="maint-kpi-card kpi-blue" style={{ cursor: 'pointer', outline: filterStatus === 'SCHEDULED' ? '2px solid #3b82f6' : 'none' }} aria-pressed={filterStatus === 'SCHEDULED'} onClick={() => handleCardClick('SCHEDULED')}>
-          <div className="kpi-icon" style={{ background: 'rgba(59,130,246,0.12)', color: '#3b82f6' }}><Calendar size={22} /></div>
-          <div className="kpi-body">
-            <span className="kpi-label">Programados</span>
-            <span className="kpi-value" style={{ color: '#3b82f6' }}>{totalScheduled}</span>
-            </div>
-        </button>
-
-        <button type="button" className="maint-kpi-card kpi-amber" style={{ cursor: 'pointer', outline: filterStatus === 'IN_PROGRESS' ? '2px solid #f59e0b' : 'none' }} aria-pressed={filterStatus === 'IN_PROGRESS'} onClick={() => handleCardClick('IN_PROGRESS')}>
-          <div className="kpi-icon" style={{ background: 'rgba(245,158,11,0.12)', color: '#f59e0b' }}><Settings size={22} /></div>
-          <div className="kpi-body">
-            <span className="kpi-label">En Progreso</span>
-            <span className="kpi-value" style={{ color: '#f59e0b' }}>{totalInProgress}</span>
-          </div>
-        </button>
-
-        <button type="button" className="maint-kpi-card kpi-red" style={{ cursor: 'pointer', outline: viewMode === 'auditoria' ? '2px solid #ef4444' : 'none' }} aria-pressed={viewMode === 'auditoria'} onClick={() => setViewMode(viewMode === 'auditoria' ? 'general' : 'auditoria')}>
-          <div className="kpi-icon" style={{ background: 'rgba(239,68,68,0.12)', color: '#ef4444' }}><AlertTriangle size={22} /></div>
-          <div className="kpi-body">
-            <span className="kpi-label">Vencidos</span>
-            <span className="kpi-value" style={{ color: '#ef4444' }}>{overdue}</span>
-            </div>
-        </button>
-
-        <button type="button" className="maint-kpi-card kpi-green" style={{ cursor: 'pointer', outline: filterStatus === 'COMPLETED' ? '2px solid #22c55e' : 'none' }} aria-pressed={filterStatus === 'COMPLETED'} onClick={() => handleCardClick('COMPLETED')}>
-          <div className="kpi-icon" style={{ background: 'rgba(34,197,94,0.12)', color: '#22c55e' }}><CheckCircle size={22} /></div>
-          <div className="kpi-body">
-            <span className="kpi-label">Completados</span>
-            <span className="kpi-value" style={{ color: '#22c55e' }}>{totalCompleted}</span>
-          </div>
-        </button>
-
-        <button type="button" className="maint-kpi-card kpi-teal" style={{ cursor: 'pointer', outline: viewMode === 'preventive' ? '2px solid #14b8a6' : 'none' }} aria-pressed={viewMode === 'preventive'} onClick={() => setViewMode(viewMode === 'preventive' ? 'general' : 'preventive')}>
-          <div className="kpi-icon" style={{ background: 'rgba(20,184,166,0.12)', color: '#14b8a6' }}><Wrench size={22} /></div>
-          <div className="kpi-body">
-            <span className="kpi-label">Preventivos</span>
-            <span className="kpi-value" style={{ color: '#14b8a6' }}>{preventiveCount}</span>
-            <span className="kpi-sub">({preventiveRatio}% del total)</span>
-          </div>
-        </button>
-
-        <button type="button" className="maint-kpi-card kpi-purple" style={{ cursor: 'pointer', outline: viewMode === 'balance' ? '2px solid #a855f7' : 'none' }} aria-pressed={viewMode === 'balance'} onClick={() => setViewMode(viewMode === 'balance' ? 'general' : 'balance')}>
-          <div className="kpi-icon" style={{ background: 'rgba(168,85,247,0.12)', color: '#a855f7' }}><Wrench size={22} /></div>
-          <div className="kpi-body">
-            <span className="kpi-label">Correctivos</span>
-            <span className="kpi-value" style={{ color: '#a855f7' }}>{correctiveCount}</span>
-            <span className="kpi-sub">({correctiveRatio}% del total)</span>
-          </div>
-        </button>
-      </div>
+      <MaintenanceKpiCards
+        totalAssetsCount={totalAssetsCount}
+        assetsWithCompletedCount={assetsWithCompletedCount}
+        scheduledWithoutCompletedCount={scheduledWithoutCompletedCount}
+        pendingSchedulingCount={pendingSchedulingCount}
+        coverageFilter={coverageFilter}
+        onCoverageClick={handleCoverageClick}
+        totalCount={totalCount}
+        totalScheduled={totalScheduled}
+        totalInProgress={totalInProgress}
+        overdue={overdue}
+        totalCompleted={totalCompleted}
+        preventiveCount={preventiveCount}
+        preventiveRatio={preventiveRatio}
+        correctiveCount={correctiveCount}
+        correctiveRatio={correctiveRatio}
+        filterStatus={filterStatus}
+        viewMode={viewMode}
+        onCardClick={handleCardClick}
+        onToggleViewMode={(mode) => setViewMode(viewMode === mode ? 'general' : mode)}
+      />
 
       {/* ── Split Layout Container ────────────────────────────────────────────── */}
       <div className="maint-split-layout">
@@ -704,153 +611,37 @@ const Maintenances: React.FC = () => {
                     })();
 
                     return (
-                      <tr key={m?.id || Math.random()}>
-                        <td style={{ fontWeight: 600 }}>
-                          <span 
-                            style={{ cursor: 'pointer', textDecoration: 'underline', color: 'var(--text-main)' }} 
-                            onClick={() => {
-                              const hostname = assets?.find(a => a.id === m?.assetId)?.dynamicAttributes?.Hostname || m?.assetId;
-                              setSearchTerm(hostname || '');
-                            }}
-                            title="Filtrar mantenimientos por este equipo"
-                          >
-                            {assets?.find(a => a.id === m?.assetId)?.dynamicAttributes?.Hostname || m?.assetId}
-                          </span>
-                        </td>
-                        <td>
-                          {m?.isDummy ? (
-                            <span className="spec-tag" style={{ background: 'rgba(71,85,105,0.12)', color: '#475569' }}>
-                              Sin asignar
-                            </span>
-                          ) : (
-                            <span className="spec-tag" style={{ background: m?.type === 'PREVENTIVE' ? 'rgba(59,130,246,0.12)' : 'rgba(239,68,68,0.12)', color: m?.type === 'PREVENTIVE' ? '#3b82f6' : '#ef4444' }}>
-                              {m?.type === 'PREVENTIVE' ? 'Preventivo' : 'Correctivo'}
-                            </span>
-                          )}
-                        </td>
-                        <td>
-                          {m?.isDummy ? (
-                            <span className="badge badge-status" style={{ background: 'rgba(239,68,68,0.12)', color: '#ef4444' }}>
-                              Sin Programar
-                            </span>
-                          ) : (
-                            <span className={`badge badge-status badge-${(m?.status || 'UNKNOWN').toLowerCase()}`}>
-                              {m?.status ? (STATUS_LABELS[m.status] || m.status) : 'Desconocido'}
-                            </span>
-                          )}
-                          {!m?.isDummy && isLate && <span style={{ color: '#ef4444', fontSize: '12px', marginLeft: '6px' }}>⚠ Vencido</span>}
-                        </td>
-                        <td>{m?.isDummy ? <span style={{ color: 'var(--text-muted)' }}>—</span> : (m?.scheduledDate ? new Date(m.scheduledDate).toLocaleDateString('es-CO', { timeZone: 'UTC' }) : 'N/A')}</td>
-                        <td>
-                          {m?.isDummy ? (
-                            <span style={{ color: 'var(--text-muted)' }}>—</span>
-                          ) : delayDays === null ? (
-                            <span style={{ color: 'var(--text-muted)' }}>—</span>
-                          ) : delayDays === 0 ? (
-                            <span style={{ color: '#10b981', fontWeight: 600 }}>A tiempo</span>
-                          ) : (
-                            <span style={{ color: m?.status === 'COMPLETED' ? '#f59e0b' : '#ef4444', fontWeight: 600 }}>{delayDays} días</span>
-                          )}
-                        </td>
-                        <td>{m?.isDummy ? getCollaboratorForAsset(m?.assetId || '') : (m?.collaboratorInTurnName || <span style={{ color: 'var(--text-muted)' }}>N/A</span>)}</td>
-                        <td>
-                          {m?.isDummy ? (
-                            <span style={{ color: 'var(--text-muted)' }}>—</span>
-                          ) : m?.status !== 'COMPLETED' ? (
-                            <span style={{ color: 'var(--text-muted)' }}>N/A</span>
-                          ) : (m?.signedAt || m?.pdfUrl) ? (
-                            <span style={{ color: '#10b981', fontWeight: 600 }}>Firmada</span>
-                          ) : m?.signatureToken ? (
-                            <span style={{ color: '#f59e0b', fontWeight: 600 }}>Pendiente</span>
-                          ) : (
-                            <span style={{ color: '#ef4444', fontWeight: 600 }}>Sin enviar</span>
-                          )}
-                        </td>
-                        <td>
-                          {m?.isDummy ? (
-                            canCreate && (
-                              <ActionMenu>
-                                <button className="btn-action" style={{ borderColor: '#3b82f6', color: '#3b82f6' }} title="Programar Mantenimiento" onClick={() => {
-                                  const asset = assets?.find(a => a.id === m?.assetId);
-                                  const displayName = asset ? `${asset.id} - ${asset.dynamicAttributes?.HOSTNAME || asset.dynamicAttributes?.Hostname || asset.dynamicAttributes?.hostname || 'Sin Hostname'}` : m.assetId;
-                                  openModal('create', undefined, { assetId: m.assetId, displayName });
-                                }}>
-                                  <Plus size={16} /> Programar
-                                </button>
-                              </ActionMenu>
-                            )
-                          ) : (
-                            <ActionMenu>
-                              <button className="btn-action" style={{ borderColor: '#8b5cf6', color: '#8b5cf6' }} title="Ver Historial" onClick={() => openModal('view', m)}>
-                                <Clock size={16} />
-                              </button>
-                              {isAdmin && m.status === 'SCHEDULED' && (
-                                <button className="btn-action" style={{ borderColor: '#eab308', color: '#eab308' }} title="Iniciar Mantenimiento" onClick={() => openModal('start', m)}>
-                                  <Wrench size={16} />
-                                </button>
-                              )}
-                              {isAdmin && m.status === 'SCHEDULED' && (
-                                <button
-                                  className="btn-action"
-                                  style={{ borderColor: '#06b6d4', color: '#06b6d4', opacity: notifyMutation.isPending ? 0.5 : 1 }}
-                                  title="Enviar recordatorio por Webex al colaborador"
-                                  disabled={notifyMutation.isPending}
-                                  onClick={() => {
-                                    confirm({
-                                      title: 'Enviar Recordatorio',
-                                      message: `¿Enviar un recordatorio por Webex al colaborador sobre el mantenimiento programado del equipo ${m.assetId}?`,
-                                      type: 'info',
-                                      onConfirm: () => notifyMutation.mutate(m.id)
-                                    });
-                                  }}
-                                >
-                                  <Bell size={16} />
-                                </button>
-                              )}
-                              {isAdmin && m.status === 'IN_PROGRESS' && (
-                                <button className="btn-action" style={{ borderColor: '#22c55e', color: '#22c55e' }} title="Completar Mantenimiento" onClick={() => openModal('complete', m)}>
-                                  <CheckCircle size={16} />
-                                </button>
-                              )}
-                              {isAdmin && m?.status === 'COMPLETED' && !m?.signedAt && !m?.pdfUrl && (
-                                <button 
-                                  className="btn-action" 
-                                  style={{ borderColor: '#ec4899', color: '#ec4899', opacity: forceSignMutation.isPending ? 0.5 : 1 }} 
-                                  title="Firmar forzadamente" 
-                                  onClick={() => openModal('forceSign', m)}
-                                  disabled={forceSignMutation.isPending}
-                                >
-                                  <Edit3 size={16} />
-                                </button>
-                              )}
-                              {isAdmin && m?.status === 'COMPLETED' && (
-                                <button
-                                  className="btn-action"
-                                  style={{
-                                    borderColor: (m?.signedAt || m?.pdfUrl) ? '#94a3b8' : '#3b82f6',
-                                    color: (m?.signedAt || m?.pdfUrl) ? '#94a3b8' : '#3b82f6',
-                                    opacity: (requestSignatureMutation.isPending || m?.signedAt || m?.pdfUrl) ? 0.5 : 1,
-                                    cursor: (m?.signedAt || m?.pdfUrl) ? 'not-allowed' : 'pointer'
-                                  }}
-                                  title={(m?.signedAt || m?.pdfUrl) ? "Mantenimiento ya firmado" : "Solicitar firma de mantenimiento"} 
-                                  onClick={() => {
-                                    if (m?.signedAt || m?.pdfUrl) return;
-                                    confirm({
-                                      title: 'Solicitar Firma',
-                                      message: '¿Estás seguro de enviar el correo solicitando la firma de este mantenimiento?',
-                                      type: 'info',
-                                      onConfirm: () => requestSignatureMutation.mutate(m.id)
-                                    });
-                                  }}
-                                  disabled={requestSignatureMutation.isPending || !!(m?.signedAt || m?.pdfUrl)}
-                                >
-                                  <Mail size={16} />
-                                </button>
-                              )}
-                            </ActionMenu>
-                          )}
-                        </td>
-                      </tr>
+                      <MaintenanceTableRow
+                        key={m?.id || Math.random()}
+                        m={m}
+                        assets={assets}
+                        isAdmin={isAdmin}
+                        canCreate={canCreate}
+                        isLate={!!isLate}
+                        delayDays={delayDays}
+                        getCollaboratorForAsset={getCollaboratorForAsset}
+                        onFilterByHostname={setSearchTerm}
+                        onOpenModal={openModal}
+                        onNotify={(id, assetId) => {
+                          confirm({
+                            title: 'Enviar Recordatorio',
+                            message: `¿Enviar un recordatorio por Webex al colaborador sobre el mantenimiento programado del equipo ${assetId}?`,
+                            type: 'info',
+                            onConfirm: () => notifyMutation.mutate(id)
+                          });
+                        }}
+                        onRequestSignature={(id) => {
+                          confirm({
+                            title: 'Solicitar Firma',
+                            message: '¿Estás seguro de enviar el correo solicitando la firma de este mantenimiento?',
+                            type: 'info',
+                            onConfirm: () => requestSignatureMutation.mutate(id)
+                          });
+                        }}
+                        notifyPending={notifyMutation.isPending}
+                        requestSignaturePending={requestSignatureMutation.isPending}
+                        forceSignPending={forceSignMutation.isPending}
+                      />
                     );
                   })}
                   {(!filteredData || filteredData.length === 0) && (
@@ -866,265 +657,27 @@ const Maintenances: React.FC = () => {
           </div>
         </div>
 
-        {/* Right Column: Charts Sidebar */}
-        <div className="charts-sidebar">
-          {/* Donut */}
-          <div className="dash-card">
-            <h3 className="dash-card-title">Preventivo vs Correctivo</h3>
-            <ResponsiveContainer width="100%" height={220}>
-              <PieChart>
-                <Pie data={typeData} cx="50%" cy="45%" innerRadius={50} outerRadius={80} paddingAngle={4} dataKey="value" nameKey="name">
-                  {typeData.map((_, i) => <Cell key={i} fill={COLORS_TYPE[i]} />)}
-                </Pie>
-                <Tooltip formatter={(v: any, n: string) => [v, n]} />
-                <Legend verticalAlign="bottom" height={36} />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-
-          {/* Bar */}
-          <div className="dash-card">
-            <h3 className="dash-card-title">Por Estado</h3>
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={statusData} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
-                <XAxis dataKey="status" stroke="var(--text-muted)" fontSize={12} />
-                <YAxis allowDecimals={false} stroke="var(--text-muted)" fontSize={12} />
-                <Tooltip cursor={{ fill: 'rgba(59,130,246,0.05)' }} />
-                <Bar dataKey="count" fill="#3b82f6" radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-
-          {/* Line — Tendencia Mensual */}
-          <div className="dash-card">
-            <h3 className="dash-card-title">Tendencia (últimos 6 m)</h3>
-            <ResponsiveContainer width="100%" height={180}>
-              <LineChart data={monthlyData} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
-                <XAxis dataKey="month" stroke="var(--text-muted)" fontSize={12} />
-                <YAxis allowDecimals={false} stroke="var(--text-muted)" fontSize={12} />
-                <Tooltip />
-                <Legend iconType="circle" iconSize={10} />
-                <Line type="monotone" dataKey="Preventivo" stroke="#14b8a6" strokeWidth={2} dot={{ fill: '#14b8a6', r: 4 }} activeDot={{ r: 6 }} />
-                <Line type="monotone" dataKey="Correctivo" stroke="#a855f7" strokeWidth={2} dot={{ r: 4 }} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
+        <MaintenanceChartsSidebar typeData={typeData} statusData={statusData} monthlyData={monthlyData} />
 
       </div>
 
-      {/* ── Modal ───────────────────────────────────────────────────────────── */}
       {showModal && (
-        <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(4px)' }}>
-          <div className="glass-panel" style={{ padding: '30px', maxWidth: '500px', width: '100%' }}>
-            <h3 style={{ marginBottom: '20px', color: 'white' }}>
-              {modalMode === 'create' ? 'Programar Mantenimiento' : modalMode === 'start' ? 'Iniciar Mantenimiento' : modalMode === 'view' ? 'Historial de Mantenimiento' : modalMode === 'forceSign' ? 'Firmar Forzadamente' : 'Completar Mantenimiento'}
-            </h3>
-            {errorMsg && (
-              <div style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', padding: '15px', borderRadius: '8px', marginBottom: '20px', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
-                {errorMsg}
-              </div>
-            )}
-            <form onSubmit={handleSubmit}>
-              {modalMode === 'create' && (
-                <>
-                  <div className="form-group" style={{ position: 'relative' }}>
-                    <label>ID del Activo, Hostname o Colaborador asignado</label>
-                    <input
-                      required
-                      type="text"
-                      className="glass-input"
-                      placeholder="Buscar por placa, hostname o colaborador..."
-                      value={assetSearchTerm}
-                      onChange={(e) => {
-                        setAssetSearchTerm(e.target.value);
-                        setShowAssetDropdown(true);
-                        if (!e.target.value) {
-                          setFormData({ ...formData, assetId: '' });
-                        }
-                      }}
-                      onFocus={() => setShowAssetDropdown(true)}
-                      onBlur={() => setTimeout(() => setShowAssetDropdown(false), 200)}
-                    />
-                    {showAssetDropdown && (
-                      <ul style={{
-                        position: 'absolute',
-                        top: '100%',
-                        left: 0,
-                        width: '100%',
-                        background: 'rgba(20, 20, 25, 0.95)',
-                        backdropFilter: 'blur(10px)',
-                        border: '1px solid rgba(255, 255, 255, 0.1)',
-                        borderRadius: '8px',
-                        listStyle: 'none',
-                        padding: '5px 0',
-                        margin: '5px 0 0 0',
-                        zIndex: 10,
-                        maxHeight: '200px',
-                        overflowY: 'auto',
-                        boxShadow: '0 4px 15px rgba(0,0,0,0.5)'
-                      }}>
-                        {assets
-                          ?.filter(a => {
-                            if (!assetSearchTerm) return true;
-                            const term = assetSearchTerm.toLowerCase();
-                            const placa = (a.id || '').toLowerCase();
-                            const hostname = (a.dynamicAttributes?.HOSTNAME || a.dynamicAttributes?.Hostname || a.dynamicAttributes?.hostname || '').toLowerCase();
-                            const collab = getCollaboratorForAsset(a.id).toLowerCase();
-                            return placa.includes(term) || hostname.includes(term) || collab.includes(term);
-                          })
-                          .slice(0, 5)
-                          .map(a => (
-                            <li
-                              key={a.id}
-                              style={{
-                                padding: '10px 15px',
-                                cursor: 'pointer',
-                                color: 'white',
-                                borderBottom: '1px solid rgba(255,255,255,0.05)',
-                                fontSize: '14px',
-                                transition: 'background 0.2s'
-                              }}
-                              onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
-                              onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                              onMouseDown={(e) => {
-                                const displayName = `${a.id} - ${a.dynamicAttributes?.HOSTNAME || a.dynamicAttributes?.Hostname || a.dynamicAttributes?.hostname || 'Sin Hostname'}`;
-                                setAssetSearchTerm(displayName);
-                                setFormData({ ...formData, assetId: a.id });
-                                setShowAssetDropdown(false);
-                              }}
-                            >
-                              <div style={{ fontWeight: 500 }}>
-                                {a.id} <span style={{ opacity: 0.7, fontSize: '12px' }}>{a.dynamicAttributes?.HOSTNAME || a.dynamicAttributes?.Hostname || a.dynamicAttributes?.hostname || ''}</span>
-                              </div>
-                              <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.6)' }}>
-                                Asignado a: {getCollaboratorForAsset(a.id)}
-                              </div>
-                            </li>
-                          ))}
-                        {assets?.filter(a => {
-                          if (!assetSearchTerm) return true;
-                          const term = assetSearchTerm.toLowerCase();
-                          const placa = (a.id || '').toLowerCase();
-                          const hostname = (a.dynamicAttributes?.HOSTNAME || a.dynamicAttributes?.Hostname || a.dynamicAttributes?.hostname || '').toLowerCase();
-                          const collab = getCollaboratorForAsset(a.id).toLowerCase();
-                          return placa.includes(term) || hostname.includes(term) || collab.includes(term);
-                        }).length === 0 && (
-                          <li style={{ padding: '10px 15px', color: 'rgba(255,255,255,0.5)', fontSize: '13px' }}>
-                            No se encontraron activos
-                          </li>
-                        )}
-                      </ul>
-                    )}
-                  </div>
-                  <div className="form-group">
-                    <label>Tipo</label>
-                    <select className="glass-input" value={formData.type} onChange={e => setFormData({ ...formData, type: e.target.value as any })}>
-                      <option value="PREVENTIVE">Preventivo</option>
-                      <option value="CORRECTIVE">Correctivo</option>
-                    </select>
-                  </div>
-                  <div className="form-group">
-                    <label>Fecha Programada</label>
-                    <input required type="date" className="glass-input" value={formData.scheduledDate} onChange={e => setFormData({ ...formData, scheduledDate: e.target.value })} />
-                  </div>
-                  <div className="form-group">
-                    <label>Motivo Inicial (Opcional)</label>
-                    <input type="text" className="glass-input" value={formData.reason} onChange={e => setFormData({ ...formData, reason: e.target.value })} />
-                  </div>
-                </>
-              )}
-              {modalMode === 'start' && (
-                <>
-                  <p style={{ color: 'var(--text-muted)', marginBottom: '15px' }}>Iniciando mantenimiento para el activo <b>{selectedRecord?.assetId}</b>.</p>
-                  <div className="form-group">
-                    <label>Diagnóstico Inicial / Notas de Inicio</label>
-                    <input required type="text" className="glass-input" value={formData.startNote} onChange={e => setFormData({ ...formData, startNote: e.target.value })} placeholder="Ej. Limpieza interna, Cambio de pasta térmica..." />
-                  </div>
-                </>
-              )}
-              {modalMode === 'complete' && (
-                <>
-                  <p style={{ color: 'var(--text-muted)', marginBottom: '15px' }}>
-                    Al completar, <b>se programará automáticamente el siguiente servicio preventivo</b> para dentro de un año.
-                  </p>
-                  <div className="form-group">
-                    <label>Notas de Resolución</label>
-                    <textarea required className="glass-input" value={formData.notes} onChange={e => setFormData({ ...formData, notes: e.target.value })} placeholder="Ej. Se limpió ventilador y se actualizó BIOS..." style={{ minHeight: '100px', resize: 'vertical' }} />
-                  </div>
-                  <div style={{ display: 'flex', gap: '12px' }}>
-                    <div className="form-group" style={{ flex: 1 }}>
-                      <label>Fecha real de inicio (Opcional)</label>
-                      <input type="date" className="glass-input" value={formData.realStartDate} onChange={e => setFormData({ ...formData, realStartDate: e.target.value })} />
-                    </div>
-                    <div className="form-group" style={{ flex: 1 }}>
-                      <label>Fecha real de finalización (Opcional)</label>
-                      <input type="date" className="glass-input" value={formData.realEndDate} onChange={e => setFormData({ ...formData, realEndDate: e.target.value })} />
-                    </div>
-                  </div>
-                  <p style={{ color: 'var(--text-muted)', fontSize: '12px', marginTop: '-8px' }}>
-                    Usa estos campos solo para cargar mantenimientos históricos (ej. desde Excel). Si los dejas vacíos, se usará la fecha y hora actual.
-                  </p>
-                </>
-              )}
-              {modalMode === 'forceSign' && (
-                <>
-                  <div className="form-group">
-                    <label>Motivo de firma forzada</label>
-                    <textarea required className="glass-input" value={formData.reason} onChange={e => setFormData({ ...formData, reason: e.target.value })} placeholder="Ej. El usuario no tiene acceso al sistema..." style={{ minHeight: '80px', resize: 'vertical' }} />
-                  </div>
-                </>
-              )}
-              {modalMode === 'view' && selectedRecord && (
-                <div className="history-timeline">
-                  <div className="history-item">
-                    <div className="history-dot" style={{ background: '#3b82f6' }}></div>
-                    <div className="history-content">
-                      <h4><Calendar size={16} color="#3b82f6" /> Programación</h4>
-                      <p><strong>Fecha:</strong> {new Date(selectedRecord.scheduledDate).toLocaleDateString('es-CO', { timeZone: 'UTC' })}</p>
-                      {selectedRecord.reason && <p><strong>Motivo de Programación:</strong> {selectedRecord.reason}</p>}
-                    </div>
-                  </div>
-                  
-                  {(selectedRecord.status === 'IN_PROGRESS' || selectedRecord.status === 'COMPLETED') && (
-                    <div className="history-item">
-                      <div className="history-dot" style={{ background: '#f59e0b' }}></div>
-                      <div className="history-content">
-                        <h4><Wrench size={16} color="#f59e0b" /> En Progreso</h4>
-                        {selectedRecord.startedAt ? (
-                          <p><strong>Fecha de inicio:</strong> {new Date(selectedRecord.startedAt).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' })}</p>
-                        ) : (
-                          <p style={{ fontStyle: 'italic', opacity: 0.7 }}>Fecha de inicio no registrada (mantenimiento anterior a esta función).</p>
-                        )}
-                        <p>El mantenimiento ha sido iniciado por el técnico.</p>
-                        {selectedRecord.startNote && <p><strong>Diagnóstico Inicial:</strong> {selectedRecord.startNote}</p>}
-                      </div>
-                    </div>
-                  )}
-
-                  {selectedRecord.status === 'COMPLETED' && (
-                    <div className="history-item">
-                      <div className="history-dot" style={{ background: '#10b981' }}></div>
-                      <div className="history-content">
-                        <h4><CheckCircle size={16} color="#10b981" /> Completado</h4>
-                        {selectedRecord.executionDate && <p><strong>Fecha Ejecución:</strong> {new Date(selectedRecord.executionDate).toLocaleDateString('es-CO', { timeZone: 'UTC' })}</p>}
-                        {selectedRecord.notes && <p><strong>Notas de Resolución:</strong> {selectedRecord.notes}</p>}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-              <div style={{ display: 'flex', gap: '10px', marginTop: '20px', justifyContent: 'flex-end' }}>
-                <button type="button" className="btn-glass" onClick={() => setShowModal(false)}>{modalMode === 'view' ? 'Cerrar' : 'Cancelar'}</button>
-                {modalMode !== 'view' && (
-                  <button type="submit" className="btn-primary" disabled={createMutation.isPending || startMutation.isPending || completeMutation.isPending || forceSignMutation.isPending}>
-                    {createMutation.isPending || startMutation.isPending || completeMutation.isPending || forceSignMutation.isPending ? 'Guardando...' : 'Confirmar'}
-                  </button>
-                )}
-              </div>
-            </form>
-          </div>
-        </div>
+        <MaintenanceModal
+          mode={modalMode}
+          selectedRecord={selectedRecord}
+          errorMsg={errorMsg}
+          formData={formData}
+          setFormData={setFormData}
+          assetSearchTerm={assetSearchTerm}
+          setAssetSearchTerm={setAssetSearchTerm}
+          showAssetDropdown={showAssetDropdown}
+          setShowAssetDropdown={setShowAssetDropdown}
+          assets={assets}
+          getCollaboratorForAsset={getCollaboratorForAsset}
+          onClose={() => setShowModal(false)}
+          onSubmit={handleSubmit}
+          isPending={createMutation.isPending || startMutation.isPending || completeMutation.isPending || forceSignMutation.isPending}
+        />
       )}
     </div>
   );

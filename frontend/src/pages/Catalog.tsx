@@ -1,10 +1,16 @@
 import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Link, useSearchParams } from 'react-router-dom';
-import ActionMenu from '../components/ActionMenu';
+import { useSearchParams } from 'react-router-dom';
 import LoadingState from '../components/LoadingState';
+import AssetTableRow from '../components/catalog/AssetTableRow';
+import ForceActionModal from '../components/catalog/ForceActionModal';
+import ExtendLoanModal from '../components/catalog/ExtendLoanModal';
+import AssignAssetModal from '../components/catalog/AssignAssetModal';
+import AssetFormModal from '../components/catalog/AssetFormModal';
+import RetireAssetModal from '../components/catalog/RetireAssetModal';
+import Pagination from '../components/Pagination';
 import axios from 'axios';
-import { Plus, Search, Tag, Cpu, HardDrive, Wifi, PlusCircle, MonitorSmartphone, RefreshCw, CheckCircle2, AlertCircle, AlertTriangle, UserCheck, Send, Upload, Trash2, CalendarClock } from 'lucide-react';
+import { Plus, Search, MonitorSmartphone, RefreshCw, CheckCircle2, Upload } from 'lucide-react';
 import { useConfirm } from '../context/ConfirmContext';
 import { useToast } from '../context/ToastContext';
 import { usePermission } from '../context/AuthContext';
@@ -33,7 +39,6 @@ export default function Catalog() {
   const [importResult, setImportResult] = useState<{ successful: number, failed: number, errors: string[] } | null>(null);
 
   // Estados de los modales
-  const [returnId, setReturnId] = useState<string | null>(null);
   const [assignModalAssetId, setAssignModalAssetId] = useState<string | null>(null);
 
   // Autocomplete state para asignación
@@ -48,6 +53,9 @@ export default function Catalog() {
   const [filterStatus, setFilterStatus] = useState(initialStatus);
 
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+  useEffect(() => { setCurrentPage(1); }, [searchTerm, filterCategory, filterStatus, filterRisk]);
   const [retireModalAssetId, setRetireModalAssetId] = useState<string | null>(null);
   const [retireReason, setRetireReason] = useState('');
   const [retireBlanccoId, setRetireBlanccoId] = useState('');
@@ -185,13 +193,11 @@ export default function Catalog() {
       if (!showWebexFailureModal(confirm, data)) {
         toast.success(data?.message || '¡Proceso de devolución iniciado! Se envió la notificación de firma por Webex.', 8000);
       }
-      setReturnId(null);
       queryClient.invalidateQueries({ queryKey: ['assets'] });
       queryClient.invalidateQueries({ queryKey: ['assignments'] });
     },
     onError: (err: any) => {
       toast.error(err.response?.data?.error || err.message, 8000);
-      setReturnId(null);
     }
   });
 
@@ -401,10 +407,6 @@ export default function Catalog() {
     }
   });
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
-
   const handleEditClick = (asset: any) => {
     setIsEditing(true);
     setNewAsset({
@@ -486,6 +488,8 @@ export default function Catalog() {
       (hostname && hostname.toLowerCase().includes(searchTerm.toLowerCase())) ||
       String(asset.categoryId).toLowerCase().includes(searchTerm.toLowerCase());
   });
+
+  const paginatedAssets = filteredAssets?.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   return (
     <div className="catalog-page">
@@ -649,298 +653,39 @@ export default function Catalog() {
               </tr>
             </thead>
             <tbody>
-              {filteredAssets?.map(asset => (
-                <tr key={asset.id} className="table-row">
-                  <td style={{ fontWeight: 600 }}>
-                    <Link to={`/assets/${asset.id}`} style={{ color: 'var(--accent-blue)', textDecoration: 'none' }}>
-                      {asset.id}
-                    </Link>
-                  </td>
-                  <td>{categories?.find(c => c.id === asset.categoryId)?.name || 'Desconocida'}</td>
-                  <td>
-                    {(() => {
-                      const activeAssignment = getActiveAssignmentForAsset(asset.id);
-                      if (activeAssignment && activeAssignment.collaboratorId) {
-                        const coll = collaborators?.find(c => c.id === activeAssignment.collaboratorId);
-                        if (!coll) return 'Sin asignar';
-                        const isLoan = activeAssignment.assignmentType === 'LOAN';
-                        const overdue = isLoan && activeAssignment.expectedReturnDate && new Date(activeAssignment.expectedReturnDate) < new Date();
-                        return (
-                          <>
-                            <Link to={`/collaborators/${activeAssignment.collaboratorId}`} style={{ color: 'var(--accent-blue)', textDecoration: 'none', fontWeight: '500' }}>
-                              {coll.email}
-                            </Link>
-                            {isLoan && (
-                              <div style={{ marginTop: '4px' }}>
-                                <span
-                                  className="badge"
-                                  style={{
-                                    fontSize: '11px',
-                                    background: overdue ? 'rgba(239, 68, 68, 0.15)' : 'rgba(245, 158, 11, 0.15)',
-                                    color: overdue ? '#dc2626' : '#ca8a04'
-                                  }}
-                                  title={overdue ? 'Préstamo vencido' : 'Préstamo activo'}
-                                >
-                                  Préstamo · {overdue ? 'Vencido' : 'Vence'} {activeAssignment.expectedReturnDate ? new Date(activeAssignment.expectedReturnDate).toLocaleDateString('es-CO') : ''}
-                                </span>
-                              </div>
-                            )}
-                          </>
-                        );
-                      }
-                      return 'Sin asignar';
-                    })()}
-                  </td>
-                  <td className="specs-cell">
-                    <div className="specs-cell-inner">
-                      {(() => {
-                        const category = categories?.find(c => c.id === asset.categoryId);
-                        const requiresPlaca = category?.schemaDefinition?.requiresPlacaIkusi !== false;
-
-                        if (!requiresPlaca) {
-                          // Mostrar todas las características para periféricos (sin placa)
-                          return (
-                            <>
-                              {asset.serial && (
-                                <span className="spec-tag" title="Serial">
-                                  <HardDrive size={12} /> {asset.serial}
-                                </span>
-                              )}
-                              {Object.entries(asset.dynamicAttributes || {}).map(([key, value]) => {
-                                if (!value || String(value).trim() === '') return null;
-                                const lowerKey = key.toLowerCase();
-
-                                if (
-                                  lowerKey.includes('fecha de compra') ||
-                                  lowerKey.includes('precio') ||
-                                  lowerKey.includes('depreciaci') ||
-                                  lowerKey.includes('garant') ||
-                                  lowerKey.includes('warranty')
-                                ) return null;
-
-                                let Icon = Tag;
-                                if (lowerKey.includes('proces') || lowerKey.includes('cpu')) Icon = Cpu;
-                                else if (lowerKey.includes('ram') || lowerKey.includes('mem') || lowerKey.includes('disco') || lowerKey.includes('disk')) Icon = HardDrive;
-                                else if (lowerKey.includes('mac') || lowerKey.includes('wifi') || lowerKey.includes('red') || lowerKey.includes('ip')) Icon = Wifi;
-
-                                return (
-                                  <span key={key} className="spec-tag" title={key}>
-                                    <Icon size={12} /> {String(value)}
-                                  </span>
-                                );
-                              })}
-                              {(!asset.dynamicAttributes || Object.values(asset.dynamicAttributes).every(v => !v || String(v).trim() === '')) && !asset.serial &&
-                                <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Sin specs</span>
-                              }
-                            </>
-                          );
-                        }
-
-                        // Equipos con placa: Mostrar solo Hostname y Modelo
-                        const hostname = asset.dynamicAttributes?.Hostname || asset.dynamicAttributes?.hostname || asset.dynamicAttributes?.HOSTNAME;
-                        const modelo = asset.dynamicAttributes?.Modelo || asset.dynamicAttributes?.modelo || asset.dynamicAttributes?.MODELO || asset.dynamicAttributes?.Model || asset.dynamicAttributes?.model;
-
-                        return (
-                          <>
-                            {hostname && (
-                              <span className="spec-tag" title="Hostname">
-                                <MonitorSmartphone size={12} /> {hostname}
-                              </span>
-                            )}
-                            {modelo && (
-                              <span className="spec-tag" title="Modelo">
-                                <Tag size={12} /> {modelo}
-                              </span>
-                            )}
-                            {!hostname && !modelo && (
-                              <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Sin specs</span>
-                            )}
-                          </>
-                        );
-                      })()}
-                    </div>
-                  </td>
-                  <td>
-                    {(() => {
-                      const activeAssignment = getActiveAssignmentForAsset(asset.id);
-                      if (activeAssignment?.status === 'PENDING_ACCEPTANCE') {
-                        return (
-                          <>
-                            <span className="badge badge-status badge-in_use" style={{ background: 'rgba(234, 179, 8, 0.15)', color: '#ca8a04' }}>
-                              Pendiente de Firma
-                            </span>
-                            <div style={{ marginTop: '8px', fontSize: '12px' }}>
-                              <span style={{ color: 'var(--text-muted)' }}>En proceso de asignación</span>
-                            </div>
-                          </>
-                        );
-                      }
-                      if (activeAssignment?.status === 'PENDING_RETURN') {
-                        return (
-                          <>
-                            <span className="badge badge-status badge-in_use" style={{ background: 'rgba(234, 179, 8, 0.15)', color: '#ca8a04' }}>
-                              Pendiente Devolución
-                            </span>
-                            <div style={{ marginTop: '8px', fontSize: '12px' }}>
-                              <span style={{ color: 'var(--text-muted)' }}>Esperando firma de devolución</span>
-                            </div>
-                          </>
-                        );
-                      }
-
-                      return (
-                        <span className={`badge badge-status badge-${asset.status.toLowerCase()}`}>
-                          {asset.status === 'AVAILABLE' ? 'Disponible' :
-                            asset.status === 'IN_USE' ? 'En Uso' :
-                            asset.status === 'PENDING_INSPECTION' ? 'Pendiente Visto Bueno' : asset.status}
-                        </span>
-                      );
-                    })()}
-                  </td>
-                  <td>
-                    <ActionMenu>
-                      <Link
-                        to={`/assets/${asset.id}`}
-                        className="btn-action"
-                        style={{ borderColor: 'var(--ikusi-green)', color: 'var(--ikusi-green)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}
-                        title="Hoja de Vida del Equipo"
-                      >
-                        📋
-                      </Link>
-                      {assetPerms.edit && asset.status !== 'RETIRED' && (
-                        <button
-                          className="btn-action"
-                          style={{ borderColor: 'var(--text-muted)', color: 'var(--text-muted)' }}
-                          title="Editar Activo"
-                          onClick={() => handleEditClick(asset)}
-                        >
-                          ✏️
-                        </button>
-                      )}
-
-                      {assetPerms.edit && (() => {
-                        const activeAssignment = getActiveAssignmentForAsset(asset.id);
-                        const isPendingAcceptance = activeAssignment?.status === 'PENDING_ACCEPTANCE';
-                        const isPendingReturn = activeAssignment?.status === 'PENDING_RETURN';
-
-                        if (isPendingAcceptance) {
-                          return (
-                            <>
-                              <button onClick={() => setForceActionModal({ type: 'accept', assetId: asset.id })} className="btn-action" style={{ borderColor: '#f59e0b', color: '#f59e0b' }} title="Firma Forzada (TI)">
-                                <AlertTriangle size={16} />
-                              </button>
-                              <button
-                                className="btn-action"
-                                style={{ borderColor: '#3b82f6', color: '#3b82f6' }}
-                                title="Reenviar Link de Firma"
-                                onClick={() => {
-                                  confirm({
-                                    title: 'Reenviar Enlace',
-                                    message: '¿Estás seguro de reenviar el enlace de firma al colaborador?',
-                                    type: 'info',
-                                    onConfirm: () => resendLinkMutation.mutate({ assetId: asset.id })
-                                  });
-                                }}
-                                disabled={resendLinkMutation.isPending}
-                              >
-                                <RefreshCw size={16} />
-                              </button>
-                            </>
-                          );
-                        }
-
-                        if (asset.status === 'AVAILABLE' && !isPendingAcceptance && !isPendingReturn) {
-                          return (
-                            <button
-                              className="btn-action btn-assign"
-                              title="Asignar Activo"
-                              onClick={() => handleAssignClick(asset.id)}
-                            >
-                              <PlusCircle size={16} />
-                            </button>
-                          );
-                        }
-
-                        if (asset.status === 'IN_USE' || isPendingReturn) {
-                          return (
-                            <>
-                              {!isPendingReturn && (
-                                <button
-                                  className="btn-action btn-return"
-                                  title="Iniciar Devolución"
-                                  onClick={() => handleReturnClick(asset.id)}
-                                  disabled={returnMutation.isPending}
-                                >
-                                  <RefreshCw size={16} />
-                                </button>
-                              )}
-                              {!isPendingReturn && activeAssignment?.assignmentType === 'LOAN' && (
-                                <button
-                                  className="btn-action"
-                                  style={{ borderColor: '#f59e0b', color: '#f59e0b' }}
-                                  title="Extender Préstamo"
-                                  onClick={() => {
-                                    setExtendLoanDate('');
-                                    setExtendLoanTarget({
-                                      assignmentId: activeAssignment.id,
-                                      assetId: asset.id,
-                                      currentReturnDate: activeAssignment.expectedReturnDate
-                                    });
-                                  }}
-                                >
-                                  <CalendarClock size={16} />
-                                </button>
-                              )}
-                              <button
-                                className="btn-action"
-                                style={{ borderColor: '#ef4444', color: '#ef4444' }}
-                                title="Devolución Forzada (TI)"
-                                onClick={() => setForceActionModal({ type: 'return', assetId: asset.id })}
-                              >
-                                <AlertTriangle size={16} />
-                              </button>
-                              {isPendingReturn && (
-                                <button
-                                  className="btn-action"
-                                  style={{ borderColor: '#3b82f6', color: '#3b82f6' }}
-                                  title="Reenviar Link de Firma"
-                                  onClick={() => {
-                                    confirm({
-                                      title: 'Reenviar Enlace',
-                                      message: '¿Estás seguro de reenviar el enlace de firma al colaborador?',
-                                      type: 'info',
-                                      onConfirm: () => resendLinkMutation.mutate({ assetId: asset.id })
-                                    });
-                                  }}
-                                  disabled={resendLinkMutation.isPending}
-                                >
-                                  <RefreshCw size={16} />
-                                </button>
-                              )}
-                            </>
-                          );
-                        }
-
-                        return null;
-                      })()}
-                      {assetPerms.delete && asset.status !== 'RETIRED' && (
-                        <button
-                          className="btn-action"
-                          style={{ borderColor: '#ef4444', color: '#ef4444' }}
-                          title="Dar de Baja"
-                          onClick={() => {
-                            setRetireReason('');
-                            setRetireBlanccoId('');
-                            setRetireNotes('');
-                            setRetireModalAssetId(asset.id);
-                          }}
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      )}
-                    </ActionMenu>
-                  </td>
-                </tr>
+              {paginatedAssets?.map(asset => (
+                <AssetTableRow
+                  key={asset.id}
+                  asset={asset}
+                  categories={categories}
+                  collaborators={collaborators}
+                  activeAssignment={getActiveAssignmentForAsset(asset.id)}
+                  assetPerms={assetPerms}
+                  onEdit={handleEditClick}
+                  onAssign={handleAssignClick}
+                  onReturn={handleReturnClick}
+                  onForceAction={(type, assetId) => setForceActionModal({ type, assetId })}
+                  onExtendLoan={(assignmentId, assetId, currentReturnDate) => {
+                    setExtendLoanDate('');
+                    setExtendLoanTarget({ assignmentId, assetId, currentReturnDate });
+                  }}
+                  onResendLink={(assetId) => {
+                    confirm({
+                      title: 'Reenviar Enlace',
+                      message: '¿Estás seguro de reenviar el enlace de firma al colaborador?',
+                      type: 'info',
+                      onConfirm: () => resendLinkMutation.mutate({ assetId })
+                    });
+                  }}
+                  onRetire={(assetId) => {
+                    setRetireReason('');
+                    setRetireBlanccoId('');
+                    setRetireNotes('');
+                    setRetireModalAssetId(assetId);
+                  }}
+                  returnPending={returnMutation.isPending}
+                  resendPending={resendLinkMutation.isPending}
+                />
               ))}
               {filteredAssets?.length === 0 && (
                 <tr>
@@ -955,522 +700,124 @@ export default function Catalog() {
             </tbody>
           </table>
         </div>
+        <Pagination
+          currentPage={currentPage}
+          totalItems={filteredAssets?.length || 0}
+          itemsPerPage={itemsPerPage}
+          onPageChange={setCurrentPage}
+        />
       </div>
 
-      {/* MODAL DE DEVOLUCIÓN FORZADA / ACEPTACIÓN FORZADA */}
-      {forceActionModal && (
-        <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(4px)' }}>
-          <div className="glass-panel" style={{ width: '400px', padding: '20px' }}>
-            <h3 style={{ marginTop: 0 }}>{forceActionModal.type === 'accept' ? 'Forzar Aceptación' : 'Forzar Devolución'}</h3>
-            <p style={{ color: 'var(--text-muted)', marginBottom: '1rem' }}>
-              Esta acción requiere registrar el motivo por el cual el administrador está firmando el acta forzadamente.
-            </p>
-            <form onSubmit={(e) => {
-              e.preventDefault();
-              if (forceActionModal.type === 'accept') {
-                forceAcceptMutation.mutate({ assetId: forceActionModal.assetId, reason: forceReason, collaboratorName: getCollaboratorName(getActiveAssignmentForAsset(forceActionModal.assetId)?.collaboratorId || '') });
-              } else {
-                forceReturnMutation.mutate({ assetId: forceActionModal.assetId, reason: forceReason, collaboratorName: getCollaboratorName(getActiveAssignmentForAsset(forceActionModal.assetId)?.collaboratorId || '') });
-              }
-            }}>
-              <div className="form-group">
-                <label>Motivo / Justificación</label>
-                <textarea
-                  required
-                  className="glass-input"
-                  rows={3}
-                  value={forceReason}
-                  onChange={(e) => setForceReason(e.target.value)}
-                  placeholder="Ej. El usuario no tiene acceso a internet..."
-                ></textarea>
-              </div>
-              <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
-                <button type="button" className="btn-glass" onClick={() => { setForceActionModal(null); setForceReason(''); }}>Cancelar</button>
-                <button type="submit" className="btn-primary" disabled={forceAcceptMutation.isPending || forceReturnMutation.isPending}>
-                  {forceAcceptMutation.isPending || forceReturnMutation.isPending ? 'Procesando...' : 'Confirmar Firma'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <ForceActionModal
+        target={forceActionModal}
+        reason={forceReason}
+        onReasonChange={setForceReason}
+        onClose={() => { setForceActionModal(null); setForceReason(''); }}
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!forceActionModal) return;
+          const collaboratorName = getCollaboratorName(getActiveAssignmentForAsset(forceActionModal.assetId)?.collaboratorId || '');
+          if (forceActionModal.type === 'accept') {
+            forceAcceptMutation.mutate({ assetId: forceActionModal.assetId, reason: forceReason, collaboratorName });
+          } else {
+            forceReturnMutation.mutate({ assetId: forceActionModal.assetId, reason: forceReason, collaboratorName });
+          }
+        }}
+        isPending={forceAcceptMutation.isPending || forceReturnMutation.isPending}
+      />
 
-      {/* MODAL EXTENDER PRÉSTAMO */}
-      {extendLoanTarget && (
-        <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(4px)' }}>
-          <div className="glass-panel" style={{ width: '400px', padding: '20px' }}>
-            <h3 style={{ marginTop: 0 }}>Extender Préstamo</h3>
-            <p style={{ color: 'var(--text-muted)', marginBottom: '1rem' }}>
-              Activo <strong>{extendLoanTarget.assetId}</strong>. Fecha de devolución actual:{' '}
-              <strong>{extendLoanTarget.currentReturnDate ? new Date(extendLoanTarget.currentReturnDate).toLocaleDateString('es-CO') : 'N/A'}</strong>.
-              Al extender, se reinicia la alerta de vencimiento.
-            </p>
-            <form onSubmit={(e) => {
-              e.preventDefault();
-              extendLoanMutation.mutate({ assignmentId: extendLoanTarget.assignmentId, newReturnDate: extendLoanDate });
-            }}>
-              <div className="form-group">
-                <label>Nueva Fecha de Devolución</label>
-                <input
-                  type="date"
-                  required
-                  className="glass-input"
-                  min={new Date().toISOString().split('T')[0]}
-                  value={extendLoanDate}
-                  onChange={(e) => setExtendLoanDate(e.target.value)}
-                />
-              </div>
-              <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
-                <button type="button" className="btn-glass" onClick={() => { setExtendLoanTarget(null); setExtendLoanDate(''); }}>Cancelar</button>
-                <button type="submit" className="btn-primary" disabled={extendLoanMutation.isPending}>
-                  {extendLoanMutation.isPending ? 'Procesando...' : 'Confirmar Extensión'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <ExtendLoanModal
+        target={extendLoanTarget}
+        newReturnDate={extendLoanDate}
+        onDateChange={setExtendLoanDate}
+        onClose={() => { setExtendLoanTarget(null); setExtendLoanDate(''); }}
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!extendLoanTarget) return;
+          extendLoanMutation.mutate({ assignmentId: extendLoanTarget.assignmentId, newReturnDate: extendLoanDate });
+        }}
+        isPending={extendLoanMutation.isPending}
+      />
 
-      {/* MODAL CONFIRMACIÓN DEVOLUCIÓN ELIMINADO PARA USAR EL GLOBAL */}
-
-
-      {/* MODAL ASIGNACIÓN RÁPIDA */}
       {assignModalAssetId && (
-        <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(4px)', padding: '20px' }}>
-
-          <div className="glass-panel form-container" style={{ position: 'relative', width: '100%', maxWidth: '900px', margin: 0 }}>
-            <button
-              className="btn-glass"
-              style={{ position: 'absolute', top: '20px', right: '20px', padding: '8px' }}
-              onClick={() => {
-                setAssignModalAssetId(null);
-                setCollabSearchTerm('');
-                setFormData({
-                  id: `assig-${Math.floor(Math.random() * 1000)}`,
-                  assetId: '',
-                  collaboratorId: '',
-                  collaboratorEmail: '',
-                  collaboratorName: '',
-                  startDate: new Date().toISOString().split('T')[0],
-                  assignmentType: 'PERMANENT',
-                  expectedReturnDate: ''
-                });
-              }}
-            >
-              ✕
-            </button>
-
-            <div className="form-sidebar">
-              <div className="icon-wrapper">
-                <UserCheck size={48} />
-              </div>
-              <h3>Asignación Rápida</h3>
-              <p>Al procesar la asignación, el sistema generará un Token criptográfico JWT y enviará un correo electrónico para capturar la firma digital del empleado.</p>
-            </div>
-
-            <form onSubmit={handleAssignSubmit} className="assignment-form">
-              <div className="form-group">
-                <label>ID de Asignación Temporal</label>
-                <input type="text" className="glass-input" name="id" value={formData.id} disabled />
-              </div>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Placa Ikusi</label>
-                  <input type="text" className="glass-input" name="assetId" value={formData.assetId} disabled />
-                </div>
-                <div className="form-group" style={{ position: 'relative' }}>
-                  <label>Colaborador</label>
-                  <input
-                    type="text"
-                    required
-                    className="glass-input"
-                    placeholder="Buscar colaborador..."
-                    value={collabSearchTerm}
-                    onChange={(e) => {
-                      setCollabSearchTerm(e.target.value);
-                      setShowCollabDropdown(true);
-                      if (!e.target.value) {
-                        setFormData({ ...formData, collaboratorEmail: '', collaboratorId: '', collaboratorName: '' });
-                      }
-                    }}
-                    onFocus={() => setShowCollabDropdown(true)}
-                    onBlur={() => setTimeout(() => setShowCollabDropdown(false), 200)}
-                    style={{ background: 'rgba(0,0,0,0.2)', color: 'white' }}
-                  />
-                  {showCollabDropdown && (
-                    <ul style={{
-                      position: 'absolute',
-                      top: '100%',
-                      left: 0,
-                      width: '100%',
-                      background: 'rgba(20, 20, 25, 0.95)',
-                      backdropFilter: 'blur(10px)',
-                      border: '1px solid rgba(255, 255, 255, 0.1)',
-                      borderRadius: '8px',
-                      listStyle: 'none',
-                      padding: '5px 0',
-                      margin: '5px 0 0 0',
-                      zIndex: 10,
-                      maxHeight: '200px',
-                      overflowY: 'auto',
-                      boxShadow: '0 4px 15px rgba(0,0,0,0.5)'
-                    }}>
-                      {collaborators
-                        ?.filter(c => c.status === 'ACTIVE' && (collabSearchTerm === '' || c.name.toLowerCase().includes(collabSearchTerm.toLowerCase())))
-                        .slice(0, 5)
-                        .map(c => (
-                          <li
-                            key={c.id}
-                            style={{
-                              padding: '10px 15px',
-                              cursor: 'pointer',
-                              color: 'white',
-                              borderBottom: '1px solid rgba(255,255,255,0.05)',
-                              fontSize: '14px',
-                              transition: 'background 0.2s'
-                            }}
-                            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
-                            onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                            onMouseDown={(e) => {
-                              setCollabSearchTerm(c.name);
-                              setFormData({
-                                ...formData,
-                                collaboratorEmail: c.email,
-                                collaboratorId: c.id,
-                                collaboratorName: c.name
-                              });
-                              setShowCollabDropdown(false);
-                            }}
-                          >
-                            <div style={{ fontWeight: 500 }}>{c.name}</div>
-                            <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.6)' }}>{c.email}</div>
-                          </li>
-                        ))}
-                      {collaborators?.filter(c => c.status === 'ACTIVE' && (collabSearchTerm === '' || c.name.toLowerCase().includes(collabSearchTerm.toLowerCase()))).length === 0 && (
-                        <li style={{ padding: '10px 15px', color: 'rgba(255,255,255,0.5)', fontSize: '13px' }}>
-                          No se encontraron colaboradores
-                        </li>
-                      )}
-                    </ul>
-                  )}
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label>Correo Electrónico (Autocompletado)</label>
-                <input type="email" className="glass-input" name="collaboratorEmail" value={formData.collaboratorEmail} disabled />
-              </div>
-
-              <div className="form-group">
-                <label>Fecha de Asignación</label>
-                <input type="date" className="glass-input" name="startDate" value={formData.startDate} onChange={handleChange} required />
-              </div>
-
-              <div className="form-group">
-                <label>Modalidad de Asignación</label>
-                <div style={{ display: 'flex', gap: '10px' }}>
-                  <button
-                    type="button"
-                    className={formData.assignmentType === 'PERMANENT' ? 'btn-primary' : 'btn-glass'}
-                    style={{ flex: 1, padding: '10px' }}
-                    onClick={() => setFormData({ ...formData, assignmentType: 'PERMANENT', expectedReturnDate: '' })}
-                  >
-                    Permanente
-                  </button>
-                  <button
-                    type="button"
-                    className={formData.assignmentType === 'LOAN' ? 'btn-primary' : 'btn-glass'}
-                    style={{ flex: 1, padding: '10px' }}
-                    onClick={() => setFormData({ ...formData, assignmentType: 'LOAN' })}
-                  >
-                    Préstamo
-                  </button>
-                </div>
-              </div>
-
-              {formData.assignmentType === 'LOAN' && (
-                <div className="form-group">
-                  <label>Fecha de Devolución Esperada</label>
-                  <input
-                    type="date"
-                    className="glass-input"
-                    name="expectedReturnDate"
-                    min={formData.startDate}
-                    value={formData.expectedReturnDate}
-                    onChange={handleChange}
-                    required
-                  />
-                </div>
-              )}
-
-              <button type="submit" className="btn-primary submit-btn" disabled={assignMutation.isPending}>
-                {assignMutation.isPending ? 'Procesando...' : <><Send size={18} /> Procesar Asignación</>}
-              </button>
-            </form>
-          </div>
-        </div>
+        <AssignAssetModal
+          formData={formData}
+          setFormData={setFormData}
+          collaborators={collaborators}
+          collabSearchTerm={collabSearchTerm}
+          setCollabSearchTerm={setCollabSearchTerm}
+          showCollabDropdown={showCollabDropdown}
+          setShowCollabDropdown={setShowCollabDropdown}
+          onClose={() => {
+            setAssignModalAssetId(null);
+            setCollabSearchTerm('');
+            setFormData({
+              id: `assig-${Math.floor(Math.random() * 1000)}`,
+              assetId: '',
+              collaboratorId: '',
+              collaboratorEmail: '',
+              collaboratorName: '',
+              startDate: new Date().toISOString().split('T')[0],
+              assignmentType: 'PERMANENT',
+              expectedReturnDate: ''
+            });
+          }}
+          onSubmit={handleAssignSubmit}
+          isPending={assignMutation.isPending}
+        />
       )}
 
-      {/* MODAL CREAR/EDITAR ACTIVO */}
       {showAddModal && (
-        <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(4px)', padding: '20px' }}>
-          <div className="glass-panel" style={{ position: 'relative', width: '100%', maxWidth: '600px', margin: 0, padding: '30px', maxHeight: '90vh', overflowY: 'auto' }}>
-            <button
-              onClick={() => setShowAddModal(false)}
-              style={{ position: 'absolute', top: '15px', right: '15px', background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '5px', fontSize: '18px' }}
-            >
-              ✕
-            </button>
-            <h3 style={{ textAlign: 'center', marginBottom: '24px', color: 'var(--text-main)', borderBottom: '1px solid var(--border-glass)', paddingBottom: '16px', fontSize: '22px', marginTop: 0 }}>
-              {isEditing ? 'Editar Activo' : 'Registrar Nuevo Activo'}
-            </h3>
-            {modalErrorMsg && (
-              <div className="alert alert-error" style={{ marginBottom: '20px', fontSize: '14px' }}>
-                <AlertCircle size={18} />
-                {modalErrorMsg}
-              </div>
-            )}
-            <form onSubmit={(e) => {
-              e.preventDefault();
-              const submitAction = () => {
-                if (isEditing) {
-                  editAssetMutation.mutate(newAsset);
-                } else {
-                  addAssetMutation.mutate(newAsset);
-                }
-              };
+        <AssetFormModal
+          newAsset={newAsset}
+          setNewAsset={setNewAsset}
+          categories={categories}
+          isEditing={isEditing}
+          modalErrorMsg={modalErrorMsg}
+          onClose={() => setShowAddModal(false)}
+          onSubmit={(e) => {
+            e.preventDefault();
+            const submitAction = () => {
+              if (isEditing) {
+                editAssetMutation.mutate(newAsset);
+              } else {
+                addAssetMutation.mutate(newAsset);
+              }
+            };
 
-              confirm({
-                title: isEditing ? 'Guardar Cambios' : 'Crear Activo',
-                message: isEditing ? '¿Estás seguro de guardar los cambios de este activo?' : '¿Estás seguro de registrar este nuevo activo?',
-                type: 'info',
-                onConfirm: submitAction
-              });
-            }} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div className="form-group">
-                <label>Categoría</label>
-                <select
-                  required
-                  className="glass-input"
-                  value={newAsset.categoryId}
-                  disabled={isEditing}
-                  onChange={e => {
-                    const catId = Number(e.target.value);
-                    const cat = categories?.find((c: any) => c.id === catId);
-                    const newDynamicAttr: any = {};
-                    if (cat && cat.schemaDefinition?.fields) {
-                      cat.schemaDefinition.fields.forEach((f: any) => newDynamicAttr[f.name] = '');
-                    }
-                    setNewAsset({ ...newAsset, categoryId: catId, dynamicAttributes: newDynamicAttr });
-                  }}
-                >
-                  <option value="" disabled>Seleccione una categoría</option>
-                  {categories?.map((cat: any) => (
-                    <option key={cat.id} value={cat.id}>{cat.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              {newAsset.categoryId && (
-                <>
-                  <div className="form-group">
-                    <label>
-                      {(() => {
-                        const cat = categories?.find((c: any) => c.id === newAsset.categoryId);
-                        return cat?.schemaDefinition?.requiresPlacaIkusi !== false ? "Placa Ikusi" : "ID Interno (Generado automáticamente)";
-                      })()}
-                    </label>
-                    <input
-                      type="text"
-                      required={categories?.find((c: any) => c.id === newAsset.categoryId)?.schemaDefinition?.requiresPlacaIkusi !== false}
-                      className="glass-input"
-                      value={newAsset.id}
-                      disabled={isEditing || categories?.find((c: any) => c.id === newAsset.categoryId)?.schemaDefinition?.requiresPlacaIkusi === false}
-                      onChange={e => setNewAsset({ ...newAsset, id: e.target.value })}
-                      placeholder={categories?.find((c: any) => c.id === newAsset.categoryId)?.schemaDefinition?.requiresPlacaIkusi !== false ? "Ej. AST-2026-050" : "Autogenerado (Ej: 000001)"}
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>Número de Serie</label>
-                    <input type="text" className="glass-input" value={newAsset.serial} onChange={e => setNewAsset({ ...newAsset, serial: e.target.value })} placeholder="Ej. SN-X3X3X3 (Opcional)" />
-                  </div>
-                  <div className="form-group">
-                    <label>Fecha de Compra</label>
-                    <input type="date" max={new Date().toISOString().split('T')[0]} className="glass-input" value={newAsset.purchaseDate || ''} onChange={e => setNewAsset({ ...newAsset, purchaseDate: e.target.value })} />
-                  </div>
-                  <div className="form-group">
-                    <label>Garantía (Meses)</label>
-                    <input type="number" min="0" className="glass-input" value={newAsset.warrantyMonths || ''} onChange={e => setNewAsset({ ...newAsset, warrantyMonths: parseInt((e.target.value), 10) })} placeholder="Ej. 12 (Opcional)" />
-                  </div>
-                  <div className="form-group">
-                    <label>Valor de Compra (COP) (Opcional)</label>
-                    <input type="number" step="0.01" min="0" className="glass-input" value={newAsset.purchasePrice || ''} onChange={e => setNewAsset({ ...newAsset, purchasePrice: parseFloat(e.target.value) })} placeholder="Ej. 1200000" />
-                  </div>
-                  <div className="form-group">
-                    <label>Depreciación (Opcional)</label>
-                    <select className="glass-input" value={newAsset.depreciationYears || ''} onChange={e => setNewAsset({ ...newAsset, depreciationYears: e.target.value ? parseInt(e.target.value, 10) : undefined })}>
-                      <option value="">No aplica / Sin calcular</option>
-                      <option value="3">3 Años</option>
-                      <option value="5">5 Años</option>
-                    </select>
-                  </div>
-                  <div className="form-group">
-                    <label>Proveedor (Opcional)</label>
-                    <input type="text" className="glass-input" value={newAsset.vendorName || ''} onChange={e => setNewAsset({ ...newAsset, vendorName: e.target.value })} placeholder="Ej. CompuMundo S.A.S" />
-                  </div>
-                  <div className="form-group">
-                    <label>Comprador Interno (Opcional)</label>
-                    <input type="text" className="glass-input" value={newAsset.internalBuyer || ''} onChange={e => setNewAsset({ ...newAsset, internalBuyer: e.target.value })} placeholder="Ej. Juan Pérez (Compras)" />
-                  </div>
-
-                  {Object.keys(newAsset.dynamicAttributes).map((attrName) => {
-                    const fieldDef = categories?.find((c: any) => c.id === newAsset.categoryId)?.schemaDefinition?.fields?.find((f: any) => f.name === attrName);
-                    const isRequired = fieldDef?.isRequired;
-                    const type = fieldDef?.type || 'text';
-                    const options = fieldDef?.options || [];
-                    const unit = fieldDef?.unit;
-                    const regex = fieldDef?.validationRegex;
-                    const regexMsg = fieldDef?.validationMessage;
-
-                    return (
-                      <div className="form-group" key={attrName}>
-                        <label style={{ textTransform: 'capitalize' }}>{attrName} {isRequired && <span style={{ color: 'red' }}>*</span>}</label>
-                        {type === 'select' ? (
-                          <select
-                            required={isRequired}
-                            className="glass-input"
-                            value={newAsset.dynamicAttributes[attrName] || ''}
-                            onChange={(e) => setNewAsset({
-                              ...newAsset,
-                              dynamicAttributes: { ...newAsset.dynamicAttributes, [attrName]: e.target.value }
-                            })}
-                          >
-                            <option value="" disabled>Seleccione una opción</option>
-                            {options.map((opt: string) => {
-                              const displayOpt = unit && !opt.includes(unit) ? `${opt} ${unit}` : opt;
-                              return <option key={opt} value={displayOpt} style={{ color: 'black' }}>{displayOpt}</option>;
-                            })}
-                          </select>
-                        ) : (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <input
-                              type="text"
-                              required={isRequired}
-                              className="glass-input"
-                              pattern={regex}
-                              title={regexMsg}
-                              value={String(newAsset.dynamicAttributes[attrName] || '').replace(new RegExp(`\\s?${unit}$`), '')}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                const finalVal = val && unit ? `${val} ${unit}` : val;
-                                setNewAsset({
-                                  ...newAsset,
-                                  dynamicAttributes: { ...newAsset.dynamicAttributes, [attrName]: finalVal }
-                                });
-                              }}
-                              placeholder={`Ingrese ${attrName}`}
-                            />
-                            {unit && <span style={{ color: 'var(--text-muted)', fontWeight: 600, paddingRight: '8px' }}>{unit}</span>}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-
-                  <button type="submit" className="btn-primary submit-btn" disabled={addAssetMutation.isPending || editAssetMutation.isPending}>
-                    {(addAssetMutation.isPending || editAssetMutation.isPending) ? 'Guardando...' : (isEditing ? 'Guardar Cambios' : 'Crear Activo')}
-                  </button>
-                </>
-              )}
-            </form>
-          </div>
-        </div>
+            confirm({
+              title: isEditing ? 'Guardar Cambios' : 'Crear Activo',
+              message: isEditing ? '¿Estás seguro de guardar los cambios de este activo?' : '¿Estás seguro de registrar este nuevo activo?',
+              type: 'info',
+              onConfirm: submitAction
+            });
+          }}
+          isPending={addAssetMutation.isPending || editAssetMutation.isPending}
+        />
       )}
 
-      {/* MODAL CONFIRMAR BAJA DE ACTIVO */}
-      {retireModalAssetId && (
-        <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(4px)', padding: '20px' }}>
-          <div className="glass-panel" style={{ padding: '30px', maxWidth: '450px', width: '100%', textAlign: 'center' }}>
-            <Trash2 size={48} color="#ef4444" style={{ marginBottom: '20px' }} />
-            <h3 style={{ color: 'var(--text-main)', marginBottom: '15px' }}>Dar de baja activo</h3>
-            <p style={{ margin: '0 0 20px 0', color: 'var(--text-muted)' }}>
-              ¿Estás seguro de que deseas dar de baja el activo <b>{retireModalAssetId}</b> definitivamente? Esta acción es irreversible.
-            </p>
-            <div className="form-group" style={{ textAlign: 'left' }}>
-              <label>Motivo de la baja *</label>
-              <select
-                className="glass-input"
-                value={['Obsolescencia', 'Daño irreparable', 'Robo / Pérdida', 'Fin de vida útil'].includes(retireReason) ? retireReason : (retireReason ? 'Otro' : '')}
-                onChange={(e) => setRetireReason(e.target.value === 'Otro' ? 'Otro: ' : e.target.value)}
-                style={{ marginBottom: '10px' }}
-              >
-                <option value="">Seleccione un motivo...</option>
-                <option value="Obsolescencia">Obsolescencia</option>
-                <option value="Daño irreparable">Daño irreparable</option>
-                <option value="Robo / Pérdida">Robo / Pérdida</option>
-                <option value="Fin de vida útil">Fin de vida útil</option>
-                <option value="Otro">Otro (especifique)</option>
-              </select>
-              {(retireReason.startsWith('Otro') || !['Obsolescencia', 'Daño irreparable', 'Robo / Pérdida', 'Fin de vida útil', ''].includes(retireReason)) && (
-                <input
-                  type="text"
-                  className="glass-input"
-                  value={retireReason.replace(/^Otro: ?/, '')}
-                  onChange={(e) => setRetireReason(`Otro: ${e.target.value}`)}
-                  placeholder="Describe el motivo..."
-                  style={{ marginBottom: '10px' }}
-                  autoFocus
-                />
-              )}
-              <label>ID del reporte de borrado (Blancco)</label>
-              <input
-                type="text"
-                className="glass-input"
-                value={retireBlanccoId}
-                onChange={(e) => setRetireBlanccoId(e.target.value)}
-                placeholder="Ej. BL-2026-00123 (déjalo vacío si no aplica, ej. robo)"
-                style={{ marginBottom: '10px' }}
-              />
-              <label>Notas adicionales</label>
-              <textarea
-                className="glass-input"
-                value={retireNotes}
-                onChange={(e) => setRetireNotes(e.target.value)}
-                style={{ minHeight: '60px', resize: 'vertical' }}
-                placeholder="Ej. Acta de robo #123, disposición final con proveedor certificado..."
-              />
-            </div>
-            <div style={{ display: 'flex', gap: '10px', marginTop: '24px', justifyContent: 'center' }}>
-              <button
-                className="btn-glass"
-                onClick={() => setRetireModalAssetId(null)}
-                style={{ padding: '10px 20px' }}
-              >
-                Cancelar
-              </button>
-              <button
-                className="btn-primary"
-                style={{ background: '#ef4444', borderColor: '#ef4444', opacity: retireReason.trim() && retireReason !== 'Otro: ' ? 1 : 0.5, padding: '10px 20px' }}
-                onClick={() => {
-                  if (retireReason.trim() && retireReason !== 'Otro: ') {
-                    retireAssetMutation.mutate({
-                      id: retireModalAssetId,
-                      reason: retireReason.trim(),
-                      blanccoReportId: retireBlanccoId.trim() || undefined,
-                      notes: retireNotes.trim() || undefined
-                    });
-                    setRetireModalAssetId(null);
-                  }
-                }}
-                disabled={!retireReason.trim() || retireReason === 'Otro: ' || retireAssetMutation.isPending}
-              >
-                {retireAssetMutation.isPending ? 'Procesando...' : 'Confirmar Baja'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <RetireAssetModal
+        assetId={retireModalAssetId}
+        reason={retireReason}
+        setReason={setRetireReason}
+        blanccoId={retireBlanccoId}
+        setBlanccoId={setRetireBlanccoId}
+        notes={retireNotes}
+        setNotes={setRetireNotes}
+        onClose={() => setRetireModalAssetId(null)}
+        onConfirm={() => {
+          if (retireModalAssetId && retireReason.trim() && retireReason !== 'Otro: ') {
+            retireAssetMutation.mutate({
+              id: retireModalAssetId,
+              reason: retireReason.trim(),
+              blanccoReportId: retireBlanccoId.trim() || undefined,
+              notes: retireNotes.trim() || undefined
+            });
+            setRetireModalAssetId(null);
+          }
+        }}
+        isPending={retireAssetMutation.isPending}
+      />
 
     </div>
   );

@@ -1,22 +1,16 @@
 import { Router } from 'express';
 import multer from 'multer';
 import * as xlsx from 'xlsx';
-import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
 import { validateBody } from '../middlewares/validate.middleware';
 import { PostgresCollaboratorRepository } from '../../modules/collaborator/infrastructure/PostgresCollaboratorRepository';
 import { PostgresDepartmentRepository } from '../../modules/collaborator/infrastructure/PostgresDepartmentRepository';
 import { PostgresCecosRepository } from '../../modules/collaborator/infrastructure/PostgresCecosRepository';
 import { CollaboratorUseCases } from '../../modules/collaborator/application/CollaboratorUseCases';
-import { CollaboratorHistory } from '../../modules/collaborator/domain/CollaboratorHistory';
 import { PostgresAssignmentRepository } from '../../modules/assignment/infrastructure/PostgresAssignmentRepository';
-import { AssignmentUseCases } from '../../modules/assignment/application/AssignmentUseCases';
 import { WebexNotificationService } from '../../shared/infrastructure/services/WebexNotificationService';
 import { PdfKitService } from '../../shared/infrastructure/services/PdfKitService';
-import { CatalogUseCases } from '../../modules/catalog/application/CatalogUseCases';
-import { PostgresCatalogRepository } from '../../modules/catalog/infrastructure/PostgresCatalogRepository';
-import { AppDataSource } from '../../shared/infrastructure/database/postgres';
-import { buildAssetActItem, resolveDepartmentName, extractCeco } from './helpers/assignmentActHelpers';
+import { OffboardCollaboratorUseCase } from '../../modules/collaborator/application/OffboardCollaboratorUseCase';
 
 const departmentSchema = z.object({
     name: z.string().min(1, 'name es requerido'),
@@ -55,10 +49,15 @@ const departmentRepository = new PostgresDepartmentRepository();
 const cecosRepository = new PostgresCecosRepository();
 const assignmentRepository = new PostgresAssignmentRepository();
 const useCases = new CollaboratorUseCases(collaboratorRepository, departmentRepository, cecosRepository);
-const assignmentUseCases = new AssignmentUseCases(assignmentRepository, new WebexNotificationService());
 const documentService = new PdfKitService();
-const catalogRepo = new PostgresCatalogRepository();
-const catalogUseCases = new CatalogUseCases(catalogRepo);
+const offboardCollaboratorUseCase = new OffboardCollaboratorUseCase(
+    collaboratorRepository,
+    assignmentRepository,
+    departmentRepository,
+    cecosRepository,
+    new WebexNotificationService(),
+    documentService
+);
 
 // --- Departments Routes ---
 
@@ -249,104 +248,25 @@ collaboratorRouter.patch('/:id/toggle-status', async (req, res) => {
     }
 });
 
-/**
- * Baja de colaborador con devolución forzada de TODOS sus activos asignados
- * y generación de un único acta de Paz y Salvo. Operación administrativa
- * inmediata (sin esperar firma del colaborador): pensada para offboarding.
- */
 collaboratorRouter.post('/:id/offboard', validateBody(offboardSchema), async (req, res) => {
     try {
         const { id } = req.params;
         const reason = req.body.reason.trim();
 
-        const collaborator = await useCases.getCollaboratorById(id);
-        if (!collaborator) return res.status(404).json({ error: 'Colaborador no encontrado' });
-        if (collaborator.status !== 'ACTIVE') {
-            return res.status(400).json({ error: 'El colaborador ya se encuentra inactivo.' });
-        }
-
-        const allActive = await assignmentRepository.findAllActive();
-        const toReturn = allActive.filter(a => a.collaboratorId === id && (a.status === 'ACCEPTED' || a.status === 'PENDING_ACCEPTANCE'));
-
-        // Toda la operación (devoluciones + cambio de estado de activos + acta +
-        // baja del colaborador) corre en una única transacción: si falla cualquier
-        // paso (incluida la generación del PDF), no debe quedar ningún activo
-        // marcado como devuelto ni el colaborador dado de baja a medias.
-        const result = await AppDataSource.manager.transaction(async (manager) => {
-            const txAssignmentRepo = new PostgresAssignmentRepository(manager);
-            const txAssignmentUseCases = new AssignmentUseCases(txAssignmentRepo, new WebexNotificationService());
-            const txCatalogRepo = new PostgresCatalogRepository(manager);
-            const txCatalogUseCases = new CatalogUseCases(txCatalogRepo);
-            const txCollaboratorRepo = new PostgresCollaboratorRepository(manager);
-            const txCollaboratorUseCases = new CollaboratorUseCases(txCollaboratorRepo, departmentRepository, cecosRepository);
-
-            let documentPath: string | undefined;
-
-            if (toReturn.length > 0) {
-                const ipAddress = `Baja de colaborador (Paz y Salvo).\nMotivo: ${reason}`;
-                const returnedAssignments = [];
-                for (const a of toReturn) {
-                    const returned = await txAssignmentUseCases.forceReturn(a.id, ipAddress);
-                    // El activo queda bloqueado hasta que TI otorgue el Visto Bueno (approve-return)
-                    await txCatalogUseCases.changeAssetStatus(returned.assetId, 'PENDING_INSPECTION');
-                    returnedAssignments.push(returned);
-                }
-
-                const assetsDetails = [];
-                for (const assign of returnedAssignments) {
-                    const asset = await txCatalogUseCases.getAssetById(assign.assetId);
-                    const category = asset ? await txCatalogRepo.getCategoryById(asset.categoryId) : null;
-                    assetsDetails.push(buildAssetActItem(asset, category, assign));
-                }
-
-                const realDept = await resolveDepartmentName(collaborator.department, departmentRepository);
-                const ceco = extractCeco(collaborator.dynamicAttributes);
-
-                // Generación del PDF dentro de la transacción a propósito: si falla,
-                // el rollback deshace las devoluciones y los cambios de estado de activos.
-                documentPath = await documentService.generateAssignmentAct({
-                    actType: 'RETURN',
-                    returnMode: 'PAZ_Y_SALVO',
-                    assignmentId: `OFFBOARD-${id}-${Date.now()}`,
-                    collaboratorName: collaborator.name,
-                    collaboratorEmail: collaborator.email,
-                    department: realDept,
-                    ceco,
-                    sede: collaborator.location,
-                    assets: assetsDetails,
-                    ipAddress,
-                    timestamp: new Date(),
-                    isForcedSignature: true,
-                    returnReason: reason
-                });
-
-                for (const assign of returnedAssignments) {
-                    await txAssignmentUseCases.updateDocumentPath(assign.id, documentPath);
-                }
-
-                await txCollaboratorRepo.saveHistory(new CollaboratorHistory(
-                    uuidv4(),
-                    id,
-                    'ASSET_RETURNED',
-                    new Date(),
-                    `Paz y Salvo: ${toReturn.length} activo(s) devuelto(s) por baja del colaborador. Motivo: ${reason}`
-                ));
-            }
-
-            const updatedCollaborator = await txCollaboratorUseCases.toggleCollaboratorStatus(id);
-
-            return { updatedCollaborator, documentPath };
-        });
+        const result = await offboardCollaboratorUseCase.execute(id, reason);
 
         res.json({
-            message: toReturn.length > 0
-                ? `Colaborador dado de baja. Se generó el Paz y Salvo de ${toReturn.length} activo(s).`
+            message: result.returnedCount > 0
+                ? `Colaborador dado de baja. Se generó el Paz y Salvo de ${result.returnedCount} activo(s).`
                 : 'Colaborador dado de baja.',
             collaborator: result.updatedCollaborator,
             documentPath: result.documentPath,
-            returnedCount: toReturn.length
+            returnedCount: result.returnedCount
         });
     } catch (error: any) {
+        if (error.message === 'Colaborador no encontrado') {
+            return res.status(404).json({ error: error.message });
+        }
         res.status(400).json({ error: error.message });
     }
 });

@@ -3,32 +3,17 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useConfirm } from '../context/ConfirmContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
-import {
-    ArrowLeft,
-    Monitor,
-    Wrench,
-    CpuIcon,
-    Users,
-    Calendar,
-    Clock,
-    CheckCircle,
-    AlertCircle,
-    FileText,
-    User,
-    Mail,
-    Tag,
-    Building2,
-    UserCheck,
-    Hash,
-    ArrowRight,
-    Plus,
-    ChevronRight,
-    Activity
-} from 'lucide-react';
+import { ArrowLeft, CpuIcon, AlertCircle, ChevronRight, Activity } from 'lucide-react';
 import './AssetProfile.css';
 import { API_URL } from '../config';
 import { usePermission } from '../context/AuthContext';
-import LoadingState from '../components/LoadingState';
+import AssetSideCard from '../components/asset-profile/AssetSideCard';
+import MaintenanceTimelineSection from '../components/asset-profile/MaintenanceTimelineSection';
+import HardwareUpgradesSection from '../components/asset-profile/HardwareUpgradesSection';
+import AssignmentHistorySection from '../components/asset-profile/AssignmentHistorySection';
+import ApprovalModal from '../components/asset-profile/ApprovalModal';
+import UpgradeFormModal from '../components/asset-profile/UpgradeFormModal';
+import DepreciationModal from '../components/asset-profile/DepreciationModal';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -378,145 +363,17 @@ export default function AssetProfile() {
             <div className="asset-profile-grid">
 
                 {/* ─────────────── LEFT: Asset Card ─────────────── */}
-                <div className="asset-side-card glass-panel">
-                    <div className="asset-icon-wrapper">
-                        <Monitor size={48} color="var(--ikusi-green)" />
-                    </div>
-
-                    <h2 className="asset-profile-id">{asset.id}</h2>
-
-                    {asset.serial && (
-                        <div className="asset-profile-serial">S/N: {asset.serial}</div>
-                    )}
-
-                    <span className={`badge ${statusClass(asset.status)}`} style={{ marginBottom: '4px' }}>
-                        {statusLabel(asset.status)}
-                    </span>
-
-                    <div className="asset-side-details">
-                        <div className="asset-detail-item">
-                            <Tag size={16} color="var(--ikusi-green)" style={{ flexShrink: 0, marginTop: '2px' }} />
-                            <div className="asset-detail-block">
-                                <span className="detail-label">Categoría</span>
-                                <span className="detail-value">{category?.name || `Cat. ${asset.categoryId}`}</span>
-                            </div>
-                        </div>
-
-                        {asset.purchaseDate && (
-                            <div className="asset-detail-item">
-                                <Calendar size={16} color="var(--ikusi-green)" style={{ flexShrink: 0, marginTop: '2px' }} />
-                                <div className="asset-detail-block">
-                                    <span className="detail-label">Fecha de Compra</span>
-                                    <span className="detail-value">{(() => {
-                                        const [y, m, d] = asset.purchaseDate!.toString().split('T')[0].split('-');
-                                        return `${parseInt(d, 10)}/${parseInt(m, 10)}/${y}`;
-                                    })()}</span>
-                                </div>
-                            </div>
-                        )}
-
-                        {asset.warrantyMonths && (
-                            <div className="asset-detail-item">
-                                <CheckCircle size={16} color="var(--ikusi-green)" style={{ flexShrink: 0, marginTop: '2px' }} />
-                                <div className="asset-detail-block">
-                                    <span className="detail-label">Garantía</span>
-                                    <span className="detail-value">{asset.warrantyMonths} meses</span>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Valor de compra: mismo fallback que el cálculo de depreciación
-                            (algunos activos importados lo tienen en los atributos dinámicos) */}
-                        {(() => {
-                            let precio = asset.purchasePrice || 0;
-                            if (!precio) {
-                                const pKey = Object.keys(specs).find(k => k.toUpperCase().includes('PRECIO'));
-                                if (pKey && specs[pKey]) precio = parseFloat(String(specs[pKey]).replace(/[^0-9.-]+/g, ''));
-                            }
-                            return (
-                                <div className="asset-detail-item">
-                                    <Tag size={16} color="var(--ikusi-green)" style={{ flexShrink: 0, marginTop: '2px' }} />
-                                    <div className="asset-detail-block">
-                                        <span className="detail-label">Valor de Compra</span>
-                                        <span className="detail-value" style={!precio ? { color: 'var(--text-muted)', fontStyle: 'italic' } : undefined}>
-                                            {precio
-                                                ? new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP' }).format(precio)
-                                                : 'No registrado'}
-                                        </span>
-                                    </div>
-                                </div>
-                            );
-                        })()}
-
-                        {asset.vendorName && (
-                            <div className="asset-detail-item">
-                                <Building2 size={16} color="var(--ikusi-green)" style={{ flexShrink: 0, marginTop: '2px' }} />
-                                <div className="asset-detail-block">
-                                    <span className="detail-label">Proveedor</span>
-                                    <span className="detail-value">{asset.vendorName}</span>
-                                </div>
-                            </div>
-                        )}
-
-                        {asset.internalBuyer && (
-                            <div className="asset-detail-item">
-                                <UserCheck size={16} color="var(--ikusi-green)" style={{ flexShrink: 0, marginTop: '2px' }} />
-                                <div className="asset-detail-block">
-                                    <span className="detail-label">Comprador Interno</span>
-                                    <span className="detail-value">{asset.internalBuyer}</span>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Información de la baja (activos retirados) */}
-                        {asset.status === 'RETIRED' && asset.disposal && (
-                            <div style={{ marginTop: '10px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '10px', padding: '12px 14px', textAlign: 'left' }}>
-                                <div style={{ fontSize: '11px', fontWeight: 700, color: '#dc2626', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: '8px' }}>
-                                    Información de la Baja
-                                </div>
-                                <div style={{ fontSize: '12px', color: '#7f1d1d', lineHeight: 1.7 }}>
-                                    <div><strong>Motivo:</strong> {asset.disposal.reason}</div>
-                                    <div><strong>Fecha:</strong> {formatDateSafe(asset.disposal.disposalDate)}</div>
-                                    <div><strong>Autorizada por:</strong> {asset.disposal.authorizedBy}</div>
-                                    {asset.disposal.blanccoReportId && (
-                                        <div><strong>Reporte Blancco:</strong> {asset.disposal.blanccoReportId}</div>
-                                    )}
-                                    {asset.disposal.notes && (
-                                        <div><strong>Notas:</strong> {asset.disposal.notes}</div>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Stats de auditoría */}
-                        <div style={{ marginTop: '8px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', textAlign: 'center' }}>
-                            <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '10px 4px' }}>
-                                <div style={{ fontSize: '20px', fontWeight: 700, color: 'var(--ikusi-green)' }}>
-                                    {maintenances?.length ?? '—'}
-                                </div>
-                                <div style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px', marginTop: '2px' }}>
-                                    Mantenimientos
-                                </div>
-                            </div>
-                            <div style={{ background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: '8px', padding: '10px 4px' }}>
-                                <div style={{ fontSize: '20px', fontWeight: 700, color: '#7c3aed' }}>
-                                    {upgrades?.length ?? '—'}
-                                </div>
-                                <div style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px', marginTop: '2px' }}>
-                                    Upgrades
-                                </div>
-                            </div>
-                            <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px', padding: '10px 4px' }}>
-                                <div style={{ fontSize: '20px', fontWeight: 700, color: '#1d4ed8' }}>
-                                    {assignmentHistory?.length ?? '—'}
-                                </div>
-                                <div style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px', marginTop: '2px' }}>
-                                    Asignados
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <AssetSideCard
+                    asset={asset}
+                    category={category}
+                    specs={specs}
+                    statusLabel={statusLabel}
+                    statusClass={statusClass}
+                    formatDateSafe={formatDateSafe}
+                    maintenancesCount={maintenances?.length}
+                    upgradesCount={upgrades?.length}
+                    assignmentHistoryCount={assignmentHistory?.length}
+                />
 
                 {/* ─────────────── RIGHT: Tabs Content ─────────────── */}
                 <div className="asset-profile-content">
@@ -548,543 +405,63 @@ export default function AssetProfile() {
                         </div>
                     )}
 
-                    {/* ── 2. Historial de Mantenimientos ── */}
-                    <div className="ap-section glass-panel">
-                        <div className="ap-section-header">
-                            <h3 className="ap-section-title">
-                                <Wrench size={20} color="var(--ikusi-green)" />
-                                Historial de Mantenimientos
-                                {maintenances && maintenances.length > 0 && (
-                                    <span className="count-badge">{maintenances.length}</span>
-                                )}
-                            </h3>
-                        </div>
+                    <MaintenanceTimelineSection
+                        maintenances={maintenances}
+                        loading={loadingMaint}
+                        maintTypeLabel={maintTypeLabel}
+                        maintStatusLabel={maintStatusLabel}
+                    />
 
-                        {loadingMaint ? (
-                            <div className="ap-empty"><LoadingState message="Cargando mantenimientos..." inline /></div>
-                        ) : !maintenances || maintenances.length === 0 ? (
-                            <p className="ap-empty">No hay registros de mantenimiento para este equipo.</p>
-                        ) : (
-                            <div className="maint-timeline">
-                                {maintenances.map((m) => (
-                                    <div key={m.id} className="maint-timeline-item">
-                                        <div className="maint-connector" />
-                                        <div className={`maint-dot ${m.type.toLowerCase()} ${m.status.toLowerCase()}`} />
-                                        <div className="maint-card">
-                                            <div className="maint-card-header">
-                                                <div className="maint-badges">
-                                                    <span className={`badge-ap badge-type-${m.type.toLowerCase()}`}>
-                                                        {m.type === 'PREVENTIVE' ? <CheckCircle size={11} /> : <AlertCircle size={11} />}
-                                                        {maintTypeLabel(m.type)}
-                                                    </span>
-                                                    <span className={`badge-ap badge-status-${m.status.toLowerCase()}`}>
-                                                        {maintStatusLabel(m.status)}
-                                                    </span>
-                                                </div>
-                                                <div className="maint-dates">
-                                                    <Calendar size={13} />
-                                                    {m.executionDate
-                                                        ? `Ejecutado: ${new Date(m.executionDate).toLocaleDateString('es-CO')}`
-                                                        : `Programado: ${new Date(m.scheduledDate).toLocaleDateString('es-CO')}`
-                                                    }
-                                                </div>
-                                            </div>
+                    <HardwareUpgradesSection
+                        upgrades={upgrades}
+                        loading={loadingUpgrades}
+                        canEdit={assetPerms.edit}
+                        onOpenUpgradeModal={() => setShowUpgradeModal(true)}
+                    />
 
-                                            {/* Notes removed to keep timeline clean */}
-
-                                            {m.collaboratorInTurnName && (
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '8px', fontSize: '12px', color: 'var(--text-muted)' }}>
-                                                    <User size={12} />
-                                                    Responsable: <strong>{m.collaboratorInTurnName}</strong>
-                                                </div>
-                                            )}
-
-                                            {m.pdfUrl && (
-                                                <a
-                                                    href={`${API_URL}${m.pdfUrl}`}
-                                                    target="_blank"
-                                                    rel="noreferrer"
-                                                    className="maint-pdf-link"
-                                                >
-                                                    <FileText size={13} />
-                                                    Ver Acta de Mantenimiento
-                                                </a>
-                                            )}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-
-                    {/* ── 3. Actualizaciones de Hardware ── */}
-                    <div className="ap-section glass-panel">
-                        <div className="ap-section-header">
-                            <h3 className="ap-section-title">
-                                <CpuIcon size={20} color="var(--ikusi-green)" />
-                                Actualizaciones de Hardware
-                                {upgrades && upgrades.length > 0 && (
-                                    <span className="count-badge">{upgrades.length}</span>
-                                )}
-                            </h3>
-                            {assetPerms.edit && (
-                            <button
-                                className="btn-primary"
-                                style={{ padding: '8px 14px', fontSize: '13px' }}
-                                onClick={() => setShowUpgradeModal(true)}
-                            >
-                                <Plus size={15} />
-                                Registrar Upgrade
-                            </button>
-                            )}
-                        </div>
-
-                        {loadingUpgrades ? (
-                            <div className="ap-empty"><LoadingState message="Cargando upgrades..." inline /></div>
-                        ) : !upgrades || upgrades.length === 0 ? (
-                            <div style={{ textAlign: 'center', padding: '20px 0' }}>
-                                <p className="ap-empty">No hay actualizaciones de hardware registradas.</p>
-                                {assetPerms.edit && (
-                                <button
-                                    className="btn-glass"
-                                    style={{ marginTop: '12px', fontSize: '13px', padding: '8px 16px' }}
-                                    onClick={() => setShowUpgradeModal(true)}
-                                >
-                                    <Plus size={14} /> Registrar el primer upgrade
-                                </button>
-                                )}
-                            </div>
-                        ) : (
-                            <div style={{ overflowX: 'auto' }}>
-                                <table className="upgrades-table">
-                                    <thead>
-                                        <tr>
-                                            <th>Fecha</th>
-                                            <th>Componente</th>
-                                            <th>Cambio</th>
-                                            <th>Técnico</th>
-                                            <th>Notas</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {upgrades.map((u) => (
-                                            <tr key={u.id}>
-                                                <td style={{ whiteSpace: 'nowrap', color: 'var(--text-muted)' }}>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                                        <Calendar size={13} />
-                                                        {new Date(u.upgrade_date).toLocaleDateString('es-CO')}
-                                                    </div>
-                                                </td>
-                                                <td>
-                                                    <span className="upgrade-component-badge">
-                                                        <CpuIcon size={11} />
-                                                        {u.component}
-                                                    </span>
-                                                </td>
-                                                <td>
-                                                    <div className="upgrade-arrow">
-                                                        {u.old_value && (
-                                                            <>
-                                                                <span className="upgrade-old-value">{u.old_value}</span>
-                                                                <ArrowRight size={13} color="var(--text-muted)" />
-                                                            </>
-                                                        )}
-                                                        <span className="upgrade-new-value">{u.new_value}</span>
-                                                    </div>
-                                                </td>
-                                                <td>
-                                                    {u.performed_by ? (
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                                            <User size={13} />
-                                                            {u.performed_by}
-                                                        </div>
-                                                    ) : (
-                                                        <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>—</span>
-                                                    )}
-                                                </td>
-                                                <td style={{ maxWidth: '200px', color: 'var(--text-muted)', fontSize: '13px' }}>
-                                                    {u.notes || '—'}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* ── 4. Historial de Asignaciones ── */}
-                    <div className="ap-section glass-panel">
-                        <div className="ap-section-header">
-                            <h3 className="ap-section-title">
-                                <Users size={20} color="var(--ikusi-green)" />
-                                Historial de Personas Asignadas
-                                {assignmentHistory && assignmentHistory.length > 0 && (
-                                    <span className="count-badge">{assignmentHistory.length}</span>
-                                )}
-                            </h3>
-                        </div>
-
-                        {loadingHistory ? (
-                            <div className="ap-empty"><LoadingState message="Cargando historial..." inline /></div>
-                        ) : !assignmentHistory || assignmentHistory.length === 0 ? (
-                            <p className="ap-empty">Este equipo no ha sido asignado a ningún colaborador.</p>
-                        ) : (
-                            <div className="assignment-history-list">
-                                {assignmentHistory.map((a) => (
-                                    <div key={a.id} className="assignment-history-card">
-                                        <div className="assignment-person">
-                                            <div className="assignment-avatar">
-                                                <User size={20} color="var(--ikusi-green)" />
-                                            </div>
-                                            <div className="assignment-person-info">
-                                                <h4>{a.collaboratorName}</h4>
-                                                {a.collaboratorEmail && (
-                                                    <p style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                        <Mail size={12} /> {a.collaboratorEmail}
-                                                    </p>
-                                                )}
-                                                <div style={{ marginTop: '6px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                                                    <span className={`badge-ap ${
-                                                        a.status === 'ACCEPTED' ? 'badge-type-preventive'
-                                                        : a.status === 'RETURNED' ? 'badge-status-cancelled'
-                                                        : 'badge-status-scheduled'
-                                                    }`}>
-                                                        {assignmentStatusLabel(a.status)}
-                                                    </span>
-                                                    {a.assignmentType === 'LOAN' && (() => {
-                                                        const overdue = a.status === 'ACCEPTED' && a.expectedReturnDate && new Date(a.expectedReturnDate) < new Date();
-                                                        return (
-                                                            <span
-                                                                className="badge-ap"
-                                                                style={{
-                                                                    background: overdue ? 'rgba(239, 68, 68, 0.15)' : 'rgba(245, 158, 11, 0.15)',
-                                                                    color: overdue ? '#dc2626' : '#ca8a04'
-                                                                }}
-                                                            >
-                                                                Préstamo{a.expectedReturnDate ? ` · ${overdue ? 'Vencido' : 'Vence'} ${formatDateSafe(a.expectedReturnDate)}` : ''}
-                                                            </span>
-                                                        );
-                                                    })()}
-                                                    {a.documentPath && (
-                                                        <a
-                                                            href={`${API_URL}${a.documentPath}`}
-                                                            target="_blank"
-                                                            rel="noreferrer"
-                                                            className="maint-pdf-link"
-                                                            style={{ marginTop: 0 }}
-                                                        >
-                                                            <FileText size={12} /> Ver Acta
-                                                        </a>
-                                                    )}
-                                                    {a.status === 'RETURNED' && a.adminApproval && (
-                                                        <span
-                                                            className="badge-ap badge-type-preventive"
-                                                            title={`Aprobado por ${a.adminApproval.approvedBy}${a.adminApproval.note ? ` — ${a.adminApproval.note}` : ''}`}
-                                                        >
-                                                            ✔ Visto bueno TI
-                                                        </span>
-                                                    )}
-                                                    {assetPerms.edit && a.status === 'RETURNED' && !a.adminApproval && (
-                                                        <button
-                                                            className="btn-action"
-                                                            style={{ borderColor: '#f59e0b', color: '#f59e0b', fontSize: '11px', padding: '2px 10px' }}
-                                                            title="Aprobar la devolución y certificar que el colaborador no tiene cuentas pendientes con TI"
-                                                            onClick={() => { setApprovalTarget(a.id); setApprovalNote(''); }}
-                                                        >
-                                                            Dar Visto Bueno
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div className="assignment-dates">
-                                            <div className="assignment-date-row">
-                                                <Calendar size={13} color="var(--ikusi-green)" />
-                                                <span>Desde: <strong>{formatDateSafe(a.startDate)}</strong></span>
-                                            </div>
-                                            {a.endDate ? (
-                                                <div className="assignment-date-row assignment-status-returned">
-                                                    <Clock size={13} />
-                                                    <span>Hasta: {formatDateSafe(a.endDate)}</span>
-                                                </div>
-                                            ) : (
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: 'var(--ikusi-green)', fontWeight: 600 }}>
-                                                    <Hash size={11} /> Asignación vigente
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
+                    <AssignmentHistorySection
+                        assignmentHistory={assignmentHistory}
+                        loading={loadingHistory}
+                        canEdit={assetPerms.edit}
+                        assignmentStatusLabel={assignmentStatusLabel}
+                        formatDateSafe={formatDateSafe}
+                        onApprove={(assignmentId) => { setApprovalTarget(assignmentId); setApprovalNote(''); }}
+                    />
 
                 </div>
             </div>
 
-            {/* ─── Modal: Visto Bueno de Devolución ─── */}
             {approvalTarget && (
-                <div className="ap-modal-overlay" onClick={() => setApprovalTarget(null)}>
-                    <div className="ap-modal glass-panel" onClick={e => e.stopPropagation()}>
-                        <button className="ap-modal-close" onClick={() => setApprovalTarget(null)}>✕</button>
-                        <h3 className="ap-modal-title">
-                            <CheckCircle size={20} color="var(--ikusi-green)" />
-                            Visto Bueno de Devolución
-                        </h3>
-                        <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '16px' }}>
-                            Al aprobar, certificas la recepción del equipo y que el colaborador no tiene cuentas pendientes con el área de TI.
-                            El acta de devolución se actualizará con tu visto bueno.
-                        </p>
-                        <div className="ap-form-group" style={{ marginBottom: '20px' }}>
-                            <label>Observaciones (estado del equipo, novedades, etc.)</label>
-                            <textarea
-                                className="glass-input"
-                                rows={4}
-                                style={{ width: '100%', resize: 'vertical' }}
-                                placeholder="Ej. Equipo recibido en buen estado, con cargador y maletín."
-                                value={approvalNote}
-                                onChange={e => setApprovalNote(e.target.value)}
-                            />
-                        </div>
-                        <button
-                            className="btn-primary"
-                            style={{ width: '100%' }}
-                            disabled={approveReturnMutation.isPending}
-                            onClick={() => approveReturnMutation.mutate({ assignmentId: approvalTarget, note: approvalNote })}
-                        >
-                            {approveReturnMutation.isPending ? 'Registrando...' : 'Aprobar Devolución'}
-                        </button>
-                    </div>
-                </div>
+                <ApprovalModal
+                    note={approvalNote}
+                    setNote={setApprovalNote}
+                    onClose={() => setApprovalTarget(null)}
+                    onSubmit={() => approveReturnMutation.mutate({ assignmentId: approvalTarget, note: approvalNote })}
+                    isPending={approveReturnMutation.isPending}
+                />
             )}
 
-            {/* ─── Modal: Registrar Upgrade de Hardware ─── */}
             {showUpgradeModal && (
-                <div className="ap-modal-overlay" onClick={() => setShowUpgradeModal(false)}>
-                    <div className="ap-modal glass-panel" onClick={e => e.stopPropagation()}>
-                        <button className="ap-modal-close" onClick={() => setShowUpgradeModal(false)}>✕</button>
-                        <h3 className="ap-modal-title">
-                            <CpuIcon size={20} color="var(--ikusi-green)" />
-                            Registrar Actualización de Hardware
-                        </h3>
-
-                        <div className="ap-form-row">
-                            <div className="ap-form-group">
-                                <label>Componente *</label>
-                                <select
-                                    className="glass-input"
-                                    value={upgradeForm.component}
-                                    onChange={e => {
-                                        const selected = e.target.value;
-                                        const currentVal = selected ? getCurrentSpecValue(selected, specs) : '';
-                                        setUpgradeForm(f => ({ ...f, component: selected, old_value: currentVal }));
-                                    }}
-                                >
-                                    <option value="">Seleccionar...</option>
-                                    {COMPONENT_OPTIONS.map(c => (
-                                        <option key={c} value={c}>{c}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div className="ap-form-group">
-                                <label>Fecha del Upgrade *</label>
-                                <input
-                                    type="date"
-                                    className="glass-input"
-                                    value={upgradeForm.upgrade_date}
-                                    onChange={e => setUpgradeForm(f => ({ ...f, upgrade_date: e.target.value }))}
-                                />
-                            </div>
-                        </div>
-
-                        <div className="ap-form-row">
-                            <div className="ap-form-group">
-                                <label>
-                                    Valor Anterior
-                                    {upgradeForm.old_value && (
-                                        <span style={{ marginLeft: '8px', fontSize: '11px', color: 'var(--ikusi-green)', fontWeight: 600 }}>
-                                            ✓ Tomado de especificaciones actuales
-                                        </span>
-                                    )}
-                                </label>
-                                <input
-                                    type="text"
-                                    className="glass-input"
-                                    placeholder="Sin especificación registrada"
-                                    value={upgradeForm.old_value}
-                                    readOnly={!!getCurrentSpecValue(upgradeForm.component, specs)}
-                                    style={getCurrentSpecValue(upgradeForm.component, specs) ? {
-                                        background: 'rgba(0,166,80,0.06)',
-                                        borderColor: 'rgba(0,166,80,0.3)',
-                                        color: 'var(--text-secondary)',
-                                        cursor: 'not-allowed'
-                                    } : {}}
-                                    onChange={e => setUpgradeForm(f => ({ ...f, old_value: e.target.value }))}
-                                />
-                            </div>
-                            <div className="ap-form-group">
-                                <label>Nuevo Valor *</label>
-                                <input
-                                    type="text"
-                                    className="glass-input"
-                                    placeholder="ej. 16 GB DDR4"
-                                    value={upgradeForm.new_value}
-                                    onChange={e => setUpgradeForm(f => ({ ...f, new_value: e.target.value }))}
-                                />
-                            </div>
-                        </div>
-
-                        <div className="ap-form-group">
-                            <label>Técnico Responsable</label>
-                            <input
-                                type="text"
-                                className="glass-input"
-                                placeholder="Nombre del técnico que realizó el cambio"
-                                value={upgradeForm.performed_by}
-                                onChange={e => setUpgradeForm(f => ({ ...f, performed_by: e.target.value }))}
-                            />
-                        </div>
-
-                        <div className="ap-form-group">
-                            <label>Notas adicionales</label>
-                            <textarea
-                                className="glass-input"
-                                rows={3}
-                                placeholder="Observaciones sobre el upgrade..."
-                                value={upgradeForm.notes}
-                                onChange={e => setUpgradeForm(f => ({ ...f, notes: e.target.value }))}
-                                style={{ resize: 'vertical' }}
-                            />
-                        </div>
-
-                        <div className="ap-modal-footer">
-                            <button className="btn-glass" onClick={() => setShowUpgradeModal(false)}>
-                                Cancelar
-                            </button>
-                            <button
-                                className="btn-primary"
-                                disabled={!upgradeForm.component || !upgradeForm.new_value || !upgradeForm.upgrade_date || createUpgrade.isPending}
-                                onClick={() => createUpgrade.mutate(upgradeForm)}
-                            >
-                                {createUpgrade.isPending ? 'Guardando...' : 'Registrar Upgrade'}
-                            </button>
-                        </div>
-
-                        {createUpgrade.isError && (
-                            <p style={{ color: 'var(--accent-red)', marginTop: '12px', fontSize: '13px' }}>
-                                Error al guardar. Intenta nuevamente.
-                            </p>
-                        )}
-                    </div>
-                </div>
+                <UpgradeFormModal
+                    form={upgradeForm}
+                    setForm={setUpgradeForm}
+                    componentOptions={COMPONENT_OPTIONS}
+                    getCurrentSpecValue={getCurrentSpecValue}
+                    specs={specs}
+                    onClose={() => setShowUpgradeModal(false)}
+                    onSubmit={() => createUpgrade.mutate(upgradeForm)}
+                    isPending={createUpgrade.isPending}
+                    isError={createUpgrade.isError}
+                />
             )}
 
-            {/* ── Depreciation Modal ── */}
-            {showDepreciationModal && (() => {
-                let precio = asset?.purchasePrice || 0;
-                if (precio === 0) {
-                    let pKey = Object.keys(specs).find(k => k.toUpperCase().includes('PRECIO'));
-                    if (pKey && specs[pKey]) {
-                        precio = parseFloat(String(specs[pKey]).replace(/[^0-9.-]+/g, ''));
-                    }
-                }
-                
-                let anos = asset?.depreciationYears || 0;
-                if (anos === 0) {
-                    let aKey = Object.keys(specs).find(k => k.toUpperCase().includes('DEPRECIACI'));
-                    if (aKey && specs[aKey]) {
-                        anos = parseFloat(String(specs[aKey]).replace(/[^0-9.-]+/g, ''));
-                    }
-                }
-                
-                let fechaCompra = asset?.purchaseDate;
-                if (!fechaCompra) {
-                    let fKey = Object.keys(specs).find(k => k.toUpperCase().includes('FECHA DE COMPRA'));
-                    if (fKey && specs[fKey]) {
-                        fechaCompra = specs[fKey];
-                    }
-                }
-
-                let content = null;
-                if (!precio || !anos || !fechaCompra) {
-                    content = (
-                        <div style={{ textAlign: 'center', padding: '20px' }}>
-                            <AlertCircle size={40} color="var(--accent-red)" style={{ marginBottom: '10px' }} />
-                            <p style={{ color: 'var(--text-secondary)' }}>Faltan datos en el activo para calcular la depreciación.</p>
-                            <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Se requiere: Precio de Compra, Fecha de Compra y Años de Depreciación.</p>
-                        </div>
-                    );
-                } else {
-                    const dateCompra = new Date(`${fechaCompra.toString().split('T')[0]}T12:00:00`);
-                    const diffTime = new Date().getTime() - dateCompra.getTime();
-                    const elapsedYears = diffTime > 0 ? diffTime / (1000 * 60 * 60 * 24 * 365.25) : 0;
-                    
-                    const depAnual = precio / anos;
-                    const depAcumulada = Math.min(precio, depAnual * elapsedYears);
-                    const valorActual = Math.max(0, precio - depAcumulada);
-                    
-                    const formatCurrency = (val: number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP' }).format(val);
-
-                    content = (
-                        <div style={{ padding: '10px 0' }}>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '20px' }}>
-                                <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Precio de Compra</div>
-                                    <div style={{ fontSize: '16px', fontWeight: 600 }}>{formatCurrency(precio)}</div>
-                                </div>
-                                <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Tiempo Transcurrido</div>
-                                    <div style={{ fontSize: '16px', fontWeight: 600 }}>{elapsedYears.toFixed(1)} años</div>
-                                </div>
-                            </div>
-                            
-                            <div style={{ marginBottom: '15px' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px dashed #e2e8f0' }}>
-                                    <span style={{ color: 'var(--text-secondary)' }}>Años de vida útil:</span>
-                                    <span style={{ fontWeight: 600 }}>{anos} años</span>
-                                </div>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px dashed #e2e8f0' }}>
-                                    <span style={{ color: 'var(--text-secondary)' }}>Depreciación anual (línea recta):</span>
-                                    <span style={{ fontWeight: 600, color: 'var(--accent-red)' }}>-{formatCurrency(depAnual)}</span>
-                                </div>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px dashed #e2e8f0' }}>
-                                    <span style={{ color: 'var(--text-secondary)' }}>Depreciación acumulada:</span>
-                                    <span style={{ fontWeight: 600, color: 'var(--accent-red)' }}>-{formatCurrency(depAcumulada)}</span>
-                                </div>
-                            </div>
-
-                            <div style={{ background: 'var(--ikusi-green)', color: 'white', padding: '15px', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span style={{ fontSize: '14px', fontWeight: 600 }}>Valor Actual Estimado</span>
-                                <span style={{ fontSize: '20px', fontWeight: 700 }}>{formatCurrency(valorActual)}</span>
-                            </div>
-                        </div>
-                    );
-                }
-
-                return (
-                    <div className="ap-modal-overlay">
-                        <div className="ap-modal glass-panel" style={{ maxWidth: '450px' }}>
-                            <div className="ap-modal-header">
-                                <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <Activity size={20} color="var(--ikusi-green)" />
-                                    Cálculo de Depreciación
-                                </h3>
-                                <button className="ap-modal-close" onClick={() => setShowDepreciationModal(false)}>×</button>
-                            </div>
-                            <div className="ap-modal-body">
-                                {content}
-                            </div>
-                            <div className="ap-modal-footer">
-                                <button className="btn-primary" onClick={() => setShowDepreciationModal(false)} style={{ width: '100%' }}>
-                                    Cerrar
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                );
-            })()}
+            {showDepreciationModal && (
+                <DepreciationModal
+                    asset={asset}
+                    specs={specs}
+                    onClose={() => setShowDepreciationModal(false)}
+                />
+            )}
         </div>
     );
 }
