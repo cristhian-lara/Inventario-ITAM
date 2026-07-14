@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { AlertCircle } from 'lucide-react';
 
 export interface NewAssetData {
@@ -27,6 +28,7 @@ interface Props {
 export default function AssetFormModal({ newAsset, setNewAsset, categories, isEditing, modalErrorMsg, onClose, onSubmit, isPending }: Props) {
   const selectedCategory = categories?.find((c: any) => c.id === newAsset.categoryId);
   const requiresPlaca = selectedCategory?.schemaDefinition?.requiresPlacaIkusi !== false;
+  const [placaUnlocked, setPlacaUnlocked] = useState(false);
 
   return (
     <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(4px)', padding: '20px' }}>
@@ -74,18 +76,33 @@ export default function AssetFormModal({ newAsset, setNewAsset, categories, isEd
           {newAsset.categoryId && (
             <>
               <div className="form-group">
-                <label>
-                  {requiresPlaca ? "Placa Ikusi" : "ID Interno (Generado automáticamente)"}
+                <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                  <span>{requiresPlaca ? "Placa Ikusi" : "ID Interno (Generado automáticamente)"}</span>
+                  {isEditing && requiresPlaca && (
+                    <button
+                      type="button"
+                      onClick={() => setPlacaUnlocked(v => !v)}
+                      style={{ background: 'transparent', border: 'none', color: 'var(--accent, #4a9eff)', cursor: 'pointer', fontSize: '12px', fontWeight: 600, textDecoration: 'underline', padding: 0 }}
+                    >
+                      {placaUnlocked ? 'Cancelar corrección' : 'Corregir placa'}
+                    </button>
+                  )}
                 </label>
                 <input
                   type="text"
                   required={requiresPlaca}
                   className="glass-input"
                   value={newAsset.id}
-                  disabled={isEditing || !requiresPlaca}
+                  disabled={(isEditing && !placaUnlocked) || !requiresPlaca}
                   onChange={e => setNewAsset({ ...newAsset, id: e.target.value })}
                   placeholder={requiresPlaca ? "Ej. AST-2026-050" : "Autogenerado (Ej: 000001)"}
                 />
+                {isEditing && requiresPlaca && placaUnlocked && (
+                  <div style={{ display: 'flex', gap: '6px', alignItems: 'flex-start', marginTop: '6px', fontSize: '12px', color: 'var(--text-muted)' }}>
+                    <AlertCircle size={14} style={{ flexShrink: 0, marginTop: '1px' }} />
+                    <span>Úsalo solo para corregir un activo que quedó sin placa asignada. El cambio se reflejará también en su historial de asignaciones, mantenimientos y upgrades.</span>
+                  </div>
+                )}
               </div>
               <div className="form-group">
                 <label>Número de Serie</label>

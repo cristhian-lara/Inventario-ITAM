@@ -46,4 +46,12 @@ export class InMemoryCatalogRepository implements ICatalogRepository {
         const count = Array.from(this.assets.values()).filter(a => a.categoryId === categoryId).length;
         return (count + 1).toString().padStart(6, '0');
     }
+
+    async renameAssetPlate(oldId: string, newId: string): Promise<void> {
+        const asset = this.assets.get(oldId);
+        if (!asset) throw new Error(`El activo con ID ${oldId} no existe.`);
+        if (this.assets.has(newId)) throw new Error(`Ya existe un activo con la placa ${newId}.`);
+        this.assets.delete(oldId);
+        this.assets.set(newId, new Asset({ ...(asset as any).props, id: newId }));
+    }
 }

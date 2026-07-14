@@ -97,6 +97,35 @@ export class CatalogUseCases {
         return asset;
     }
 
+    /**
+     * Corrige manualmente la Placa Ikusi de un activo (caso de equipos que,
+     * por malas prácticas previas, quedaron dados de alta sin placa asignada).
+     * Propaga el cambio a assignments/maintenances/hardware_upgrades para no
+     * romper el historial existente.
+     */
+    async renameAssetPlate(oldId: string, newId: string): Promise<Asset> {
+        const trimmedNewId = newId?.trim();
+        if (!trimmedNewId) {
+            throw new Error('La nueva Placa Ikusi no puede estar vacía.');
+        }
+        if (trimmedNewId === oldId) {
+            throw new Error('La nueva Placa Ikusi debe ser diferente a la actual.');
+        }
+
+        const asset = await this.repository.getAssetById(oldId);
+        if (!asset) throw new Error(`El activo con ID ${oldId} no existe.`);
+
+        const conflicting = await this.repository.getAssetById(trimmedNewId);
+        if (conflicting) throw new Error(`Ya existe un activo con la placa ${trimmedNewId}.`);
+
+        await this.repository.renameAssetPlate(oldId, trimmedNewId);
+
+        const renamed = await this.repository.getAssetById(trimmedNewId);
+        if (!renamed) throw new Error('No se pudo confirmar el renombrado del activo.');
+
+        return renamed;
+    }
+
     async changeAssetStatus(assetId: string, newStatus: AssetStatus, reason?: string): Promise<Asset> {
         const asset = await this.repository.getAssetById(assetId);
         if (!asset) throw new Error(`El activo con ID ${assetId} no fue encontrado.`);

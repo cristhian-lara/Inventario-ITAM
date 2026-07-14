@@ -68,6 +68,7 @@ export default function Catalog() {
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [editingOriginalId, setEditingOriginalId] = useState<string | null>(null);
   const [newAsset, setNewAsset] = useState<{ id: string; categoryId: number | ''; serial: string; dynamicAttributes: any; purchaseDate?: string; warrantyMonths?: number; depreciationYears?: number; purchasePrice?: number; vendorName?: string; internalBuyer?: string }>({
     id: '',
     categoryId: '',
@@ -280,6 +281,28 @@ export default function Catalog() {
     }
   });
 
+  const renamePlateMutation = useMutation({
+    mutationFn: async ({ oldId, asset }: { oldId: string, asset: any }) => {
+      await axios.put(`${API_URL}/api/catalog/assets/${oldId}/plate`, { newId: asset.id });
+      const response = await axios.put(`${API_URL}/api/catalog/assets/${asset.id}`, asset);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['assets'] });
+      queryClient.invalidateQueries({ queryKey: ['assignments'] });
+      queryClient.invalidateQueries({ queryKey: ['maintenances'] });
+      setShowAddModal(false);
+      setNewAsset({ id: '', categoryId: '', serial: '', dynamicAttributes: {} });
+      setIsEditing(false);
+      setEditingOriginalId(null);
+      toast.success('Placa Ikusi corregida y activo actualizado exitosamente', 3000);
+    },
+    onError: (err: any) => {
+      setModalErrorMsg(err.response?.data?.error || err.message);
+      setTimeout(() => setModalErrorMsg(''), 8000);
+    }
+  });
+
   const retireAssetMutation = useMutation({
     mutationFn: async ({ id, reason, blanccoReportId, notes }: { id: string, reason: string, blanccoReportId?: string, notes?: string }) => {
       const response = await axios.post(`${API_URL}/api/catalog/assets/${id}/decommission`, { reason, blanccoReportId, notes });
@@ -410,6 +433,7 @@ export default function Catalog() {
 
   const handleEditClick = (asset: any) => {
     setIsEditing(true);
+    setEditingOriginalId(asset.id);
     setNewAsset({
       id: asset.id,
       categoryId: Number(asset.categoryId),
@@ -791,11 +815,15 @@ export default function Catalog() {
           categories={categories}
           isEditing={isEditing}
           modalErrorMsg={modalErrorMsg}
-          onClose={() => setShowAddModal(false)}
+          onClose={() => { setShowAddModal(false); setEditingOriginalId(null); }}
           onSubmit={(e) => {
             e.preventDefault();
+            const plateChanged = isEditing && editingOriginalId !== null && newAsset.id !== editingOriginalId;
+
             const submitAction = () => {
-              if (isEditing) {
+              if (plateChanged) {
+                renamePlateMutation.mutate({ oldId: editingOriginalId!, asset: newAsset });
+              } else if (isEditing) {
                 editAssetMutation.mutate(newAsset);
               } else {
                 addAssetMutation.mutate(newAsset);
@@ -804,12 +832,14 @@ export default function Catalog() {
 
             confirm({
               title: isEditing ? 'Guardar Cambios' : 'Crear Activo',
-              message: isEditing ? '¿Estás seguro de guardar los cambios de este activo?' : '¿Estás seguro de registrar este nuevo activo?',
-              type: 'info',
+              message: plateChanged
+                ? `Vas a cambiar la Placa Ikusi de "${editingOriginalId}" a "${newAsset.id}". El historial de asignaciones, mantenimientos y upgrades de este equipo se actualizará con la nueva placa. ¿Deseas continuar?`
+                : (isEditing ? '¿Estás seguro de guardar los cambios de este activo?' : '¿Estás seguro de registrar este nuevo activo?'),
+              type: plateChanged ? 'warning' : 'info',
               onConfirm: submitAction
             });
           }}
-          isPending={addAssetMutation.isPending || editAssetMutation.isPending}
+          isPending={addAssetMutation.isPending || editAssetMutation.isPending || renamePlateMutation.isPending}
         />
       )}
 

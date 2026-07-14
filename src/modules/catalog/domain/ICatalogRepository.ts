@@ -10,4 +10,10 @@ export interface ICatalogRepository {
     getAllAssets(): Promise<Asset[]>;
     getAssetsPaginated(page: number, limit: number): Promise<{ items: Asset[]; total: number }>;
     generateIncrementalId(categoryId: number): Promise<string>;
+    /**
+     * Renombra el identificador (Placa Ikusi) de un activo, propagando el
+     * cambio a las tablas que lo referencian por texto (sin FK real):
+     * assignments, maintenances, hardware_upgrades.
+     */
+    renameAssetPlate(oldId: string, newId: string): Promise<void>;
 }

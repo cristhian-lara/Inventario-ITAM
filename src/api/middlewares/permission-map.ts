@@ -67,6 +67,7 @@ export const ROUTE_PERMISSIONS: RoutePermission[] = [
     { method: 'POST', pattern: /^\/catalog\/assets\/import$/, anyOf: [req('assets', 'create')] },
     { method: 'POST', pattern: /^\/catalog\/assets\/[^/]+\/decommission$/, anyOf: [req('assets', 'delete')] },
     { method: 'PUT', pattern: /^\/catalog\/assets\/[^/]+\/status$/, anyOf: [req('assets', 'edit')] },
+    { method: 'PUT', pattern: /^\/catalog\/assets\/[^/]+\/plate$/, anyOf: [req('assets', 'edit')] },
     { method: 'POST', pattern: /^\/catalog\/assets$/, anyOf: [req('assets', 'create')] },
     { method: 'PUT', pattern: /^\/catalog\/assets\/[^/]+$/, anyOf: [req('assets', 'edit')] },
     { method: 'GET', pattern: /^\/catalog\/assets/, anyOf: anyRead('assets', 'collaborators', 'maintenances', 'dashboard') },

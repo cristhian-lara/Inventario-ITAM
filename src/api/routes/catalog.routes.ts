@@ -42,6 +42,10 @@ const changeStatusSchema = z.object({
     reason: z.string().optional(),
 });
 
+const renamePlateSchema = z.object({
+    newId: z.string().min(1, 'La nueva Placa Ikusi es obligatoria'),
+});
+
 const upgradeSchema = z.object({
     upgrade_date: z.string().min(1, 'upgrade_date es obligatorio'),
     component: z.string().min(1, 'component es obligatorio'),
@@ -164,6 +168,30 @@ router.put('/assets/:id', validateBody(updateAssetSchema), async (req, res) => {
             vendorName || undefined,
             internalBuyer || undefined
         );
+        res.json({
+            id: asset.id,
+            categoryId: asset.categoryId,
+            serial: asset.serial,
+            status: asset.status,
+            dynamicAttributes: asset.dynamicAttributes,
+            purchaseDate: asset.purchaseDate,
+            warrantyMonths: asset.warrantyMonths,
+            depreciationYears: asset.depreciationYears,
+            purchasePrice: asset.purchasePrice,
+            vendorName: asset.vendorName,
+            internalBuyer: asset.internalBuyer
+        });
+    } catch (error: any) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Corrección manual de la Placa Ikusi (equipos dados de alta sin placa por
+// malas prácticas previas). Propaga el cambio al historial de asignaciones,
+// mantenimientos y upgrades de hardware.
+router.put('/assets/:id/plate', validateBody(renamePlateSchema), async (req, res) => {
+    try {
+        const asset = await catalogUseCases.renameAssetPlate(req.params.id, req.body.newId);
         res.json({
             id: asset.id,
             categoryId: asset.categoryId,

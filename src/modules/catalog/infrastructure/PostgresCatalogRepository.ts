@@ -140,4 +140,29 @@ export class PostgresCatalogRepository implements ICatalogRepository {
         const nextId = count + 1;
         return nextId.toString().padStart(6, '0');
     }
+
+    /**
+     * Renombra la Placa Ikusi (PK del activo). No existe FK real hacia
+     * assignments/maintenances/hardware_upgrades (guardan asset_id como texto),
+     * así que el cambio se propaga manualmente a las tres en la misma transacción.
+     */
+    async renameAssetPlate(oldId: string, newId: string): Promise<void> {
+        const manager = this.assetRepo.manager;
+        try {
+            await manager.transaction(async (tx) => {
+                const result = await tx.query('UPDATE assets SET id = $1 WHERE id = $2', [newId, oldId]);
+                if (result[1] === 0) {
+                    throw new Error(`El activo con ID ${oldId} no existe.`);
+                }
+                await tx.query('UPDATE assignments SET asset_id = $1 WHERE asset_id = $2', [newId, oldId]);
+                await tx.query('UPDATE maintenances SET asset_id = $1 WHERE asset_id = $2', [newId, oldId]);
+                await tx.query('UPDATE hardware_upgrades SET asset_id = $1 WHERE asset_id = $2', [newId, oldId]);
+            });
+        } catch (error: any) {
+            if (error?.driverError?.code === '23505' || error?.code === '23505') {
+                throw new Error(`Ya existe un activo con la placa ${newId}.`);
+            }
+            throw error;
+        }
+    }
 }
