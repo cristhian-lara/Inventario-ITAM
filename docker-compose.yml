@@ -9,7 +9,9 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD:-secret}
       POSTGRES_DB: ${DB_DATABASE:-inventario-ikusi}
     ports:
-      - "5432:5432"
+      # Solo accesible desde localhost: el backend la alcanza por la red interna de Docker (db:5432),
+      # no hace falta ni conviene exponerla a la red local/Wi-Fi
+      - "127.0.0.1:5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     restart: always

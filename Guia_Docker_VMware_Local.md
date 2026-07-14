@@ -37,10 +37,13 @@ Ejemplo de lo que debes poner o modificar en tu `.env`:
 ```env
 BACKEND_URL=http://192.168.1.50:3000
 FRONTEND_URL=http://192.168.1.50
+JWT_SECRET=escribe_aqui_una_clave_cualquiera_para_pruebas
 ```
 *(Reemplaza `192.168.1.50` por la IP real de tu VMware)*
 
 > [!IMPORTANT]
+> **Sobre la seguridad:** Por seguridad, la variable `JWT_SECRET` fue eliminada del archivo `docker-compose.yml`. Esto significa que si no la agregas en tu archivo `.env`, Docker mostrará un error y no dejará encender el proyecto. Para pruebas en VMware, puedes poner cualquier texto.
+> 
 > Si solo vas a acceder al sistema desde el navegador dentro de la misma máquina virtual, puedes usar `http://localhost:3000` y `http://localhost`. Pero si quieres acceder desde el Windows físico (el "host" de VMware), DEBES poner la IP de la máquina VMware.
 
 ---

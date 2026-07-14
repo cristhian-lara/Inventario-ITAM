@@ -73,6 +73,9 @@ FRONTEND_URL=http://10.50.20.100
 > En Producción es vital cambiar la clave `DB_PASSWORD` por algo seguro y poner un `JWT_SECRET` totalmente nuevo. 
 > Además, los usuarios de tu empresa accederán a `http://10.50.20.100` desde sus navegadores.
 
+> [!IMPORTANT]
+> **Sobre el JWT_SECRET:** Por seguridad, esta variable fue removida por completo del archivo `docker-compose.yml`. Esto significa que **es estrictamente obligatorio** incluirla en este archivo `.env`. Si olvidas ponerla, el comando de Docker arrojará un error de seguridad y el proyecto no se encenderá.
+
 ---
 
 ## 4. Encender en Producción

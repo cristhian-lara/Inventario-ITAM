@@ -36,7 +36,9 @@ app.use(helmet({
 const allowedOrigins = (process.env.CORS_ORIGINS || '')
     .split(',').map(o => o.trim()).filter(Boolean);
 const isProduction = process.env.NODE_ENV === 'production';
-const DEV_ORIGIN_PATTERN = /^http:\/\/(localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3}):\d+$/;
+// El puerto es opcional: el navegador omite el puerto en el header Origin
+// cuando es el puerto por defecto del esquema (80 para http).
+const DEV_ORIGIN_PATTERN = /^http:\/\/(localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3})(:\d+)?$/;
 app.use(cors({
     origin: (origin, callback) => {
         if (!origin || allowedOrigins.includes(origin) || (!isProduction && DEV_ORIGIN_PATTERN.test(origin))) return callback(null, true);
