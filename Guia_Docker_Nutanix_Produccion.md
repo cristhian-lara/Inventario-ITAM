@@ -63,10 +63,16 @@ DB_DATABASE=inventario-ikusi
 # Configuración de Servidor
 PORT=3000
 JWT_SECRET=escribe_aqui_una_clave_larga_y_aleatoria_por_seguridad
+NODE_ENV=production
 
 # URL para el funcionamiento de Frontend y Backend
 BACKEND_URL=http://10.50.20.100:3000
 FRONTEND_URL=http://10.50.20.100
+
+# Origen exacto desde el que se accede por navegador (sin barra final).
+# En producción es obligatorio: fuera de localhost/192.168.x.x, CORS rechaza
+# cualquier origen que no esté en esta lista.
+CORS_ORIGINS=http://10.50.20.100
 ```
 
 > [!TIP]

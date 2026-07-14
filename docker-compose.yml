@@ -31,6 +31,8 @@ services:
       - FRONTEND_URL=${FRONTEND_URL:-http://localhost}
       - BACKEND_URL=${BACKEND_URL:-http://localhost:3000}
       - JWT_SECRET=${JWT_SECRET:?La variable de entorno JWT_SECRET es obligatoria (sin valor por defecto por seguridad)}
+      - NODE_ENV=${NODE_ENV:-development}
+      - CORS_ORIGINS=${CORS_ORIGINS:-}
     ports:
       - "3000:3000"
     depends_on:
