@@ -253,7 +253,7 @@ export class CollaboratorUseCases {
                 const email = record.Email || record.email || record.Correo || record.correo;
                 const departmentName = record.Department || record.department || record.Departamento || record.departamento;
                 const location = record.Location || record.location || record.Ubicacion || record.Ubicación || record.ubicacion;
-                const cecosId = record.CECOS || record.Cecos || record.cecos || record.CentroCostos || record.centroCostos || record['Centro de costos'] || record['Centro de Costos'];
+                const cecosId = record.CECOS || record.Cecos || record.cecos || record.Ceco || record.ceco || record.CentroCostos || record.centroCostos || record['Centro de costos'] || record['Centro de Costos'];
                 const activationDateRaw = record.FechaAlta || record.fechaAlta || record.ActivationDate || record.activationDate || record['Fecha de Alta'] || record['Fecha de alta'];
 
                 let isLeader = false;
@@ -297,9 +297,37 @@ export class CollaboratorUseCases {
                     }
                 }
 
+                const normalizedEmail = String(email).trim();
+                const existing = await this.collaboratorRepo.findByEmail(normalizedEmail);
+
+                if (existing) {
+                    // Upsert: el colaborador ya existe. Solo actualizamos el CECO (sin
+                    // tocar estado, nombre, departamento ni ubicación) para no reactivar
+                    // bajas ni sobreescribir ediciones manuales.
+                    if (finalCecosId) {
+                        const updated = new Collaborator(
+                            existing.id,
+                            existing.name,
+                            existing.email,
+                            existing.department,
+                            existing.location,
+                            existing.status,
+                            existing.activationDate,
+                            existing.deactivationDate,
+                            existing.createdAt,
+                            existing.isLeader,
+                            existing.leaderId,
+                            { ...existing.dynamicAttributes, CECOS: finalCecosId }
+                        );
+                        await this.collaboratorRepo.update(updated);
+                    }
+                    successful++;
+                    continue;
+                }
+
                 await this.createCollaborator({
                     name: String(name).trim(),
-                    email: String(email).trim(),
+                    email: normalizedEmail,
                     department: Number(department.id),
                     location: String(location).trim(),
                     isLeader: isLeader,
