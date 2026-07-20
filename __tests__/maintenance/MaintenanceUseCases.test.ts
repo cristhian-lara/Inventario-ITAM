@@ -14,6 +14,8 @@ describe('MaintenanceUseCases', () => {
             findById: jest.fn(),
             findByAssetId: jest.fn(),
             findAll: jest.fn(),
+            findByIds: jest.fn(),
+            findMaintenancesDueWithinDays: jest.fn(),
         };
 
         mockAssignmentService = {
@@ -43,7 +45,31 @@ describe('MaintenanceUseCases', () => {
                 assetId: 'asset1',
                 type: 'PREVENTIVE',
                 scheduledDate: new Date()
-            })).rejects.toThrow(/El equipo ya cuenta con un mantenimiento programado/);
+            })).rejects.toThrow(/El equipo ya cuenta con un mantenimiento Preventivo programado/);
+        });
+
+        it('should allow scheduling a maintenance of a different type than the active one', async () => {
+            const existingRecord = new MaintenanceRecord({
+                id: 'm1',
+                assetId: 'asset1',
+                type: 'PREVENTIVE',
+                status: 'SCHEDULED',
+                scheduledDate: new Date(),
+            });
+
+            mockRepo.findByAssetId.mockResolvedValue([existingRecord]);
+            mockAssignmentService.getActiveAssignmentForAsset.mockResolvedValue(null);
+
+            const record = await useCases.createManualMaintenance({
+                assetId: 'asset1',
+                type: 'CORRECTIVE',
+                scheduledDate: new Date(),
+                reason: 'Reparación urgente'
+            });
+
+            expect(record.type).toBe('CORRECTIVE');
+            expect(record.status).toBe('SCHEDULED');
+            expect(mockRepo.save).toHaveBeenCalledTimes(1);
         });
 
         it('should create and save a new scheduled maintenance successfully', async () => {

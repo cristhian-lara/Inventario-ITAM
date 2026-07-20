@@ -24,15 +24,18 @@ export class MaintenanceUseCases {
 
     async createManualMaintenance(dto: { assetId: string, type: MaintenanceType, scheduledDate: Date, reason?: string }): Promise<MaintenanceRecord> {
         const existingMaintenances = await this.repo.findByAssetId(dto.assetId);
-        // Regla de negocio: un activo no puede tener más de un mantenimiento activo a la vez,
-        // sin importar el tipo (preventivo o correctivo) del existente o del que se intenta crear.
-        const activeMaintenance = existingMaintenances.find(m => m.status === 'SCHEDULED' || m.status === 'IN_PROGRESS');
+        // Regla de negocio: un activo no puede tener más de un mantenimiento activo del MISMO tipo
+        // a la vez. Sí puede tener a la vez uno preventivo y uno correctivo, porque son
+        // independientes (p. ej. una revisión programada y una reparación urgente).
+        const activeMaintenance = existingMaintenances.find(
+            m => (m.status === 'SCHEDULED' || m.status === 'IN_PROGRESS') && m.type === dto.type
+        );
 
         if (activeMaintenance) {
             const d = new Date(activeMaintenance.scheduledDate);
             const dateStr = d.toISOString().split('T')[0];
             const typeStr = activeMaintenance.type === 'PREVENTIVE' ? 'Preventivo' : 'Correctivo';
-            throw new Error(`El equipo ya cuenta con un mantenimiento activo (${typeStr}) programado para la fecha ${dateStr}. Debe completarse antes de programar uno nuevo.`);
+            throw new Error(`El equipo ya cuenta con un mantenimiento ${typeStr} programado para la fecha ${dateStr}. Debe completarse antes de programar otro del mismo tipo.`);
         }
 
         const id = `maint-${Date.now()}-${Math.floor(Math.random()*1000)}`;
