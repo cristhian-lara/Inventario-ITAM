@@ -10,6 +10,8 @@ interface DocumentInfo {
   filename: string;
   url: string;
   date: string;
+  placa?: string;
+  serial?: string;
 }
 
 interface DocumentsResponse {
@@ -110,7 +112,12 @@ export default function Actas() {
     if (activeTab === 'maintenances') list = data.maintenances;
 
     if (searchTerm) {
-      list = list.filter(d => formatFilename(d.filename).toLowerCase().includes(searchTerm.toLowerCase()));
+      const term = searchTerm.toLowerCase();
+      list = list.filter(d =>
+        formatFilename(d.filename).toLowerCase().includes(term) ||
+        (d.placa?.toLowerCase().includes(term) ?? false) ||
+        (d.serial?.toLowerCase().includes(term) ?? false)
+      );
     }
     return list;
   };
@@ -129,7 +136,7 @@ export default function Actas() {
           <Search className="search-icon" size={20} />
           <input 
             type="text" 
-            placeholder="Buscar por nombre de archivo..." 
+            placeholder="Buscar por nombre, placa o serial..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="glass-input"
@@ -168,6 +175,8 @@ export default function Actas() {
             <thead>
               <tr>
                 <th>Nombre del Documento</th>
+                <th>Placa</th>
+                <th>Serial</th>
                 <th>Fecha de Generación</th>
                 <th style={{ textAlign: 'center' }}>Acciones</th>
               </tr>
@@ -176,6 +185,8 @@ export default function Actas() {
               {filteredDocs.map((doc, idx) => (
                 <tr key={idx}>
                   <td style={{ fontWeight: '500', textTransform: 'capitalize' }}>{formatFilename(doc.filename)}</td>
+                  <td>{doc.placa || <span style={{ color: 'var(--text-muted)' }}>—</span>}</td>
+                  <td>{doc.serial || <span style={{ color: 'var(--text-muted)' }}>—</span>}</td>
                   <td>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <Calendar size={14} style={{ color: 'var(--text-muted)' }} />
