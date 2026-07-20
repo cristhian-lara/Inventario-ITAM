@@ -37,7 +37,7 @@ export default function Catalog() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importing, setImporting] = useState(false);
-  const [importResult, setImportResult] = useState<{ successful: number, failed: number, errors: string[] } | null>(null);
+  const [importResult, setImportResult] = useState<{ successful: number, failed: number, errors: string[], warnings?: string[] } | null>(null);
 
   // Estados de los modales
   const [assignModalAssetId, setAssignModalAssetId] = useState<string | null>(null);
@@ -337,6 +337,23 @@ export default function Catalog() {
     }
   });
 
+  const generateActMutation = useMutation({
+    mutationFn: async (assignmentId: string) => {
+      const response = await axios.post(`${API_URL}/api/assignments/${assignmentId}/generate-act`);
+      return response.data;
+    },
+    onSuccess: (data) => {
+      toast.success('Acta generada.');
+      queryClient.invalidateQueries({ queryKey: ['assignments'] });
+      if (data.documentPath) {
+        window.open(`${API_URL}${data.documentPath}`, '_blank');
+      }
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.error || err.message, 8000);
+    }
+  });
+
   const forceReturnMutation = useMutation({
     mutationFn: async ({ assetId, reason, collaboratorName }: { assetId: string, reason: string, collaboratorName?: string }) => {
       const response = await axios.post(`${API_URL}/api/assignments/force-return-by-asset/${assetId}`, { reason, collaboratorName });
@@ -606,6 +623,15 @@ export default function Catalog() {
                   </div>
                 </div>
               )}
+
+              {importResult.warnings && importResult.warnings.length > 0 && (
+                <div style={{ marginTop: '15px', padding: '15px', background: 'rgba(245, 158, 11, 0.1)', borderRadius: '8px', border: '1px solid rgba(245, 158, 11, 0.25)' }}>
+                  <h4 style={{ color: '#ca8a04', margin: '0 0 10px 0', fontSize: '14px' }}>Avisos de asignación:</h4>
+                  <div style={{ maxHeight: '150px', overflowY: 'auto', fontSize: '13px', color: 'var(--text-muted)' }}>
+                    {importResult.warnings.map((warn, i) => <div key={i} style={{ marginBottom: '4px' }}>• {warn}</div>)}
+                  </div>
+                </div>
+              )}
             </div>
             <button
               onClick={() => setImportResult(null)}
@@ -724,8 +750,18 @@ export default function Catalog() {
                     setRetireNotes('');
                     setRetireModalAssetId(assetId);
                   }}
+                  onGenerateAct={(assignmentId) => {
+                    confirm({
+                      title: 'Generar Acta',
+                      message: '¿Generar el acta de asignación de este activo? Se creará el PDF de entrega.',
+                      type: 'info',
+                      onConfirm: () => generateActMutation.mutate(assignmentId)
+                    });
+                  }}
+                  onViewAct={(documentPath) => window.open(`${API_URL}${documentPath}`, '_blank')}
                   returnPending={returnMutation.isPending}
                   resendPending={resendLinkMutation.isPending}
+                  generateActPending={generateActMutation.isPending}
                 />
               ))}
               {filteredAssets?.length === 0 && (

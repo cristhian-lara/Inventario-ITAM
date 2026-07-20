@@ -626,6 +626,32 @@ router.post('/force-accept-by-asset/:assetId', validateBody(forceActionSchema), 
     }
 });
 
+// Generar (o regenerar) el acta de asignación de una asignación ya activa.
+// Pensado para asignaciones creadas por importación masiva, que no tienen acta:
+// reutiliza el mismo generador de PDF de la entrega y guarda su ruta.
+router.post('/:id/generate-act', async (req, res) => {
+    try {
+        const assignment = await assignmentRepo.findById(req.params.id);
+        if (!assignment) {
+            return res.status(404).json({ error: 'Asignación no encontrada' });
+        }
+        if (assignment.status !== 'ACCEPTED') {
+            return res.status(400).json({ error: 'Solo se puede generar el acta de una asignación activa (aceptada).' });
+        }
+
+        const ipAddress = assignment.signatureMetadata?.ipAddress || 'Acta generada manualmente tras carga masiva.';
+        const documentPath = await generateDraftPdf(assignment, 'ASSIGNMENT', undefined, {
+            ipAddress,
+            isForcedSignature: true
+        });
+        await assignmentUseCases.updateDocumentPath(assignment.id, documentPath);
+
+        res.json({ message: 'Acta generada', documentPath });
+    } catch (error: any) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
 // Confirmar devolución (Firma del Paz y Salvo)
 router.get('/:id/confirm-return', async (req, res) => {
     try {

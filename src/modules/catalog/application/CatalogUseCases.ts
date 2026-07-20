@@ -141,24 +141,52 @@ export class CatalogUseCases {
         return asset;
     }
 
-    async importAssets(records: any[]): Promise<{ successful: number; failed: number; errors: string[] }> {
+    async importAssets(records: any[]): Promise<{ successful: number; failed: number; errors: string[]; created: ImportedAssetRef[] }> {
         let successful = 0;
         let failed = 0;
         const errors: string[] = [];
+        const created: ImportedAssetRef[] = [];
 
         const allCategories = await this.repository.getAllCategories();
 
         for (const [index, record] of records.entries()) {
             try {
+                // Lectura de columnas tolerante a mayúsculas/minúsculas y espacios:
+                // así "Placa IKUSI", "placa ikusi", "Placa Ikusi", etc. se reconocen
+                // por igual sin depender del formato exacto del encabezado del Excel.
+                const normalizedIndex: Record<string, string> = {};
+                for (const key of Object.keys(record)) {
+                    normalizedIndex[key.toLowerCase().trim()] = key;
+                }
+                const consumedKeys = new Set<string>();
+                const pick = (...candidates: string[]): any => {
+                    let value: any = undefined;
+                    for (const cand of candidates) {
+                        const realKey = normalizedIndex[cand.toLowerCase().trim()];
+                        if (realKey === undefined) continue;
+                        consumedKeys.add(realKey); // la columna es "conocida": no va a atributos dinámicos
+                        if (value === undefined && record[realKey] !== undefined && record[realKey] !== '') {
+                            value = record[realKey];
+                        }
+                    }
+                    return value;
+                };
+
                 // Known columns
-                const rawId = record['Placa Ikusi'] || record.PlacaIkusi || record.ID || record.id || '';
-                const categoryRaw = record['Categoría'] || record.Categoria || record.Category || record.category || record.categoryId;
-                const serial = record['Serial'] || record.serial || record.SerialNumber;
-                const purchaseDateRaw = record['Fecha de Compra'] || record.PurchaseDate || record.purchaseDate;
-                const warrantyMonthsRaw = record['Meses Garantía'] || record.WarrantyMonths || record.warrantyMonths;
-                const depreciationYearsRaw = record['Años Depreciación'] || record.DepreciationYears || record.depreciationYears;
-                const vendorNameRaw = record['Proveedor'] || record.Vendor || record.vendorName;
-                const internalBuyerRaw = record['Comprador Interno'] || record.InternalBuyer || record.internalBuyer;
+                const rawId = pick('Placa Ikusi', 'PlacaIkusi', 'ID', 'id') || '';
+                const categoryRaw = pick('Categoría', 'Categoria', 'Category', 'category', 'categoryId');
+                const serial = pick('Serial', 'SerialNumber');
+                const purchaseDateRaw = pick('Fecha de Compra', 'PurchaseDate', 'purchaseDate');
+                const warrantyMonthsRaw = pick('Meses Garantía', 'WarrantyMonths', 'warrantyMonths');
+                const depreciationYearsRaw = pick('Años Depreciación', 'DepreciationYears', 'depreciationYears');
+                const vendorNameRaw = pick('Proveedor', 'Vendor', 'vendorName');
+                const internalBuyerRaw = pick('Comprador Interno', 'InternalBuyer', 'internalBuyer');
+                const purchasePriceRaw = pick('Precio Compra', 'PurchasePrice', 'purchasePrice');
+                // Columnas de asignación: no forman parte del activo; la ruta las usa
+                // para asignar el activo al colaborador tras crearlo.
+                const assigneeEmailRaw = pick('Asignado a', 'AsignadoA', 'Asignado', 'Assignee', 'AssignedTo');
+                const assignmentDateRaw = pick('Fecha de Asignación', 'Fecha de Asignacion', 'FechaAsignacion', 'AssignmentDate');
+                void purchasePriceRaw; // reservado: la creación de activo aún no recibe precio en el import
 
                 if (!categoryRaw || !serial) {
                     throw new Error('Faltan campos obligatorios (Categoría, Serial)');
@@ -169,13 +197,11 @@ export class CatalogUseCases {
                     throw new Error(`La categoría '${categoryRaw}' no existe.`);
                 }
 
-                // Dynamic attributes
-                const knownKeys = ['Placa Ikusi', 'PlacaIkusi', 'ID', 'id', 'Categoría', 'Categoria', 'Category', 'category', 'categoryId', 'Serial', 'serial', 'SerialNumber', 'Fecha de Compra', 'PurchaseDate', 'purchaseDate', 'Meses Garantía', 'WarrantyMonths', 'warrantyMonths', 'Años Depreciación', 'DepreciationYears', 'depreciationYears', 'Precio Compra', 'PurchasePrice', 'purchasePrice', 'Proveedor', 'Vendor', 'vendorName', 'Comprador Interno', 'InternalBuyer', 'internalBuyer'];
+                // Dynamic attributes: todo lo que no sea una columna conocida
+                // (los campos propios de la categoría llegan aquí y se emparejan abajo).
                 const dynamicAttributes: Record<string, any> = {};
-                
-                // Copy all unknown keys first
                 for (const key of Object.keys(record)) {
-                    if (!knownKeys.includes(key)) {
+                    if (!consumedKeys.has(key)) {
                         dynamicAttributes[key] = record[key];
                     }
                 }
@@ -226,7 +252,7 @@ export class CatalogUseCases {
                 const warrantyMonths = warrantyMonthsRaw ? parseInt(String(warrantyMonthsRaw), 10) : undefined;
                 const depreciationYears = depreciationYearsRaw ? parseInt(String(depreciationYearsRaw), 10) : undefined;
 
-                await this.createAsset(
+                const createdAsset = await this.createAsset(
                     String(rawId).trim(),
                     category.id as number,
                     String(serial).trim(),
@@ -238,7 +264,27 @@ export class CatalogUseCases {
                     vendorNameRaw ? String(vendorNameRaw).trim() : undefined,
                     internalBuyerRaw ? String(internalBuyerRaw).trim() : undefined
                 );
-                
+
+                // Fecha de asignación normalizada a 'YYYY-MM-DD' (Excel puede entregar
+                // un Date, un serial numérico o un string dd/mm/yyyy).
+                let assignmentDate: string | undefined = undefined;
+                if (assignmentDateRaw instanceof Date) {
+                    assignmentDate = assignmentDateRaw.toISOString().split('T')[0];
+                } else if (typeof assignmentDateRaw === 'number') {
+                    assignmentDate = new Date((assignmentDateRaw - (25567 + 2)) * 86400 * 1000).toISOString().split('T')[0];
+                } else if (typeof assignmentDateRaw === 'string' && assignmentDateRaw.trim()) {
+                    const parts = assignmentDateRaw.trim().split('/');
+                    assignmentDate = parts.length === 3
+                        ? `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`
+                        : assignmentDateRaw.trim();
+                }
+
+                created.push({
+                    assetId: createdAsset.id,
+                    assigneeEmail: assigneeEmailRaw ? String(assigneeEmailRaw).trim() : undefined,
+                    assignmentDate
+                });
+
                 successful++;
             } catch (error: any) {
                 failed++;
@@ -246,6 +292,13 @@ export class CatalogUseCases {
             }
         }
 
-        return { successful, failed, errors };
+        return { successful, failed, errors, created };
     }
+}
+
+/** Referencia mínima de un activo creado por importación, para la fase de asignación posterior. */
+export interface ImportedAssetRef {
+    assetId: string;
+    assigneeEmail?: string;
+    assignmentDate?: string;
 }

@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Tag, Cpu, HardDrive, Wifi, PlusCircle, MonitorSmartphone, RefreshCw, AlertTriangle, Trash2, CalendarClock } from 'lucide-react';
+import { Tag, Cpu, HardDrive, Wifi, PlusCircle, MonitorSmartphone, RefreshCw, AlertTriangle, Trash2, CalendarClock, FileText, FileCheck } from 'lucide-react';
 import ActionMenu from '../ActionMenu';
 
 interface Asset {
@@ -23,8 +23,11 @@ interface Props {
   onExtendLoan: (assignmentId: string, assetId: string, currentReturnDate?: string) => void;
   onResendLink: (assetId: string) => void;
   onRetire: (assetId: string) => void;
+  onGenerateAct: (assignmentId: string) => void;
+  onViewAct: (documentPath: string) => void;
   returnPending: boolean;
   resendPending: boolean;
+  generateActPending: boolean;
 }
 
 export default function AssetTableRow({
@@ -40,8 +43,11 @@ export default function AssetTableRow({
   onExtendLoan,
   onResendLink,
   onRetire,
+  onGenerateAct,
+  onViewAct,
   returnPending,
-  resendPending
+  resendPending,
+  generateActPending
 }: Props) {
   const category = categories?.find(c => c.id === asset.categoryId);
   const requiresPlaca = category?.schemaDefinition?.requiresPlacaIkusi !== false;
@@ -212,6 +218,28 @@ export default function AssetTableRow({
     if (asset.status === 'IN_USE' || isPendingReturn) {
       return (
         <>
+          {activeAssignment?.status === 'ACCEPTED' && (
+            activeAssignment?.documentPath ? (
+              <button
+                className="btn-action"
+                style={{ borderColor: 'var(--ikusi-green)', color: 'var(--ikusi-green)' }}
+                title="Ver Acta de Asignación"
+                onClick={() => onViewAct(activeAssignment.documentPath)}
+              >
+                <FileCheck size={16} />
+              </button>
+            ) : (
+              <button
+                className="btn-action"
+                style={{ borderColor: '#3b82f6', color: '#3b82f6' }}
+                title="Generar Acta de Asignación"
+                onClick={() => onGenerateAct(activeAssignment.id)}
+                disabled={generateActPending}
+              >
+                <FileText size={16} />
+              </button>
+            )
+          )}
           {!isPendingReturn && (
             <button
               className="btn-action btn-return"

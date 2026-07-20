@@ -8,6 +8,11 @@ import { AppDataSource } from '../../shared/infrastructure/database/postgres';
 import { HardwareUpgradeOrmEntity } from '../../modules/catalog/infrastructure/orm/HardwareUpgrade.entity';
 import { v4 as uuidv4 } from 'uuid';
 import { validateBody } from '../middlewares/validate.middleware';
+import { AssignmentUseCases } from '../../modules/assignment/application/AssignmentUseCases';
+import { PostgresAssignmentRepository } from '../../modules/assignment/infrastructure/PostgresAssignmentRepository';
+import { PostgresCollaboratorRepository } from '../../modules/collaborator/infrastructure/PostgresCollaboratorRepository';
+import { CollaboratorHistory } from '../../modules/collaborator/domain/CollaboratorHistory';
+import { WebexNotificationService } from '../../shared/infrastructure/services/WebexNotificationService';
 
 const router = Router();
 
@@ -62,6 +67,10 @@ const upload = multer({ storage: multer.memoryStorage() });
 const catalogRepository = new PostgresCatalogRepository();
 const catalogUseCases = new CatalogUseCases(catalogRepository);
 
+const assignmentRepository = new PostgresAssignmentRepository();
+const assignmentUseCases = new AssignmentUseCases(assignmentRepository, new WebexNotificationService());
+const collaboratorRepository = new PostgresCollaboratorRepository();
+
 router.post('/categories', validateBody(categorySchema), async (req, res) => {
     try {
         const { name, schema } = req.body;
@@ -115,7 +124,56 @@ router.post('/assets/import', upload.single('file'), async (req, res) => {
         const records = xlsx.utils.sheet_to_json(sheet);
 
         const result = await catalogUseCases.importAssets(records);
-        res.json(result);
+
+        // Fase de asignación: para cada activo creado cuya columna "Asignado a" traiga
+        // el email de un colaborador ACTIVO, se crea la asignación y el activo queda
+        // "En Uso". Sin generar acta ni enviar correo (carga masiva): el acta se genera
+        // luego bajo demanda. Los casos que no se pueden asignar se reportan como avisos
+        // sin perder el activo (ya quedó creado como Disponible).
+        const warnings: string[] = [];
+        for (const item of result.created) {
+            const email = item.assigneeEmail;
+            if (!email) continue;
+            try {
+                const collaborator = await collaboratorRepository.findByEmail(email);
+                if (!collaborator) {
+                    warnings.push(`Activo ${item.assetId}: el colaborador "${email}" no existe; se cargó sin asignar.`);
+                    continue;
+                }
+                if (collaborator.status !== 'ACTIVE') {
+                    warnings.push(`Activo ${item.assetId}: el colaborador "${email}" está inactivo; se cargó sin asignar.`);
+                    continue;
+                }
+                const existing = await assignmentRepository.findCurrentByAssetId(item.assetId);
+                if (existing) {
+                    warnings.push(`Activo ${item.assetId}: ya tenía una asignación activa; no se reasignó.`);
+                    continue;
+                }
+
+                const { assignment } = await assignmentUseCases.createAssignment(
+                    uuidv4(),
+                    item.assetId,
+                    collaborator.id,
+                    collaborator.email,
+                    item.assignmentDate,
+                    'PERMANENT'
+                );
+                await assignmentUseCases.forceAccept(assignment.id, 'Asignación por importación masiva');
+                await catalogUseCases.changeAssetStatus(item.assetId, 'IN_USE');
+                await collaboratorRepository.saveHistory(new CollaboratorHistory(
+                    uuidv4(),
+                    collaborator.id,
+                    'ASSET_ASSIGNED' as any,
+                    new Date(),
+                    `Activo ${item.assetId} asignado por importación masiva`
+                ));
+            } catch (assignErr: any) {
+                warnings.push(`Activo ${item.assetId}: no se pudo asignar a "${email}" (${assignErr.message}).`);
+            }
+        }
+
+        const { created, ...summary } = result;
+        res.json({ ...summary, warnings });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
