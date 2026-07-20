@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, X, Search, Calendar } from 'lucide-react';
+import { Plus, X, Search, Calendar, Upload, CheckCircle2 } from 'lucide-react';
 import { useConfirm } from '../context/ConfirmContext';
 import { useToast } from '../context/ToastContext';
 import { usePermission } from '../context/AuthContext';
@@ -58,6 +58,41 @@ const Maintenances: React.FC = () => {
   const [modalMode, setModalMode] = useState<'create' | 'start' | 'complete' | 'view' | 'forceSign'>('create');
   const [selectedRecord, setSelectedRecord] = useState<MaintenanceRecord | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
+
+  // Importación masiva de mantenimientos históricos
+  const importInputRef = useRef<HTMLInputElement>(null);
+  const [importResult, setImportResult] = useState<{
+    successful: number; failed: number; completed: number; scheduled: number;
+    reprogrammed: number; skipped: number; errors: string[]; warnings: string[];
+  } | null>(null);
+
+  const importMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const body = new FormData();
+      body.append('file', file);
+      const res = await fetch(`${API_URL}/api/maintenances/import`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Error al importar');
+      }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      setImportResult(data);
+      queryClient.invalidateQueries({ queryKey: ['maintenances'] });
+    },
+    onError: (err: any) => { toast.error(err.message, 8000); }
+  });
+
+  const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) importMutation.mutate(file);
+    e.target.value = ''; // permite reimportar el mismo archivo
+  };
 
   const [formData, setFormData] = useState({
     assetId: '',
@@ -483,9 +518,72 @@ const Maintenances: React.FC = () => {
         </div>
         <div className="header-actions" style={{ display: 'flex', gap: '10px' }}>
           <button className="btn-glass" onClick={exportCSV}>Exportar CSV</button>
+          {canCreate && (
+            <>
+              <input
+                ref={importInputRef}
+                type="file"
+                accept=".xlsx,.csv"
+                style={{ display: 'none' }}
+                onChange={handleImportFile}
+              />
+              <button
+                className="btn-glass"
+                onClick={() => importInputRef.current?.click()}
+                disabled={importMutation.isPending}
+              >
+                <Upload size={16} /> {importMutation.isPending ? 'Importando…' : 'Importar (.xlsx, .csv)'}
+              </button>
+            </>
+          )}
           {canCreate && <button className="btn-primary" onClick={() => openModal('create')}><Plus size={18} /> Programar</button>}
         </div>
       </header>
+
+      {importResult && (
+        <div className="glass-panel" style={{ marginBottom: '20px', borderLeft: '4px solid #3b82f6', background: 'rgba(59, 130, 246, 0.05)', padding: '20px', borderRadius: '12px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div style={{ flex: 1 }}>
+              <h3 style={{ marginTop: 0, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <CheckCircle2 size={20} color="#3b82f6" />
+                Resultados de Importación
+              </h3>
+              <div style={{ display: 'flex', gap: '20px', marginTop: '10px', flexWrap: 'wrap' }}>
+                <span style={{ color: 'var(--text-muted)' }}><strong style={{ color: '#22c55e' }}>Creados:</strong> {importResult.successful}</span>
+                <span style={{ color: 'var(--text-muted)' }}><strong>Completados:</strong> {importResult.completed}</span>
+                <span style={{ color: 'var(--text-muted)' }}><strong>Programados:</strong> {importResult.scheduled}</span>
+                <span style={{ color: 'var(--text-muted)' }}><strong>Reprogramados +1 año:</strong> {importResult.reprogrammed}</span>
+                <span style={{ color: 'var(--text-muted)' }}><strong>Omitidos:</strong> {importResult.skipped}</span>
+                <span style={{ color: 'var(--text-muted)' }}><strong style={{ color: '#ef4444' }}>Fallidos:</strong> {importResult.failed}</span>
+              </div>
+
+              {importResult.errors && importResult.errors.length > 0 && (
+                <div style={{ marginTop: '15px', padding: '15px', background: 'rgba(239, 68, 68, 0.1)', borderRadius: '8px', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
+                  <h4 style={{ color: '#ef4444', margin: '0 0 10px 0', fontSize: '14px' }}>Detalles de errores:</h4>
+                  <div style={{ maxHeight: '150px', overflowY: 'auto', fontSize: '13px', color: 'var(--text-muted)' }}>
+                    {importResult.errors.map((err, i) => <div key={i} style={{ marginBottom: '4px' }}>• {err}</div>)}
+                  </div>
+                </div>
+              )}
+
+              {importResult.warnings && importResult.warnings.length > 0 && (
+                <div style={{ marginTop: '15px', padding: '15px', background: 'rgba(245, 158, 11, 0.1)', borderRadius: '8px', border: '1px solid rgba(245, 158, 11, 0.25)' }}>
+                  <h4 style={{ color: '#ca8a04', margin: '0 0 10px 0', fontSize: '14px' }}>Avisos:</h4>
+                  <div style={{ maxHeight: '150px', overflowY: 'auto', fontSize: '13px', color: 'var(--text-muted)' }}>
+                    {importResult.warnings.map((warn, i) => <div key={i} style={{ marginBottom: '4px' }}>• {warn}</div>)}
+                  </div>
+                </div>
+              )}
+            </div>
+            <button
+              onClick={() => setImportResult(null)}
+              style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '5px' }}
+            >
+              <X size={20} />
+            </button>
+          </div>
+        </div>
+      )}
 
       <MaintenanceKpiCards
         totalAssetsCount={totalAssetsCount}

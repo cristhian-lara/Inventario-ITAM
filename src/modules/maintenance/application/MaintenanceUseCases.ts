@@ -1,8 +1,28 @@
+import { v4 as uuidv4 } from 'uuid';
 import { IMaintenanceRepository } from '../domain/IMaintenanceRepository';
 import { MaintenanceRecord } from '../domain/MaintenanceRecord';
 import { MaintenanceStatus, MaintenanceType } from '../domain/MaintenanceTypes';
 import { NotificationError, NotificationResult } from '../../../shared/contracts/NotificationError';
 import { JWT_SECRET } from '../../../shared/infrastructure/config/env';
+
+/** Adaptadores de acceso a datos que la ruta inyecta para el import histórico. */
+export interface MaintenanceImportDeps {
+    /** Fecha de corte: mantenimientos en esta fecha o antes = Completados; después = Programados. */
+    cutoffDate: Date;
+    assetExists: (placa: string) => Promise<boolean>;
+    resolveCollaborator: (email: string) => Promise<{ id: string; name: string } | null>;
+}
+
+export interface MaintenanceImportResult {
+    successful: number;
+    failed: number;
+    completed: number;
+    scheduled: number;
+    reprogrammed: number;
+    skipped: number;
+    errors: string[];
+    warnings: string[];
+}
 
 // Definimos un contrato para consultar si un activo está asignado (así no acoplamos directamente al repositorio de asignaciones)
 export interface IAssetAssignmentService {
@@ -221,5 +241,175 @@ export class MaintenanceUseCases {
         const records = await this.repo.findByIds(maintenanceIds);
         records.forEach(record => record.registerAlertSent(sentAt));
         await Promise.all(records.map(record => this.repo.save(record)));
+    }
+
+    /**
+     * Carga masiva de mantenimientos preventivos históricos desde un Excel/CSV.
+     *
+     * Reglas de negocio (acordadas para la migración):
+     * - Llave del activo: "Placa Ikusi". Si no existe, la fila falla (no rompe la carga).
+     * - Colaborador en turno: se resuelve por "Correo"; si no existe, se guarda el correo
+     *   como nombre del snapshot (aviso, no bloquea).
+     * - Fecha del mantenimiento: columna "Próximo mantenimiento". Todos son PREVENTIVE.
+     * - Corte por fecha (deps.cutoffDate): en la fecha de corte o antes → COMPLETED
+     *   (marcado como migrado/firmado, sin correo ni acta automática) y además se crea
+     *   su siguiente ciclo a +1 año en estado SCHEDULED. Después del corte → SCHEDULED.
+     * - Idempotencia: no se duplica un preventivo con la misma Placa y fecha programada.
+     */
+    async importMaintenances(records: any[], deps: MaintenanceImportDeps): Promise<MaintenanceImportResult> {
+        const result: MaintenanceImportResult = {
+            successful: 0, failed: 0, completed: 0, scheduled: 0, reprogrammed: 0, skipped: 0, errors: [], warnings: []
+        };
+
+        // Corte inclusivo a nivel de día: normalizamos al final del día de corte.
+        const cutoff = new Date(deps.cutoffDate);
+        cutoff.setHours(23, 59, 59, 999);
+
+        const sameDay = (a: Date, b: Date) =>
+            a.toISOString().split('T')[0] === b.toISOString().split('T')[0];
+
+        const parseDate = (raw: any): Date | null => {
+            if (raw instanceof Date) return raw;
+            if (typeof raw === 'number') return new Date((raw - (25567 + 2)) * 86400 * 1000);
+            if (typeof raw === 'string') {
+                const s = raw.trim();
+                if (!s) return null;
+                const parts = s.split('/');
+                if (parts.length === 3) {
+                    const [d, m, y] = parts.map(p => parseInt(p, 10)); // Formato Colombia: día/mes/año
+                    if (!d || !m || !y) return null;
+                    return new Date(Date.UTC(y, m - 1, d, 12));
+                }
+                const dt = new Date(s);
+                return isNaN(dt.getTime()) ? null : dt;
+            }
+            return null;
+        };
+
+        for (const [index, record] of records.entries()) {
+            const rowNum = index + 2;
+            try {
+                // Lectura de columnas tolerante a mayúsculas/minúsculas y espacios.
+                const normalizedIndex: Record<string, string> = {};
+                for (const key of Object.keys(record)) {
+                    normalizedIndex[key.toLowerCase().trim()] = key;
+                }
+                const pick = (...candidates: string[]): any => {
+                    for (const cand of candidates) {
+                        const realKey = normalizedIndex[cand.toLowerCase().trim()];
+                        if (realKey !== undefined && record[realKey] !== undefined && record[realKey] !== '') {
+                            return record[realKey];
+                        }
+                    }
+                    return undefined;
+                };
+
+                const placaRaw = pick('Placa Ikusi', 'PlacaIkusi', 'Placa', 'ID');
+                const emailRaw = pick('Correo', 'Email', 'Correo Electrónico', 'Correo Electronico');
+                const dateRaw = pick('Próximo mantenimiento', 'Proximo mantenimiento', 'Próximo Mantenimiento', 'Proximo Mantenimiento');
+
+                if (!placaRaw) throw new Error('Falta la Placa Ikusi.');
+                if (!dateRaw) throw new Error('Falta la fecha de "Próximo mantenimiento".');
+
+                const scheduledDate = parseDate(dateRaw);
+                if (!scheduledDate || isNaN(scheduledDate.getTime())) {
+                    throw new Error(`Fecha de mantenimiento inválida ("${dateRaw}").`);
+                }
+
+                const placa = String(placaRaw).trim();
+                if (!(await deps.assetExists(placa))) {
+                    result.failed++;
+                    result.errors.push(`Fila ${rowNum}: el activo con Placa "${placa}" no existe; se omite.`);
+                    continue;
+                }
+
+                // Snapshot del colaborador en turno.
+                let snapshotId: string | undefined;
+                let snapshotName: string | undefined;
+                if (emailRaw) {
+                    const email = String(emailRaw).trim();
+                    const collaborator = await deps.resolveCollaborator(email);
+                    if (collaborator) {
+                        snapshotId = collaborator.id;
+                        snapshotName = collaborator.name;
+                    } else {
+                        snapshotName = email;
+                        result.warnings.push(`Fila ${rowNum}: el colaborador "${email}" no existe; se guarda el correo como usuario en turno.`);
+                    }
+                }
+
+                // Idempotencia: preventivos ya existentes para esta placa.
+                const existing = await this.repo.findByAssetId(placa);
+                const existsPreventiveOn = (d: Date) =>
+                    existing.some(m => m.type === 'PREVENTIVE' && sameDay(new Date(m.scheduledDate), d));
+
+                const dateStr = scheduledDate.toISOString().split('T')[0];
+                const isCompleted = scheduledDate.getTime() <= cutoff.getTime();
+
+                if (isCompleted) {
+                    // Registro Completado (histórico migrado: firmado, sin correo ni acta automática).
+                    if (existsPreventiveOn(scheduledDate)) {
+                        result.skipped++;
+                        result.warnings.push(`Fila ${rowNum}: ya existía un preventivo para ${dateStr} en ${placa}; se omite.`);
+                    } else {
+                        await this.repo.save(new MaintenanceRecord({
+                            id: `maint-${uuidv4()}`,
+                            assetId: placa,
+                            type: 'PREVENTIVE',
+                            status: 'COMPLETED',
+                            scheduledDate,
+                            startedAt: scheduledDate,
+                            executionDate: scheduledDate,
+                            collaboratorInTurnId: snapshotId,
+                            collaboratorInTurnName: snapshotName,
+                            signedAt: scheduledDate,
+                            signatureMetadata: { migrated: true, note: 'Registro histórico migrado (carga masiva).' }
+                        }));
+                        result.completed++;
+                        result.successful++;
+                    }
+
+                    // Siguiente ciclo a +1 año en estado Programado.
+                    const nextDate = new Date(scheduledDate);
+                    nextDate.setFullYear(nextDate.getFullYear() + 1);
+                    if (!existsPreventiveOn(nextDate)) {
+                        await this.repo.save(new MaintenanceRecord({
+                            id: `maint-${uuidv4()}`,
+                            assetId: placa,
+                            type: 'PREVENTIVE',
+                            status: 'SCHEDULED',
+                            scheduledDate: nextDate,
+                            collaboratorInTurnId: snapshotId,
+                            collaboratorInTurnName: snapshotName
+                        }));
+                        result.reprogrammed++;
+                        result.successful++;
+                    }
+                } else {
+                    // Mantenimiento futuro: solo Programado.
+                    if (existsPreventiveOn(scheduledDate)) {
+                        result.skipped++;
+                        result.warnings.push(`Fila ${rowNum}: ya existía un preventivo para ${dateStr} en ${placa}; se omite.`);
+                    } else {
+                        await this.repo.save(new MaintenanceRecord({
+                            id: `maint-${uuidv4()}`,
+                            assetId: placa,
+                            type: 'PREVENTIVE',
+                            status: 'SCHEDULED',
+                            scheduledDate,
+                            collaboratorInTurnId: snapshotId,
+                            collaboratorInTurnName: snapshotName
+                        }));
+                        result.scheduled++;
+                        result.successful++;
+                    }
+                }
+            } catch (error: any) {
+                result.failed++;
+                result.errors.push(`Fila ${rowNum}: ${error.message}`);
+            }
+        }
+
+        return result;
     }
 }

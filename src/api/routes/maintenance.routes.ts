@@ -1,4 +1,6 @@
 import { Router } from 'express';
+import multer from 'multer';
+import * as xlsx from 'xlsx';
 import { z } from 'zod';
 import { MaintenanceUseCases } from '../../modules/maintenance/application/MaintenanceUseCases';
 import { PostgresMaintenanceRepository } from '../../modules/maintenance/infrastructure/PostgresMaintenanceRepository';
@@ -122,6 +124,46 @@ router.post('/', validateBody(createMaintenanceSchema), async (req, res) => {
         res.status(201).json(serializeRecord(result));
     } catch (error: any) {
         res.status(400).json({ error: error.message });
+    }
+});
+
+// 1b. Importación masiva de mantenimientos históricos (Excel/CSV)
+const uploadMaintenance = multer({ storage: multer.memoryStorage() });
+router.post('/import', uploadMaintenance.single('file'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: 'No se subió ningún archivo' });
+        }
+
+        const isCsv = req.file.originalname.toLowerCase().endsWith('.csv');
+        const workbook = isCsv
+            ? xlsx.read(req.file.buffer.toString('utf8'), { type: 'string', cellDates: true })
+            : xlsx.read(req.file.buffer, { type: 'buffer', cellDates: true });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const records = xlsx.utils.sheet_to_json(sheet);
+
+        const { PostgresCatalogRepository } = require('../../modules/catalog/infrastructure/PostgresCatalogRepository');
+        const { PostgresCollaboratorRepository } = require('../../modules/collaborator/infrastructure/PostgresCollaboratorRepository');
+        const catalogRepo = new PostgresCatalogRepository(AppDataSource);
+        const collaboratorRepo = new PostgresCollaboratorRepository(AppDataSource);
+
+        // Corte por defecto: hoy (fecha del servidor). Puede sobreescribirse con ?cutoffDate=YYYY-MM-DD.
+        const cutoffDate = req.query.cutoffDate
+            ? new Date(`${req.query.cutoffDate}T12:00:00Z`)
+            : new Date();
+
+        const result = await useCases.importMaintenances(records, {
+            cutoffDate,
+            assetExists: async (placa: string) => !!(await catalogRepo.getAssetById(placa)),
+            resolveCollaborator: async (email: string) => {
+                const collaborator = await collaboratorRepo.findByEmail(email);
+                return collaborator ? { id: collaborator.id, name: collaborator.name } : null;
+            }
+        });
+
+        res.json(result);
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
     }
 });
 
