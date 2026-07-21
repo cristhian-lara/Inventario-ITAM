@@ -252,18 +252,37 @@ export class CatalogUseCases {
                 const warrantyMonths = warrantyMonthsRaw ? parseInt(String(warrantyMonthsRaw), 10) : undefined;
                 const depreciationYears = depreciationYearsRaw ? parseInt(String(depreciationYearsRaw), 10) : undefined;
 
-                const createdAsset = await this.createAsset(
-                    String(rawId).trim(),
-                    category.id as number,
-                    String(serial).trim(),
-                    dynamicAttributes,
-                    purchaseDate,
-                    warrantyMonths,
-                    depreciationYears,
-                    undefined,
-                    vendorNameRaw ? String(vendorNameRaw).trim() : undefined,
-                    internalBuyerRaw ? String(internalBuyerRaw).trim() : undefined
-                );
+                // Idempotencia: si el activo ya existe (reimportación), se ACTUALIZA
+                // preservando su estado actual (En Uso, En Mantenimiento, etc.). Recrearlo
+                // con createAsset lo resetearía a "Disponible" y desincronizaría el estado
+                // frente a una asignación activa. Solo los nuevos se crean como Disponible.
+                const trimmedId = String(rawId).trim();
+                const existingAsset = trimmedId ? await this.repository.getAssetById(trimmedId) : null;
+
+                const createdAsset = existingAsset
+                    ? await this.updateAsset(
+                        trimmedId,
+                        String(serial).trim(),
+                        dynamicAttributes,
+                        purchaseDate,
+                        warrantyMonths,
+                        depreciationYears,
+                        undefined,
+                        vendorNameRaw ? String(vendorNameRaw).trim() : undefined,
+                        internalBuyerRaw ? String(internalBuyerRaw).trim() : undefined
+                    )
+                    : await this.createAsset(
+                        trimmedId,
+                        category.id as number,
+                        String(serial).trim(),
+                        dynamicAttributes,
+                        purchaseDate,
+                        warrantyMonths,
+                        depreciationYears,
+                        undefined,
+                        vendorNameRaw ? String(vendorNameRaw).trim() : undefined,
+                        internalBuyerRaw ? String(internalBuyerRaw).trim() : undefined
+                    );
 
                 // Fecha de asignación normalizada a 'YYYY-MM-DD' (Excel puede entregar
                 // un Date, un serial numérico o un string dd/mm/yyyy).

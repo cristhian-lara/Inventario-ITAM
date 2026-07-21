@@ -146,7 +146,19 @@ router.post('/assets/import', upload.single('file'), async (req, res) => {
                 }
                 const existing = await assignmentRepository.findCurrentByAssetId(item.assetId);
                 if (existing) {
-                    warnings.push(`Activo ${item.assetId}: ya tenía una asignación activa; no se reasignó.`);
+                    // El activo ya tiene una asignación activa. Auto-sanación: si por una
+                    // reimportación el activo quedó "Disponible" pero su asignación sigue
+                    // aceptada, se restaura a "En Uso" (no toca mantenimiento/inspección).
+                    if (existing.status === 'ACCEPTED') {
+                        const currentAsset = await catalogUseCases.getAssetById(item.assetId);
+                        if (currentAsset && currentAsset.status === 'AVAILABLE') {
+                            await catalogUseCases.changeAssetStatus(item.assetId, 'IN_USE');
+                        }
+                    }
+                    // Solo se avisa si el Excel pretende asignarlo a un colaborador distinto.
+                    if (existing.collaboratorId !== collaborator.id) {
+                        warnings.push(`Activo ${item.assetId}: ya está asignado a otro colaborador; no se reasignó a "${email}".`);
+                    }
                     continue;
                 }
 
