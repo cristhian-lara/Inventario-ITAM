@@ -1,0 +1,42 @@
+-- CECOS generados desde el Excel para inyectar en producción.
+-- Generado: 2026-07-21T01:00:24.338Z
+-- Total: 37
+BEGIN;
+INSERT INTO cecos (id, name, description) VALUES ('10101000', 'Direccion General', 'Direccion General') ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description;
+INSERT INTO cecos (id, name, description) VALUES ('10101020', 'Capital Humano', 'Sistemas Integrados de Gestión') ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description;
+INSERT INTO cecos (id, name, description) VALUES ('10102100', 'Comercial', 'Dirección Comercial') ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description;
+INSERT INTO cecos (id, name, description) VALUES ('10102120', 'Comercial', 'Comercial Medianas y pequeños Negocios') ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description;
+INSERT INTO cecos (id, name, description) VALUES ('10102125', 'Comercial', 'Comercial Gobierno') ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description;
+INSERT INTO cecos (id, name, description) VALUES ('10102140', 'Comercial', 'Comercial Enterprise y Banca') ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description;
+INSERT INTO cecos (id, name, description) VALUES ('10102124', 'Comercial', 'Otros Gtos Comercial') ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description;
+INSERT INTO cecos (id, name, description) VALUES ('10103100', 'Preventa', 'Direccion Preventa') ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description;
+INSERT INTO cecos (id, name, description) VALUES ('10103112', 'Preventa', 'Arq. Desarrollo Soft') ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description;
+INSERT INTO cecos (id, name, description) VALUES ('10103130', 'Preventa', 'Arqs. Infraestructur') ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description;
+INSERT INTO cecos (id, name, description) VALUES ('10103160', 'Preventa', 'Arq. Servicios') ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description;
+INSERT INTO cecos (id, name, description) VALUES ('10104000', 'Financiero', 'Direccion Financiera') ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description;
+INSERT INTO cecos (id, name, description) VALUES ('10104010', 'Financiero', 'Controlling') ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description;
+INSERT INTO cecos (id, name, description) VALUES ('10104020', 'Financiero', 'Compras y Logistica') ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description;
+INSERT INTO cecos (id, name, description) VALUES ('10104220', 'Operaciones', 'PMO') ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description;
+INSERT INTO cecos (id, name, description) VALUES ('10104300', 'Operaciones', 'Direccion Operaciones') ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description;
+INSERT INTO cecos (id, name, description) VALUES ('10104330', 'Operaciones', 'SOC y Soporte de G') ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description;
+INSERT INTO cecos (id, name, description) VALUES ('10104340', 'Operaciones', 'Operaciones') ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description;
+INSERT INTO cecos (id, name, description) VALUES ('10900100', 'Direccion General', 'Cuenta Española') ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description;
+INSERT INTO cecos (id, name, description) VALUES ('10900200', 'Gosa', 'Cento de Servicios') ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description;
+INSERT INTO cecos (id, name, description) VALUES ('10900210', 'Gosa', 'Contabilidad') ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description;
+INSERT INTO cecos (id, name, description) VALUES ('10900230', 'Gosa', 'Tesoreria') ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description;
+INSERT INTO cecos (id, name, description) VALUES ('10900240', 'Gosa', 'Administracion de Personal') ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description;
+INSERT INTO cecos (id, name, description) VALUES ('10900321', 'Operaciones', 'TI') ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description;
+INSERT INTO cecos (id, name, description) VALUES ('10900350', 'Legal', 'Legal') ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description;
+INSERT INTO cecos (id, name, description) VALUES ('10900500', 'Financiero', 'Servicios Administrados') ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description;
+INSERT INTO cecos (id, name, description) VALUES ('10900600', 'Capital Humano', 'Direccion Capital Humano') ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description;
+INSERT INTO cecos (id, name, description) VALUES ('10900620', 'Capital Humano', 'Capital Humano') ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description;
+INSERT INTO cecos (id, name, description) VALUES ('10900630', 'Capital Humano', 'Capital Humano Gral') ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description;
+INSERT INTO cecos (id, name, description) VALUES ('10900650', 'Preventa', 'Marketing') ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description;
+INSERT INTO cecos (id, name, description) VALUES ('10900705', 'Financiero', 'Servicios Gral II') ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description;
+INSERT INTO cecos (id, name, description) VALUES ('10104320', 'Operaciones', 'CX- Cisco') ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description;
+INSERT INTO cecos (id, name, description) VALUES ('10103110', 'Preventa', 'Assessment Preventa') ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description;
+INSERT INTO cecos (id, name, description) VALUES ('10900320', 'Operaciones', 'Infraestructura') ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description;
+INSERT INTO cecos (id, name, description) VALUES ('10101010', 'Direccion General', 'Innovación y Desarrollo ( I+D)') ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description;
+INSERT INTO cecos (id, name, description) VALUES ('10103222', 'Preventa', 'Business Development') ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description;
+INSERT INTO cecos (id, name, description) VALUES ('57.1002.23.IC.001-1', 'Ormazabal', 'Ormazabal') ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description;
+COMMIT;
