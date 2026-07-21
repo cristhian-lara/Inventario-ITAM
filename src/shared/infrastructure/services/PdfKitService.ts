@@ -284,15 +284,15 @@ Este documento cancela la responsiva firmada en el momento de la asignación ori
                 doc.moveDown(1.5);
 
                 const category = categoryName || asset?.category?.name || 'EQUIPO';
-                const brand = asset?.dynamicAttributes?.marca || asset?.dynamicAttributes?.brand || asset?.dynamicAttributes?.Marca || asset?.dynamicAttributes?.Brand || 'N/A';
+                const hostname = asset?.dynamicAttributes?.Hostname || asset?.dynamicAttributes?.hostname || asset?.dynamicAttributes?.HOSTNAME || 'N/A';
                 const model = asset?.dynamicAttributes?.modelo || asset?.dynamicAttributes?.model || asset?.dynamicAttributes?.Modelo || asset?.dynamicAttributes?.Model || 'N/A';
                 const serial = asset?.serial || asset?.serialNumber || 'N/A';
 
                 const tableGeneral = {
                     title: 'Datos del Equipo',
-                    headers: ['Placa Ikusi', 'Tipo', 'Producto', 'Serie', 'Modelo'],
+                    headers: ['Placa Ikusi', 'Tipo', 'Hostname', 'Serie', 'Modelo'],
                     rows: [
-                        [record.assetId, category, brand, serial, model]
+                        [record.assetId, category, hostname, serial, model]
                     ]
                 };
 
