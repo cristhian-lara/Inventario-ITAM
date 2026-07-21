@@ -217,6 +217,21 @@ export class MaintenanceUseCases {
             await this.repo.save(record);
         }
     }
+
+    /**
+     * Edita las notas del acta de un mantenimiento completado y guarda.
+     * Devuelve el registro actualizado para que la ruta genere el PDF.
+     */
+    async updateActNotes(id: string, fields: { reason?: string; startNote?: string; notes?: string }): Promise<MaintenanceRecord> {
+        const record = await this.repo.findById(id);
+        if (!record) throw new Error('Mantenimiento no encontrado');
+        if (record.status !== 'COMPLETED') {
+            throw new Error('Solo se puede generar el acta de un mantenimiento completado.');
+        }
+        record.updateActNotes(fields);
+        await this.repo.save(record);
+        return record;
+    }
     
     async getAllMaintenances(status?: string): Promise<MaintenanceRecord[]> {
         return this.repo.findAll({ status: status as MaintenanceStatus });

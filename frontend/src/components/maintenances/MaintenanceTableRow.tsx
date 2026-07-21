@@ -1,4 +1,4 @@
-import { Plus, Clock, Wrench, Bell, CheckCircle, Edit3, Mail } from 'lucide-react';
+import { Plus, Clock, Wrench, Bell, CheckCircle, Edit3, Mail, FileText, FileCheck } from 'lucide-react';
 import ActionMenu from '../ActionMenu';
 
 const STATUS_LABELS: Record<string, string> = {
@@ -20,6 +20,8 @@ interface Props {
   onOpenModal: (mode: 'create' | 'start' | 'complete' | 'view' | 'forceSign', record?: any, presetAsset?: { assetId: string; displayName: string }) => void;
   onNotify: (id: string, assetId: string) => void;
   onRequestSignature: (id: string) => void;
+  onGenerateAct: (record: any) => void;
+  onViewAct: (pdfUrl: string) => void;
   notifyPending: boolean;
   requestSignaturePending: boolean;
   forceSignPending: boolean;
@@ -37,6 +39,8 @@ export default function MaintenanceTableRow({
   onOpenModal,
   onNotify,
   onRequestSignature,
+  onGenerateAct,
+  onViewAct,
   notifyPending,
   requestSignaturePending,
   forceSignPending
@@ -170,6 +174,26 @@ export default function MaintenanceTableRow({
                 disabled={requestSignaturePending || !!(m?.signedAt || m?.pdfUrl)}
               >
                 <Mail size={16} />
+              </button>
+            )}
+            {isAdmin && m?.status === 'COMPLETED' && m?.pdfUrl && (
+              <button
+                className="btn-action"
+                style={{ borderColor: 'var(--ikusi-green)', color: 'var(--ikusi-green)' }}
+                title="Ver Acta (PDF)"
+                onClick={() => onViewAct(m.pdfUrl)}
+              >
+                <FileCheck size={16} />
+              </button>
+            )}
+            {isAdmin && m?.status === 'COMPLETED' && m?.signedAt && !m?.pdfUrl && (
+              <button
+                className="btn-action"
+                style={{ borderColor: '#3b82f6', color: '#3b82f6' }}
+                title="Generar Acta"
+                onClick={() => onGenerateAct(m)}
+              >
+                <FileText size={16} />
               </button>
             )}
           </ActionMenu>

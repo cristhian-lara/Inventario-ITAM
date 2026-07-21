@@ -477,4 +477,47 @@ router.post('/:id/force-sign', validateBody(forceSignSchema), async (req, res) =
     }
 });
 
+// 10. Generar acta bajo demanda (mantenimientos históricos migrados).
+// Guarda las notas editadas del acta y produce el PDF. Pensado para los
+// registros cargados por importación, que no tienen notas ni PDF.
+const generateActSchema = z.object({
+    reason: z.string().optional(),
+    startNote: z.string().optional(),
+    notes: z.string().optional(),
+});
+router.post('/:id/generate-act', validateBody(generateActSchema), async (req, res) => {
+    try {
+        const { reason, startNote, notes } = req.body;
+
+        const record = await useCases.updateActNotes(req.params.id, { reason, startNote, notes });
+
+        const catalogRepo = new (require('../../modules/catalog/infrastructure/PostgresCatalogRepository').PostgresCatalogRepository)(AppDataSource);
+        const asset = await catalogRepo.getAssetById(record.assetId);
+        let categoryName = 'EQUIPO';
+        if (asset && asset.categoryId) {
+            const category = await catalogRepo.getCategoryById(asset.categoryId);
+            if (category) categoryName = category.name;
+        }
+
+        const recordData = serializeRecord(record) as any;
+        if (!recordData.collaboratorInTurnName) {
+            const activeAssignment = await assignmentAdapter.getActiveAssignmentForAsset(record.assetId);
+            if (activeAssignment) {
+                recordData.collaboratorInTurnName = activeAssignment.collaboratorName;
+                recordData.collaboratorEmail = activeAssignment.collaboratorEmail;
+            }
+        }
+
+        const migratedNote = record.signatureMetadata?.note || 'Carga masiva de mantenimientos.';
+        const signatureText = `Firma forzada por migración histórica.\n${migratedNote}`;
+        const pdfPath = await documentService.generateMaintenanceAct(recordData, asset, signatureText, categoryName);
+
+        await useCases.updatePdfUrl(record.id, pdfPath);
+
+        res.json({ message: 'Acta generada', pdfUrl: pdfPath });
+    } catch (error: any) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
 export { router as maintenanceRouter };

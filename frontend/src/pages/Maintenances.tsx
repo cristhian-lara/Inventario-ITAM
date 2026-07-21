@@ -94,6 +94,46 @@ const Maintenances: React.FC = () => {
     e.target.value = ''; // permite reimportar el mismo archivo
   };
 
+  // Generar acta bajo demanda (con notas editables) para mantenimientos migrados
+  const ACT_DEFAULTS = {
+    reason: 'Mantenimiento preventivo programado — registro histórico migrado.',
+    startNote: 'Sin diagnóstico de inicio registrado (carga histórica).',
+    notes: 'Mantenimiento preventivo ejecutado. Registro cargado por migración; sin notas de detalle en el origen.'
+  };
+  const [actModalRecord, setActModalRecord] = useState<any | null>(null);
+  const [actNotes, setActNotes] = useState({ reason: '', startNote: '', notes: '' });
+
+  const openActModal = (record: any) => {
+    setActNotes({
+      reason: record?.reason || ACT_DEFAULTS.reason,
+      startNote: record?.startNote || ACT_DEFAULTS.startNote,
+      notes: record?.notes || ACT_DEFAULTS.notes
+    });
+    setActModalRecord(record);
+  };
+
+  const generateActMutation = useMutation({
+    mutationFn: async ({ id, notes }: { id: string; notes: { reason: string; startNote: string; notes: string } }) => {
+      const res = await fetch(`${API_URL}/api/maintenances/${id}/generate-act`, {
+        method: 'POST',
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify(notes)
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Error al generar el acta');
+      }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      toast.success('Acta generada.');
+      setActModalRecord(null);
+      queryClient.invalidateQueries({ queryKey: ['maintenances'] });
+      if (data.pdfUrl) window.open(`${API_URL}${data.pdfUrl}`, '_blank');
+    },
+    onError: (err: any) => { toast.error(err.message, 8000); }
+  });
+
   const [formData, setFormData] = useState({
     assetId: '',
     type: 'PREVENTIVE',
@@ -726,6 +766,8 @@ const Maintenances: React.FC = () => {
                             onConfirm: () => requestSignatureMutation.mutate(id)
                           });
                         }}
+                        onGenerateAct={openActModal}
+                        onViewAct={(pdfUrl) => window.open(`${API_URL}${pdfUrl}`, '_blank')}
                         notifyPending={notifyMutation.isPending}
                         requestSignaturePending={requestSignatureMutation.isPending}
                         forceSignPending={forceSignMutation.isPending}
@@ -766,6 +808,64 @@ const Maintenances: React.FC = () => {
           onSubmit={handleSubmit}
           isPending={createMutation.isPending || startMutation.isPending || completeMutation.isPending || forceSignMutation.isPending}
         />
+      )}
+
+      {actModalRecord && (
+        <div
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}
+          onClick={() => setActModalRecord(null)}
+        >
+          <div
+            className="glass-panel"
+            style={{ background: 'var(--bg-card, #fff)', borderRadius: '12px', padding: '24px', width: '100%', maxWidth: '560px', maxHeight: '90vh', overflowY: 'auto' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <h3 style={{ margin: 0, color: 'var(--text-main)' }}>Generar Acta de Mantenimiento</h3>
+              <button onClick={() => setActModalRecord(null)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
+                <X size={20} />
+              </button>
+            </div>
+            <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginTop: 0 }}>
+              Revisa o edita las notas antes de emitir el PDF. Vienen pre-llenadas por ser un registro histórico; puedes ajustarlas si tienes el detalle real.
+            </p>
+
+            <label style={{ display: 'block', fontWeight: 600, fontSize: '13px', color: 'var(--text-main)', marginTop: '14px', marginBottom: '4px' }}>Motivo de Programación</label>
+            <textarea
+              value={actNotes.reason}
+              onChange={(e) => setActNotes({ ...actNotes, reason: e.target.value })}
+              rows={2}
+              style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px solid var(--border-color, #ccc)', resize: 'vertical' }}
+            />
+
+            <label style={{ display: 'block', fontWeight: 600, fontSize: '13px', color: 'var(--text-main)', marginTop: '14px', marginBottom: '4px' }}>Diagnóstico de Inicio</label>
+            <textarea
+              value={actNotes.startNote}
+              onChange={(e) => setActNotes({ ...actNotes, startNote: e.target.value })}
+              rows={2}
+              style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px solid var(--border-color, #ccc)', resize: 'vertical' }}
+            />
+
+            <label style={{ display: 'block', fontWeight: 600, fontSize: '13px', color: 'var(--text-main)', marginTop: '14px', marginBottom: '4px' }}>Trabajo Realizado / Notas Finales</label>
+            <textarea
+              value={actNotes.notes}
+              onChange={(e) => setActNotes({ ...actNotes, notes: e.target.value })}
+              rows={3}
+              style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px solid var(--border-color, #ccc)', resize: 'vertical' }}
+            />
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px' }}>
+              <button className="btn-glass" onClick={() => setActModalRecord(null)}>Cancelar</button>
+              <button
+                className="btn-primary"
+                disabled={generateActMutation.isPending}
+                onClick={() => generateActMutation.mutate({ id: actModalRecord.id, notes: actNotes })}
+              >
+                {generateActMutation.isPending ? 'Generando…' : 'Generar Acta'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

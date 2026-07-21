@@ -131,6 +131,17 @@ export class MaintenanceRecord {
         this.props.pdfUrl = url;
     }
 
+    /**
+     * Edita las notas del acta (motivo, diagnóstico de inicio, trabajo realizado).
+     * Usado al generar el acta de mantenimientos históricos migrados, que se cargaron
+     * sin estas notas y se completan en el momento de emitir el PDF.
+     */
+    public updateActNotes(fields: { reason?: string; startNote?: string; notes?: string }): void {
+        if (fields.reason !== undefined) this.props.reason = fields.reason;
+        if (fields.startNote !== undefined) this.props.startNote = fields.startNote;
+        if (fields.notes !== undefined) this.props.notes = fields.notes;
+    }
+
     public cancelMaintenance(notes?: string): void {
         this.props.status = 'CANCELLED';
         if (notes) this.props.notes = notes;
