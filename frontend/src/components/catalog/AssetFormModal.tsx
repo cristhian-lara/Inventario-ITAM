@@ -137,7 +137,14 @@ export default function AssetFormModal({ newAsset, setNewAsset, categories, isEd
                 <input type="text" className="glass-input" value={newAsset.internalBuyer || ''} onChange={e => setNewAsset({ ...newAsset, internalBuyer: e.target.value })} placeholder="Ej. Juan Pérez (Compras)" />
               </div>
 
-              {Object.keys(newAsset.dynamicAttributes).map((attrName) => {
+              {(() => {
+                // Renderizamos todos los campos definidos en el esquema de la categoría
+                // (aunque estén vacíos) y además cualquier atributo legado que ya tenga
+                // el activo pero que ya no esté en el esquema, para no ocultar datos.
+                const schemaFieldNames: string[] = (selectedCategory?.schemaDefinition?.fields || []).map((f: any) => f.name);
+                const legacyNames = Object.keys(newAsset.dynamicAttributes).filter((n) => !schemaFieldNames.includes(n));
+                return [...schemaFieldNames, ...legacyNames];
+              })().map((attrName) => {
                 const fieldDef = selectedCategory?.schemaDefinition?.fields?.find((f: any) => f.name === attrName);
                 const isRequired = fieldDef?.isRequired;
                 const type = fieldDef?.type || 'text';
