@@ -2,6 +2,8 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { AssignmentUseCases } from '../../modules/assignment/application/AssignmentUseCases';
 import { PostgresAssignmentRepository } from '../../modules/assignment/infrastructure/PostgresAssignmentRepository';
+import { MaintenanceUseCases } from '../../modules/maintenance/application/MaintenanceUseCases';
+import { PostgresMaintenanceRepository } from '../../modules/maintenance/infrastructure/PostgresMaintenanceRepository';
 import { WebexNotificationService } from '../../shared/infrastructure/services/WebexNotificationService';
 import { NotificationError, NotificationResult } from '../../shared/contracts/NotificationError';
 import { PdfKitService } from '../../shared/infrastructure/services/PdfKitService';
@@ -68,6 +70,126 @@ const catalogUseCases = new CatalogUseCases(catalogRepo);
 
 const collaboratorRepo = new PostgresCollaboratorRepository();
 const departmentRepo = new PostgresDepartmentRepository();
+
+// Los mantenimientos preventivos automáticos aplican SOLO a computadores. Se disparan
+// en tres momentos del ciclo de asignación (ver helpers abajo). Adaptador mínimo para que
+// el caso de uso capture la foto del colaborador en turno, igual que el módulo de mantenimiento.
+const maintenanceRepo = new PostgresMaintenanceRepository(AppDataSource);
+const maintenanceAssignmentAdapter: any = {
+    async getActiveAssignmentForAsset(assetId: string) {
+        const assignment = await assignmentRepo.findCurrentByAssetId(assetId);
+        if (!assignment || !assignment.collaboratorId) return null;
+        const collaborator = await collaboratorRepo.findById(assignment.collaboratorId);
+        return {
+            collaboratorId: assignment.collaboratorId,
+            collaboratorName: collaborator?.name || 'Usuario Asignado',
+            collaboratorEmail: collaborator?.email || ''
+        };
+    }
+};
+const maintenanceUseCases = new MaintenanceUseCases(maintenanceRepo, maintenanceAssignmentAdapter);
+
+/** Los preventivos automáticos aplican solo a la categoría "Computadores". */
+async function isComputadora(asset: any): Promise<boolean> {
+    if (!asset) return false;
+    const categories = await catalogUseCases.getAllCategories();
+    const category = categories.find(c => c.id === asset.categoryId);
+    return category?.name === 'Computadores';
+}
+
+/**
+ * Genera el acta (PDF) de un mantenimiento preventivo, reutilizando el mismo formato
+ * del módulo de mantenimiento. `signatureText` es la leyenda de firma (aquí, la de TI).
+ */
+async function generateMaintenanceActPdf(record: any, asset: any, signatureText: string): Promise<string> {
+    const categories = await catalogUseCases.getAllCategories();
+    const category = asset ? categories.find(c => c.id === asset.categoryId) : null;
+    const categoryName = category?.name || 'EQUIPO';
+    const recordData = {
+        id: record.id,
+        assetId: record.assetId,
+        type: record.type,
+        status: record.status,
+        scheduledDate: record.scheduledDate,
+        startedAt: record.startedAt,
+        executionDate: record.executionDate,
+        reason: record.reason,
+        startNote: record.startNote,
+        notes: record.notes,
+        collaboratorInTurnId: record.collaboratorInTurnId,
+        collaboratorInTurnName: record.collaboratorInTurnName,
+        signedAt: record.signedAt,
+        pdfUrl: record.pdfUrl
+    };
+    return documentService.generateMaintenanceAct(recordData, asset, signatureText, categoryName);
+}
+
+/**
+ * Caso B (reasignación), al iniciar la asignación: si el computador ya tuvo colaborador,
+ * registra un preventivo YA FINALIZADO con firma forzada de TI y envía su acta (firmada
+ * por TI) al colaborador que recibe el equipo, a modo informativo. No bloqueante.
+ */
+async function registerPreAssignmentMaintenanceIfReassignedComputer(
+    asset: any,
+    collaboratorId: string,
+    collaboratorEmail: string,
+    collaboratorName?: string
+): Promise<void> {
+    try {
+        if (!(await isComputadora(asset))) return;
+        if (!(await assignmentRepo.hasPreviousAssignment(asset.id))) return;
+
+        const collaborator = await collaboratorRepo.findById(collaboratorId);
+        const snapshotName = collaborator?.name || collaboratorName;
+
+        const record = await maintenanceUseCases.registerCompletedPreventivePriorToAssignment(
+            asset.id, new Date(), { collaboratorId, collaboratorName: snapshotName }
+        );
+
+        const signatureText = 'Firma forzada por administrador.\nMotivo: Se realiza mantenimiento preventivo previo a la asignación.';
+        const pdfPath = await generateMaintenanceActPdf(record, asset, signatureText);
+        await maintenanceUseCases.updatePdfUrl(record.id, pdfPath);
+
+        await trySendNotification(() => mailerService.sendPreAssignmentMaintenanceInfoEmail(collaboratorEmail, pdfPath));
+        console.log(`🛠️ Preventivo previo (finalizado) registrado para ${asset.id} y acta enviada a ${collaboratorEmail}.`);
+    } catch (error: any) {
+        console.error(`⚠️ No se pudo registrar el preventivo previo de ${asset?.id}:`, error.message);
+    }
+}
+
+/**
+ * Casos A y B, al firmar el colaborador (el computador pasa a EN USO): programa el
+ * próximo preventivo a +1 año de la firma. Idempotente y no bloqueante.
+ */
+async function scheduleNextPreventiveIfComputer(assetId: string, signatureDate: Date): Promise<void> {
+    try {
+        const asset = await catalogUseCases.getAssetById(assetId);
+        if (!(await isComputadora(asset))) return;
+        const record = await maintenanceUseCases.schedulePreventiveForAssignment(assetId, signatureDate);
+        if (record) {
+            console.log(`🛠️ Próximo preventivo programado para ${assetId} el ${record.scheduledDate.toISOString().split('T')[0]}.`);
+        }
+    } catch (error: any) {
+        console.error(`⚠️ No se pudo programar el próximo preventivo de ${assetId}:`, error.message);
+    }
+}
+
+/**
+ * Req 1, al registrar la devolución: cancela los preventivos programados a futuro del
+ * computador con la nota de negocio. No bloqueante.
+ */
+async function cancelPreventivesOnReturn(assetId: string, returnDate: Date): Promise<void> {
+    try {
+        const asset = await catalogUseCases.getAssetById(assetId);
+        if (!(await isComputadora(asset))) return;
+        const cancelled = await maintenanceUseCases.cancelScheduledPreventivesForReturn(assetId, returnDate);
+        if (cancelled.length) {
+            console.log(`🛠️ ${cancelled.length} preventivo(s) cancelado(s) por devolución de ${assetId}.`);
+        }
+    } catch (error: any) {
+        console.error(`⚠️ No se pudieron cancelar preventivos de ${assetId}:`, error.message);
+    }
+}
 
 /**
  * Envía una notificación de Webex sin romper el flujo: el token de firma ya
@@ -185,6 +307,11 @@ router.post('/', validateBody(createAssignmentSchema), async (req, res) => {
         }
 
         const { assignment, token } = await assignmentUseCases.createAssignment(id, assetId, collaboratorId, collaboratorEmail, startDate, assignmentType, expectedReturnDate);
+
+        // Caso B (reasignación de computador): al iniciar la asignación se registra el
+        // preventivo previo (finalizado, firmado por TI) y se envía su acta informativa
+        // al colaborador. No bloqueante: un fallo aquí no invalida la asignación.
+        await registerPreAssignmentMaintenanceIfReassignedComputer(asset, collaboratorId, collaboratorEmail, collaboratorName);
 
         const documentPath = await generateDraftPdf(assignment, 'ASSIGNMENT', collaboratorName);
 
@@ -438,7 +565,7 @@ router.post('/:id/force-return', validateBody(forceActionSchema), async (req, re
         // Devolución + cambio de estado del activo + acta + historial en una sola
         // transacción: si falla algo (incluida la generación del PDF), no debe
         // quedar el activo marcado como devuelto sin su acta correspondiente.
-        const { documentPath } = await AppDataSource.manager.transaction(async (manager) => {
+        const result = await AppDataSource.manager.transaction(async (manager) => {
             const txAssignmentRepo = new PostgresAssignmentRepository(manager);
             const txAssignmentUseCases = new AssignmentUseCases(txAssignmentRepo, mailerService);
             const txCatalogRepo = new PostgresCatalogRepository(manager);
@@ -487,10 +614,13 @@ router.post('/:id/force-return', validateBody(forceActionSchema), async (req, re
                 `Activo ${returnedAssignment.assetId} devuelto forzadamente`
             ));
 
-            return { documentPath };
+            return { documentPath, assetId: returnedAssignment.assetId };
         });
 
-        res.json({ message: 'Devolución forzada exitosa', documentPath });
+        // Se registró la devolución: cancelar los preventivos programados a futuro del computador.
+        await cancelPreventivesOnReturn(result.assetId, new Date());
+
+        res.json({ message: 'Devolución forzada exitosa', documentPath: result.documentPath });
     } catch (error: any) {
         res.status(400).json({ error: error.message });
     }
@@ -556,6 +686,9 @@ router.post('/force-return-by-asset/:assetId', validateBody(forceActionSchema), 
             return { documentPath };
         });
 
+        // Se registró la devolución: cancelar los preventivos programados a futuro del computador.
+        await cancelPreventivesOnReturn(req.params.assetId, new Date());
+
         res.json({ message: 'Devolución forzada exitosa', documentPath });
     } catch (error: any) {
         res.status(400).json({ error: error.message });
@@ -620,6 +753,9 @@ router.post('/force-accept-by-asset/:assetId', validateBody(forceActionSchema), 
             return { documentPath };
         });
 
+        // El computador pasó a EN USO (forzado): programar el próximo preventivo a +1 año.
+        await scheduleNextPreventiveIfComputer(req.params.assetId, new Date());
+
         res.json({ message: 'Aceptación forzada exitosa', documentPath });
     } catch (error: any) {
         res.status(400).json({ error: error.message });
@@ -668,6 +804,9 @@ router.get('/:id/confirm-return', async (req, res) => {
 
         // El activo queda bloqueado hasta que TI otorgue el Visto Bueno (approve-return)
         await catalogUseCases.changeAssetStatus(returnedAssignment.assetId, 'PENDING_INSPECTION');
+
+        // Se registró la devolución: cancelar los preventivos programados a futuro del computador.
+        await cancelPreventivesOnReturn(returnedAssignment.assetId, new Date());
 
         // Buscar activo para poblar el PDF
         const asset = await catalogUseCases.getAssetById(returnedAssignment.assetId);
@@ -831,6 +970,9 @@ router.get('/:id/accept', async (req, res) => {
             new Date(),
             `Activo ${acceptedAssignment.assetId} asignado`
         ));
+
+        // El computador pasó a EN USO: programar el próximo preventivo a +1 año de la firma.
+        await scheduleNextPreventiveIfComputer(acceptedAssignment.assetId, new Date());
 
         res.send(`
             <!DOCTYPE html>
@@ -1032,6 +1174,8 @@ router.get('/batch-accept-return', async (req, res) => {
                 if (asset) {
                     // El activo queda bloqueado hasta que TI otorgue el Visto Bueno (approve-return)
                     await catalogUseCases.changeAssetStatus(asset.id, 'PENDING_INSPECTION');
+                    // Se registró la devolución: cancelar los preventivos programados a futuro del computador.
+                    await cancelPreventivesOnReturn(asset.id, new Date());
                 }
             }
 

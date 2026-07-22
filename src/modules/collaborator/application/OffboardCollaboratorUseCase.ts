@@ -20,6 +20,8 @@ export interface OffboardResult {
     updatedCollaborator: Collaborator;
     documentPath?: string;
     returnedCount: number;
+    /** Activos devueltos en la baja (para cancelar sus preventivos programados, etc.). */
+    returnedAssetIds: string[];
 }
 
 /**
@@ -117,6 +119,6 @@ export class OffboardCollaboratorUseCase {
             return { updatedCollaborator, documentPath };
         });
 
-        return { ...result, returnedCount: toReturn.length };
+        return { ...result, returnedCount: toReturn.length, returnedAssetIds: toReturn.map(a => a.assetId) };
     }
 }

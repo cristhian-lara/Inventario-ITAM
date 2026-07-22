@@ -11,6 +11,11 @@ import { PostgresAssignmentRepository } from '../../modules/assignment/infrastru
 import { WebexNotificationService } from '../../shared/infrastructure/services/WebexNotificationService';
 import { PdfKitService } from '../../shared/infrastructure/services/PdfKitService';
 import { OffboardCollaboratorUseCase } from '../../modules/collaborator/application/OffboardCollaboratorUseCase';
+import { CatalogUseCases } from '../../modules/catalog/application/CatalogUseCases';
+import { PostgresCatalogRepository } from '../../modules/catalog/infrastructure/PostgresCatalogRepository';
+import { MaintenanceUseCases } from '../../modules/maintenance/application/MaintenanceUseCases';
+import { PostgresMaintenanceRepository } from '../../modules/maintenance/infrastructure/PostgresMaintenanceRepository';
+import { AppDataSource } from '../../shared/infrastructure/database/postgres';
 
 const departmentSchema = z.object({
     name: z.string().min(1, 'name es requerido'),
@@ -58,6 +63,30 @@ const offboardCollaboratorUseCase = new OffboardCollaboratorUseCase(
     new WebexNotificationService(),
     documentService
 );
+
+// Al dar de baja a un colaborador se devuelven sus equipos; hay que cancelar los
+// preventivos programados a futuro de los computadores (misma regla que las devoluciones).
+const catalogUseCases = new CatalogUseCases(new PostgresCatalogRepository());
+const maintenanceUseCases = new MaintenanceUseCases(
+    new PostgresMaintenanceRepository(AppDataSource),
+    { async getActiveAssignmentForAsset() { return null; } } as any
+);
+
+async function cancelPreventivesForReturnedComputer(assetId: string): Promise<void> {
+    try {
+        const asset = await catalogUseCases.getAssetById(assetId);
+        if (!asset) return;
+        const categories = await catalogUseCases.getAllCategories();
+        const category = categories.find(c => c.id === asset.categoryId);
+        if (category?.name !== 'Computadores') return;
+        const cancelled = await maintenanceUseCases.cancelScheduledPreventivesForReturn(assetId, new Date());
+        if (cancelled.length) {
+            console.log(`🛠️ ${cancelled.length} preventivo(s) cancelado(s) por baja/devolución de ${assetId}.`);
+        }
+    } catch (error: any) {
+        console.error(`⚠️ No se pudieron cancelar preventivos de ${assetId}:`, error.message);
+    }
+}
 
 // --- Departments Routes ---
 
@@ -254,6 +283,11 @@ collaboratorRouter.post('/:id/offboard', validateBody(offboardSchema), async (re
         const reason = req.body.reason.trim();
 
         const result = await offboardCollaboratorUseCase.execute(id, reason);
+
+        // Cancelar los preventivos programados a futuro de los computadores devueltos.
+        for (const assetId of result.returnedAssetIds) {
+            await cancelPreventivesForReturnedComputer(assetId);
+        }
 
         res.json({
             message: result.returnedCount > 0

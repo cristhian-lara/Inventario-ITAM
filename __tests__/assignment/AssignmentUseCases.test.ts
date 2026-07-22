@@ -19,6 +19,7 @@ describe('AssignmentUseCases', () => {
             findAllActive: jest.fn(),
             findActiveByAssetId: jest.fn(),
             findCurrentByAssetId: jest.fn(),
+            hasPreviousAssignment: jest.fn(),
             findLoansDueWithinDays: jest.fn(),
         };
 

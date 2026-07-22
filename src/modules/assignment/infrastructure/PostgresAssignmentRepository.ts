@@ -62,6 +62,11 @@ export class PostgresAssignmentRepository implements IAssignmentRepository {
         return ormEntity ? this.mapToDomain(ormEntity) : null;
     }
 
+    async hasPreviousAssignment(assetId: string): Promise<boolean> {
+        const count = await this.repo.count({ where: { asset_id: assetId, status: 'RETURNED' } });
+        return count > 0;
+    }
+
     async findLoansDueWithinDays(days: number): Promise<Assignment[]> {
         const limit = new Date();
         limit.setDate(limit.getDate() + days);

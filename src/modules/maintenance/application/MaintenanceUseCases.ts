@@ -78,6 +78,104 @@ export class MaintenanceUseCases {
         return record;
     }
 
+    /**
+     * Programa automáticamente el próximo mantenimiento preventivo al asignar un activo:
+     * queda agendado para un año después de la fecha de asignación (p. ej. asignado el
+     * 22/07/2026 → preventivo programado para el 22/07/2027).
+     *
+     * Es idempotente y NO bloqueante: si el activo ya tiene un preventivo activo
+     * (Programado o En Progreso) no crea otro ni lanza error, para no interrumpir la
+     * aceptación de la asignación. Reutiliza la misma foto (snapshot) del colaborador
+     * en turno que el resto del módulo.
+     *
+     * @param assignmentDate fecha de asignación (base del ciclo; se le suma 1 año).
+     * @returns el registro creado, o null si ya existía un preventivo activo.
+     */
+    async schedulePreventiveForAssignment(assetId: string, assignmentDate: Date): Promise<MaintenanceRecord | null> {
+        const existing = await this.repo.findByAssetId(assetId);
+        const hasActivePreventive = existing.some(
+            m => m.type === 'PREVENTIVE' && (m.status === 'SCHEDULED' || m.status === 'IN_PROGRESS')
+        );
+        if (hasActivePreventive) return null;
+
+        const scheduledDate = new Date(assignmentDate);
+        scheduledDate.setFullYear(scheduledDate.getFullYear() + 1);
+
+        const activeAssignment = await this.assignmentService.getActiveAssignmentForAsset(assetId);
+
+        const record = new MaintenanceRecord({
+            id: `maint-${Date.now()}-${Math.floor(Math.random()*1000)}`,
+            assetId,
+            type: 'PREVENTIVE',
+            status: 'SCHEDULED',
+            scheduledDate,
+            collaboratorInTurnId: activeAssignment?.collaboratorId,
+            collaboratorInTurnName: activeAssignment?.collaboratorName
+        });
+
+        await this.repo.save(record);
+        return record;
+    }
+
+    /**
+     * Registra un mantenimiento preventivo YA FINALIZADO, previo a una (re)asignación,
+     * firmado forzadamente por TI. Aplica a computadores que vuelven a asignarse: TI hace
+     * limpieza/revisión antes de entregarlos y deja constancia en la hoja de vida.
+     *
+     * A diferencia de `completeMaintenance`, NO genera automáticamente el siguiente ciclo:
+     * el próximo preventivo (+1 año) se programa por separado cuando el colaborador firma
+     * el acta de asignación (ver `schedulePreventiveForAssignment`).
+     */
+    async registerCompletedPreventivePriorToAssignment(
+        assetId: string,
+        executionDate: Date,
+        snapshot?: { collaboratorId?: string; collaboratorName?: string }
+    ): Promise<MaintenanceRecord> {
+        const record = new MaintenanceRecord({
+            id: `maint-${uuidv4()}`,
+            assetId,
+            type: 'PREVENTIVE',
+            status: 'COMPLETED',
+            scheduledDate: executionDate,
+            startedAt: executionDate,
+            executionDate,
+            notes: 'Mantenimiento preventivo: limpieza de hardware, revisión física y verificación general del equipo previo a la asignación.',
+            collaboratorInTurnId: snapshot?.collaboratorId,
+            collaboratorInTurnName: snapshot?.collaboratorName,
+            signedAt: executionDate,
+            signatureMetadata: {
+                forced: true,
+                reason: 'Se realiza mantenimiento preventivo previo a la asignación',
+                adminId: 'TI',
+                signedAt: executionDate.toISOString()
+            }
+        });
+        await this.repo.save(record);
+        return record;
+    }
+
+    /**
+     * Cancela los preventivos PROGRAMADOS a futuro (fecha aún no llegada) de un activo,
+     * al registrarse su devolución. Cada uno queda con la nota indicada por negocio.
+     * No toca preventivos ya completados/en progreso ni los vencidos.
+     *
+     * @returns los registros cancelados.
+     */
+    async cancelScheduledPreventivesForReturn(assetId: string, returnDate: Date = new Date()): Promise<MaintenanceRecord[]> {
+        const existing = await this.repo.findByAssetId(assetId);
+        const cancelled: MaintenanceRecord[] = [];
+        for (const m of existing) {
+            const isFuture = new Date(m.scheduledDate).getTime() > returnDate.getTime();
+            if (m.type === 'PREVENTIVE' && m.status === 'SCHEDULED' && isFuture) {
+                const dateStr = new Date(m.scheduledDate).toISOString().split('T')[0];
+                m.cancelMaintenance(`Cancelación mantenimiento preventivo con fecha ${dateStr} por devolución del computador.`);
+                await this.repo.save(m);
+                cancelled.push(m);
+            }
+        }
+        return cancelled;
+    }
+
     async startMaintenance(id: string, startNote?: string): Promise<MaintenanceRecord> {
         const record = await this.repo.findById(id);
         if (!record) throw new Error('Mantenimiento no encontrado');

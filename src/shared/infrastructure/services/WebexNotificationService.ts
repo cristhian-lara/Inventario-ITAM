@@ -150,6 +150,16 @@ export class WebexNotificationService implements IMailerService {
     }
 
     /**
+     * Copia informativa (no requiere firma del colaborador) del acta de un mantenimiento
+     * preventivo realizado por TI antes de entregar el equipo. Se envía a la persona a la
+     * que se le está asignando el computador.
+     */
+    async sendPreAssignmentMaintenanceInfoEmail(to: string, documentPath: string): Promise<void> {
+        const markdown = `**🛠️ Mantenimiento Preventivo Previo a la Asignación**\n\nHola, antes de entregarte el equipo, TI realizó un mantenimiento preventivo (limpieza y revisión general). Adjuntamos el acta correspondiente, firmada por TI, a modo informativo.`;
+        await this.sendMessage(to, markdown, documentPath);
+    }
+
+    /**
      * Digest diario a un administrador con TODOS los préstamos que están a
      * `alertThresholdDays` días de vencer o ya vencidos. Disparado por el job
      * de alertas (no por acción manual de un usuario).
