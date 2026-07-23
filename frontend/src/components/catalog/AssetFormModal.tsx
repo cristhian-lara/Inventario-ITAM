@@ -105,6 +105,11 @@ export default function AssetFormModal({ newAsset, setNewAsset, categories, isEd
                   </div>
                 )}
               </div>
+              {/* Datos de compra y garantía: solo para categorías con Placa Ikusi
+                  (Computadores, Monitores). Los periféricos no se controlan a ese
+                  nivel de detalle, así que ni siquiera se piden. */}
+              {requiresPlaca && (
+                <>
               <div className="form-group">
                 <label>Número de Serie</label>
                 <input type="text" className="glass-input" value={newAsset.serial} onChange={e => setNewAsset({ ...newAsset, serial: e.target.value })} placeholder="Ej. SN-X3X3X3 (Opcional)" />
@@ -137,6 +142,8 @@ export default function AssetFormModal({ newAsset, setNewAsset, categories, isEd
                 <label>Comprador Interno (Opcional)</label>
                 <input type="text" className="glass-input" value={newAsset.internalBuyer || ''} onChange={e => setNewAsset({ ...newAsset, internalBuyer: e.target.value })} placeholder="Ej. Juan Pérez (Compras)" />
               </div>
+                </>
+              )}
 
               {(() => {
                 // Renderizamos todos los campos definidos en el esquema de la categoría
