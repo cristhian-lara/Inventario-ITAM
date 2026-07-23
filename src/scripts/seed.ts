@@ -10,7 +10,7 @@ import { Category } from '../modules/catalog/domain/Category';
 import { PostgresAssignmentRepository } from '../modules/assignment/infrastructure/PostgresAssignmentRepository';
 import { AssignmentUseCases } from '../modules/assignment/application/AssignmentUseCases';
 import { IMailerService } from '../shared/contracts/IMailerService';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID as uuidv4 } from 'crypto';
 
 async function seed() {
     console.log('🌱 Iniciando Seed de Datos...');

@@ -13,7 +13,7 @@ import { PostgresCatalogRepository } from '../../modules/catalog/infrastructure/
 import { PostgresCollaboratorRepository } from '../../modules/collaborator/infrastructure/PostgresCollaboratorRepository';
 import { PostgresDepartmentRepository } from '../../modules/collaborator/infrastructure/PostgresDepartmentRepository';
 import { CollaboratorHistory } from '../../modules/collaborator/domain/CollaboratorHistory';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID as uuidv4 } from 'crypto';
 import { AppDataSource } from '../../shared/infrastructure/database/postgres';
 import { validateBody } from '../middlewares/validate.middleware';
 import { buildAssetActItem, resolveCollaboratorActContext, resolveDepartmentName, extractCeco } from './helpers/assignmentActHelpers';

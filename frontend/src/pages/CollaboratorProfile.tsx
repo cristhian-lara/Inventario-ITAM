@@ -208,7 +208,7 @@ export default function CollaboratorProfile() {
           <div className="content-section glass-panel">
             <h3 className="section-title"><Activity size={20} /> Histórico y Auditoría de Estados</h3>
             <div className="timeline">
-              {history?.map((event, index) => {
+              {history?.map((event) => {
                 // Extraer el ID del activo del campo reason (ej. "Activo 000264 asignado...")
                 const isAssetEvent = event.action === 'ASSET_ASSIGNED' || event.action === 'ASSET_RETURNED';
                 let assetCategoryName: string | null = null;

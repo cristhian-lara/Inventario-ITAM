@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import type { ReactNode } from 'react';
 import axios from 'axios';
 import { API_URL } from '../config';
 
@@ -21,11 +22,16 @@ axios.interceptors.response.use(
     }
 );
 
-export enum Role {
-    SUPER_ADMIN = 'SUPER_ADMIN',
-    ADMINISTRADOR = 'ADMINISTRADOR',
-    ESTANDAR = 'ESTANDAR'
-}
+// Objeto + tipo en vez de `enum`: los enums no son borrables en tiempo de
+// compilación y el proyecto compila con `erasableSyntaxOnly`. Se sigue usando
+// igual, tanto como valor (Role.SUPER_ADMIN) como tipo (role: Role).
+export const Role = {
+    SUPER_ADMIN: 'SUPER_ADMIN',
+    ADMINISTRADOR: 'ADMINISTRADOR',
+    ESTANDAR: 'ESTANDAR'
+} as const;
+
+export type Role = typeof Role[keyof typeof Role];
 
 export interface PermissionFlags {
     read: boolean;

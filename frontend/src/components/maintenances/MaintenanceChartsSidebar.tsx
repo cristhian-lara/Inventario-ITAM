@@ -18,7 +18,7 @@ export default function MaintenanceChartsSidebar({ typeData, statusData, monthly
             <Pie data={typeData} cx="50%" cy="45%" innerRadius={50} outerRadius={80} paddingAngle={4} dataKey="value" nameKey="name">
               {typeData.map((_, i) => <Cell key={i} fill={COLORS_TYPE[i]} />)}
             </Pie>
-            <Tooltip formatter={(v: any, n: string) => [v, n]} />
+            <Tooltip />
             <Legend verticalAlign="bottom" height={36} />
           </PieChart>
         </ResponsiveContainer>

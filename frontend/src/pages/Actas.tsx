@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { FileDown, Calendar, FileText, CheckCircle, Search } from 'lucide-react';
 import './Actas.css';

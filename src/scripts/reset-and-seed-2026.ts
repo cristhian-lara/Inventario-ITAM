@@ -22,7 +22,7 @@ import { WebexNotificationService } from '../shared/infrastructure/services/Webe
 import { PdfKitService } from '../shared/infrastructure/services/PdfKitService';
 import { IMailerService } from '../shared/contracts/IMailerService';
 import { HardwareUpgradeOrmEntity } from '../modules/catalog/infrastructure/orm/HardwareUpgrade.entity';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID as uuidv4 } from 'crypto';
 
 const mockMailer: IMailerService = {
     sendAssignmentEmail: async () => {},

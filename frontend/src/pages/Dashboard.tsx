@@ -1,4 +1,4 @@
-import { Activity, ShieldCheck, MonitorSmartphone, ArrowRight, Clock, Package, FileDown, Users } from 'lucide-react';
+import { Activity, ShieldCheck, MonitorSmartphone, Clock, Package, FileDown, Users } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
@@ -316,7 +316,7 @@ export default function Dashboard() {
               <Pie data={pieData} cx="50%" cy="50%" innerRadius={55} outerRadius={85} paddingAngle={3} dataKey="count" nameKey="name">
                 {pieData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
               </Pie>
-              <Tooltip formatter={(v: any, n: string) => [v, n]} />
+              <Tooltip />
               <Legend iconType="circle" iconSize={10} />
             </PieChart>
           </ResponsiveContainer>

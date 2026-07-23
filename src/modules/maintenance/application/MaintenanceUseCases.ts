@@ -1,4 +1,4 @@
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID as uuidv4 } from 'crypto';
 import { IMaintenanceRepository } from '../domain/IMaintenanceRepository';
 import { MaintenanceRecord } from '../domain/MaintenanceRecord';
 import { MaintenanceStatus, MaintenanceType } from '../domain/MaintenanceTypes';

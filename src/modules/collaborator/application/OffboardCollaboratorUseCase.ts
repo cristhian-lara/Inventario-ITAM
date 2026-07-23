@@ -1,4 +1,4 @@
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID as uuidv4 } from 'crypto';
 import { AppDataSource } from '../../../shared/infrastructure/database/postgres';
 import { IMailerService } from '../../../shared/contracts/IMailerService';
 import { IDocumentService } from '../../../shared/contracts/IDocumentService';

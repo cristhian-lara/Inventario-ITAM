@@ -6,7 +6,7 @@ import { CatalogUseCases } from '../../modules/catalog/application/CatalogUseCas
 import { PostgresCatalogRepository } from '../../modules/catalog/infrastructure/PostgresCatalogRepository';
 import { AppDataSource } from '../../shared/infrastructure/database/postgres';
 import { HardwareUpgradeOrmEntity } from '../../modules/catalog/infrastructure/orm/HardwareUpgrade.entity';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID as uuidv4 } from 'crypto';
 import { validateBody } from '../middlewares/validate.middleware';
 import { AssignmentUseCases } from '../../modules/assignment/application/AssignmentUseCases';
 import { PostgresAssignmentRepository } from '../../modules/assignment/infrastructure/PostgresAssignmentRepository';

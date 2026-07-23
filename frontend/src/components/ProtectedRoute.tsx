@@ -3,7 +3,7 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 interface ProtectedRouteProps {
-    children: JSX.Element;
+    children: React.ReactElement;
     /** Clave del módulo RBAC requerido (con lectura basta). Sin prop = solo exige sesión. */
     module?: string;
 }

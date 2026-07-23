@@ -1,4 +1,4 @@
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID as uuidv4 } from 'crypto';
 import { Collaborator } from '../domain/Collaborator';
 import { CollaboratorHistory } from '../domain/CollaboratorHistory';
 import { ICollaboratorRepository } from '../domain/ICollaboratorRepository';
