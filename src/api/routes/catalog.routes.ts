@@ -13,25 +13,9 @@ import { PostgresAssignmentRepository } from '../../modules/assignment/infrastru
 import { PostgresCollaboratorRepository } from '../../modules/collaborator/infrastructure/PostgresCollaboratorRepository';
 import { CollaboratorHistory } from '../../modules/collaborator/domain/CollaboratorHistory';
 import { WebexNotificationService } from '../../shared/infrastructure/services/WebexNotificationService';
+import { createAssetSchema, updateAssetSchema } from './schemas/asset.schemas';
 
 const router = Router();
-
-const createAssetSchema = z.object({
-    // Opcional a nivel de transporte: las categorías sin Placa Ikusi generan el
-    // ID en el dominio. La obligatoriedad la impone CatalogUseCases según la categoría.
-    id: z.string().optional().default(''),
-    categoryId: z.coerce.number({ message: 'categoryId debe ser numérico' }),
-    serial: z.string().optional(),
-    dynamicAttributes: z.record(z.string(), z.any()).optional().default({}),
-    purchaseDate: z.string().regex(/^\d{4}-\d{2}-\d{2}/, 'purchaseDate debe tener formato YYYY-MM-DD').optional(),
-    warrantyMonths: z.coerce.number().optional(),
-    depreciationYears: z.coerce.number().optional(),
-    purchasePrice: z.coerce.number().optional(),
-    vendorName: z.string().optional(),
-    internalBuyer: z.string().optional(),
-});
-
-const updateAssetSchema = createAssetSchema.omit({ id: true, categoryId: true }).partial();
 
 const categorySchema = z.object({
     name: z.string().min(1, 'name es requerido'),

@@ -454,12 +454,14 @@ export default function Catalog() {
     setNewAsset({
       id: asset.id,
       categoryId: Number(asset.categoryId),
-      serial: asset.serial,
+      serial: asset.serial || '',
       dynamicAttributes: asset.dynamicAttributes || {},
       purchaseDate: asset.purchaseDate ? asset.purchaseDate.split('T')[0] : '',
-      warrantyMonths: asset.warrantyMonths || 0,
-      depreciationYears: asset.depreciationYears || 0,
-      purchasePrice: asset.purchasePrice || undefined,
+      // Sin dato se deja undefined, no 0: un `|| 0` guardaba "0 meses de
+      // garantía" y "0 años de depreciación" en activos que no tenían nada.
+      warrantyMonths: asset.warrantyMonths ?? undefined,
+      depreciationYears: asset.depreciationYears ?? undefined,
+      purchasePrice: asset.purchasePrice ?? undefined,
       vendorName: asset.vendorName || '',
       internalBuyer: asset.internalBuyer || ''
     });
@@ -524,11 +526,22 @@ export default function Catalog() {
       if (asset.status !== filterStatus) return false;
     }
 
-    const hostname = String(asset.dynamicAttributes?.HOSTNAME || asset.dynamicAttributes?.Hostname || asset.dynamicAttributes?.hostname || '');
-    return asset.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (asset.serial && asset.serial.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (hostname && hostname.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      String(asset.categoryId).toLowerCase().includes(searchTerm.toLowerCase());
+    if (!searchTerm.trim()) return true;
+    const term = searchTerm.toLowerCase().trim();
+
+    // La búsqueda cubre el ID, el serial, el nombre de la categoría y CUALQUIER
+    // campo definido en el esquema de esa categoría (Modelo, Marca, Tipo,
+    // Hostname...). Antes solo miraba id/serial/hostname, así que buscar un
+    // periférico por su modelo no devolvía nada.
+    const categoryName = categories?.find((c: any) => Number(c.id) === Number(asset.categoryId))?.name || '';
+    const dynamicValues = Object.values(asset.dynamicAttributes || {})
+      .filter(v => v !== null && v !== undefined)
+      .map(v => String(v).toLowerCase());
+
+    return asset.id.toLowerCase().includes(term) ||
+      (asset.serial && String(asset.serial).toLowerCase().includes(term)) ||
+      categoryName.toLowerCase().includes(term) ||
+      dynamicValues.some(v => v.includes(term));
   });
 
   const paginatedAssets = filteredAssets?.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
