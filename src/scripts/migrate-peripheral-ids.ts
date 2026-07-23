@@ -62,7 +62,9 @@ async function main() {
     // El consecutivo arranca después del mayor sufijo ya existente con el prefijo
     // en TODA la tabla, no solo en esta categoría: el ID es la llave primaria.
     const maxRow = await AppDataSource.query(
-        `SELECT COALESCE(MAX(CAST(SUBSTRING(id FROM $1) AS INTEGER)), 0) AS max
+        // $1::int obligatorio: como texto, Postgres resuelve SUBSTRING(id FROM $1)
+        // por su variante de regex y devuelve un dígito suelto, no el sufijo.
+        `SELECT COALESCE(MAX(CAST(SUBSTRING(id FROM $1::int) AS INTEGER)), 0) AS max
            FROM assets WHERE id ~ $2`,
         [PREFIX.length + 1, `^${PREFIX}[0-9]+$`]
     ) as Array<{ max: string }>;

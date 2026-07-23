@@ -140,9 +140,12 @@ export class PostgresCatalogRepository implements ICatalogRepository {
      */
     async generateIncrementalId(categoryId: number, prefix?: string): Promise<string> {
         if (prefix) {
+            // El ::int del parámetro no es opcional: sin él Postgres lo toma como
+            // texto y resuelve SUBSTRING(id FROM $1) por su variante de REGEX,
+            // devolviendo el dígito encontrado en vez del sufijo del ID.
             const row = await this.assetRepo
                 .createQueryBuilder('a')
-                .select(`MAX(CAST(SUBSTRING(a.id FROM :len) AS INTEGER))`, 'max')
+                .select(`MAX(CAST(SUBSTRING(a.id FROM :len::int) AS INTEGER))`, 'max')
                 .where('a.id ~ :pattern', { pattern: `^${prefix}[0-9]+$` })
                 .setParameter('len', prefix.length + 1)
                 .getRawOne<{ max: string | null }>();

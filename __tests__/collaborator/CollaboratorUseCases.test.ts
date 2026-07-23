@@ -5,7 +5,10 @@ import { ICecosRepository } from '../../src/modules/collaborator/domain/ICecosRe
 import { Department } from '../../src/modules/collaborator/domain/Department';
 import { Collaborator } from '../../src/modules/collaborator/domain/Collaborator';
 
-jest.mock('uuid', () => ({ v4: () => 'mock-uuid' }));
+jest.mock('crypto', () => ({
+    ...jest.requireActual('crypto'),
+    randomUUID: () => 'mock-uuid'
+}));
 
 describe('CollaboratorUseCases', () => {
     let useCases: CollaboratorUseCases;
