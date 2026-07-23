@@ -253,25 +253,34 @@ export class CatalogUseCases {
                 const depreciationYears = depreciationYearsRaw ? parseInt(String(depreciationYearsRaw), 10) : undefined;
 
                 // Idempotencia: si el activo ya existe (reimportación), se ACTUALIZA
-                // preservando su estado actual (En Uso, En Mantenimiento, etc.). Recrearlo
-                // con createAsset lo resetearía a "Disponible" y desincronizaría el estado
-                // frente a una asignación activa. Solo los nuevos se crean como Disponible.
+                // preservando su estado actual (En Uso, En Mantenimiento, etc.) — recrearlo
+                // con createAsset lo resetearía a "Disponible". La validación y la categoría
+                // se toman SIEMPRE de la fila del Excel (la categoría del archivo manda), no
+                // de la categoría previamente guardada; así un Computador no se valida contra
+                // las reglas de Monitores/Periféricos.
                 const trimmedId = String(rawId).trim();
                 const existingAsset = trimmedId ? await this.repository.getAssetById(trimmedId) : null;
 
-                const createdAsset = existingAsset
-                    ? await this.updateAsset(
-                        trimmedId,
-                        String(serial).trim(),
+                let createdAsset: Asset;
+                if (existingAsset) {
+                    const updated = new Asset({
+                        id: trimmedId,
+                        categoryId: category.id as number,
+                        serial: String(serial).trim(),
+                        status: existingAsset.status, // preserva En Uso / En Mantenimiento / etc.
                         dynamicAttributes,
                         purchaseDate,
                         warrantyMonths,
                         depreciationYears,
-                        undefined,
-                        vendorNameRaw ? String(vendorNameRaw).trim() : undefined,
-                        internalBuyerRaw ? String(internalBuyerRaw).trim() : undefined
-                    )
-                    : await this.createAsset(
+                        purchasePrice: existingAsset.purchasePrice,
+                        vendorName: vendorNameRaw ? String(vendorNameRaw).trim() : existingAsset.vendorName,
+                        internalBuyer: internalBuyerRaw ? String(internalBuyerRaw).trim() : existingAsset.internalBuyer,
+                        disposal: existingAsset.disposal
+                    }, category); // valida contra la categoría de la FILA
+                    await this.repository.saveAsset(updated);
+                    createdAsset = updated;
+                } else {
+                    createdAsset = await this.createAsset(
                         trimmedId,
                         category.id as number,
                         String(serial).trim(),
@@ -283,6 +292,7 @@ export class CatalogUseCases {
                         vendorNameRaw ? String(vendorNameRaw).trim() : undefined,
                         internalBuyerRaw ? String(internalBuyerRaw).trim() : undefined
                     );
+                }
 
                 // Fecha de asignación normalizada a 'YYYY-MM-DD' (Excel puede entregar
                 // un Date, un serial numérico o un string dd/mm/yyyy).
