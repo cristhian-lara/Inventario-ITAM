@@ -170,6 +170,15 @@ const Maintenances: React.FC = () => {
     }
   });
 
+  const { data: categories } = useQuery<any[]>({
+    queryKey: ['categories'],
+    queryFn: async () => {
+      const res = await fetch(`${API_URL}/api/catalog/categories`, { headers: authHeaders() });
+      if (!res.ok) return [];
+      return res.json();
+    }
+  });
+
   const { data: assignments } = useQuery<any[]>({
     queryKey: ['assignments'],
     queryFn: async () => {
@@ -387,10 +396,15 @@ const Maintenances: React.FC = () => {
     };
   });
 
-  // Global coverage metrics
+  // Global coverage metrics. Los mantenimientos solo aplican a Computadores, así
+  // que la cobertura (total, con mantenimiento, agendados, pendientes) se calcula
+  // únicamente sobre esa categoría: incluir monitores o periféricos inflaría el
+  // denominador con activos que nunca se van a mantener.
+  const computadoresCategoryId = categories?.find(c => c.name === 'Computadores')?.id;
   const filteredAssets = assets?.filter(a => {
     if (a.status === 'RETIRED') return false;
-    return true;
+    if (computadoresCategoryId === undefined) return false;
+    return a.categoryId === computadoresCategoryId;
   }) || [];
 
   const totalAssetsCount = filteredAssets.length;
@@ -802,7 +816,10 @@ const Maintenances: React.FC = () => {
           setAssetSearchTerm={setAssetSearchTerm}
           showAssetDropdown={showAssetDropdown}
           setShowAssetDropdown={setShowAssetDropdown}
-          assets={assets}
+          // Solo Computadores: son los únicos activos a los que se les hace
+          // mantenimiento. La tabla sí sigue resolviendo contra `assets` completo
+          // para no romper el histórico de otras categorías.
+          assets={filteredAssets}
           getCollaboratorForAsset={getCollaboratorForAsset}
           onClose={() => setShowModal(false)}
           onSubmit={handleSubmit}

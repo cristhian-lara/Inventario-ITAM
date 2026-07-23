@@ -17,6 +17,7 @@ describe('CatalogUseCases', () => {
             getAllAssets: jest.fn(),
             getAssetsPaginated: jest.fn(),
             generateIncrementalId: jest.fn(),
+            renameAssetPlate: jest.fn(),
         };
 
         useCases = new CatalogUseCases(mockRepository);
@@ -60,8 +61,39 @@ describe('CatalogUseCases', () => {
             const asset = await useCases.createAsset('', 1, 'SN123', {});
 
             expect(asset.id).toBe('000001');
-            expect(mockRepository.generateIncrementalId).toHaveBeenCalledWith(1);
+            expect(mockRepository.generateIncrementalId).toHaveBeenCalledWith(1, undefined);
             expect(mockRepository.saveAsset).toHaveBeenCalledTimes(1);
+        });
+
+        it('should generate a prefixed ID when the category defines idPrefix', async () => {
+            const mockCategory = new Category({ id: 3, name: 'Periféricos', schemaDefinition: { requiresPlacaIkusi: false, idPrefix: 'PER' } as any });
+            mockRepository.getCategoryById.mockResolvedValue(mockCategory);
+            mockRepository.generateIncrementalId.mockResolvedValue('PER001');
+
+            const asset = await useCases.createAsset('', 3, 'SN123', {});
+
+            expect(asset.id).toBe('PER001');
+            expect(mockRepository.generateIncrementalId).toHaveBeenCalledWith(3, 'PER');
+        });
+
+        it('should ignore a manually provided ID for prefixed categories', async () => {
+            const mockCategory = new Category({ id: 3, name: 'Periféricos', schemaDefinition: { requiresPlacaIkusi: false, idPrefix: 'PER' } as any });
+            mockRepository.getCategoryById.mockResolvedValue(mockCategory);
+            mockRepository.generateIncrementalId.mockResolvedValue('PER007');
+
+            const asset = await useCases.createAsset('MI-PLACA-MANUAL', 3, 'SN123', {});
+
+            expect(asset.id).toBe('PER007');
+        });
+
+        it('should respect an ID that already matches the prefix (reimportación idempotente)', async () => {
+            const mockCategory = new Category({ id: 3, name: 'Periféricos', schemaDefinition: { requiresPlacaIkusi: false, idPrefix: 'PER' } as any });
+            mockRepository.getCategoryById.mockResolvedValue(mockCategory);
+
+            const asset = await useCases.createAsset('PER042', 3, 'SN123', {});
+
+            expect(asset.id).toBe('PER042');
+            expect(mockRepository.generateIncrementalId).not.toHaveBeenCalled();
         });
     });
 

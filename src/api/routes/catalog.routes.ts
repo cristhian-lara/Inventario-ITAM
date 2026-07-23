@@ -17,7 +17,9 @@ import { WebexNotificationService } from '../../shared/infrastructure/services/W
 const router = Router();
 
 const createAssetSchema = z.object({
-    id: z.string().min(1, 'id es requerido'),
+    // Opcional a nivel de transporte: las categorías sin Placa Ikusi generan el
+    // ID en el dominio. La obligatoriedad la impone CatalogUseCases según la categoría.
+    id: z.string().optional().default(''),
     categoryId: z.coerce.number({ message: 'categoryId debe ser numérico' }),
     serial: z.string().optional(),
     dynamicAttributes: z.record(z.string(), z.any()).optional().default({}),

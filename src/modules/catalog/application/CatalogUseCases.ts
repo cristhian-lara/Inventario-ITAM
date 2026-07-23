@@ -25,20 +25,37 @@ export class CatalogUseCases {
         return updatedCategory;
     }
 
+    /**
+     * Decide el ID de un activo nuevo según su categoría:
+     *  - Con Placa Ikusi: es obligatoria y se respeta tal cual.
+     *  - Sin Placa Ikusi (Periféricos): el ID lo asigna SIEMPRE el sistema
+     *    (PER001, PER002...). El único ID externo que se acepta es uno que ya
+     *    venga con el prefijo de la categoría, para que reimportar un Excel de
+     *    periféricos no duplique los que ya existen.
+     */
+    private async resolveNewAssetId(providedId: string | undefined, category: Category): Promise<string> {
+        const trimmed = (providedId || '').trim();
+        const requiresPlaca = category.schemaDefinition.requiresPlacaIkusi !== false; // defaults to true
+
+        if (requiresPlaca) {
+            if (!trimmed) throw new Error('La Placa Ikusi es obligatoria para esta categoría.');
+            return trimmed;
+        }
+
+        const prefix: string | undefined = category.schemaDefinition.idPrefix?.trim() || undefined;
+        if (prefix && new RegExp(`^${prefix}\\d+$`).test(trimmed)) {
+            return trimmed;
+        }
+        return this.repository.generateIncrementalId(category.id as number, prefix);
+    }
+
     async createAsset(id: string, categoryId: number, serial: string, dynamicAttributes: Record<string, any>, purchaseDate?: Date, warrantyMonths?: number, depreciationYears?: number, purchasePrice?: number, vendorName?: string, internalBuyer?: string): Promise<Asset> {
         const category = await this.repository.getCategoryById(categoryId);
         if (!category) {
             throw new Error(`La categoría con ID ${categoryId} no existe.`);
         }
 
-        let assetId = id;
-        const requiresPlaca = category.schemaDefinition.requiresPlacaIkusi !== false; // defaults to true
-        
-        if (!requiresPlaca && (!assetId || assetId.trim() === '')) {
-            assetId = await this.repository.generateIncrementalId(categoryId);
-        } else if (requiresPlaca && (!assetId || assetId.trim() === '')) {
-            throw new Error('La Placa Ikusi es obligatoria para esta categoría.');
-        }
+        const assetId = await this.resolveNewAssetId(id, category);
 
         const asset = new Asset({
             id: assetId,

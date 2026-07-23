@@ -25,6 +25,7 @@ export default function Settings() {
   // Estados form Categoría
   const [newCatName, setNewCatName] = useState('');
   const [newCatRequiresPlaca, setNewCatRequiresPlaca] = useState(true);
+  const [newCatIdPrefix, setNewCatIdPrefix] = useState('');
   const [fields, setFields] = useState<FieldConfig[]>([{ name: '', isRequired: true, type: 'text', options: [], unit: '', newOptionValue: '' }]);
   const [deleteFieldIdx, setDeleteFieldIdx] = useState<number | null>(null);
 
@@ -79,9 +80,10 @@ export default function Settings() {
       }));
       const payload = {
         name: newCatName,
-        schema: { 
+        schema: {
           requiresPlacaIkusi: newCatRequiresPlaca,
-          fields: cleanFields 
+          idPrefix: newCatRequiresPlaca ? undefined : (newCatIdPrefix.trim() || undefined),
+          fields: cleanFields
         }
       };
       const res = await axios.post(`${API_URL}/api/catalog/categories`, payload);
@@ -89,7 +91,7 @@ export default function Settings() {
     },
     onSuccess: () => {
       setSuccessMsg('Categoría creada con éxito');
-      setNewCatName(''); setNewCatRequiresPlaca(true); setFields([{name: '', isRequired: true, type: 'text', options: [], unit: '', newOptionValue: ''}]); setShowCatModal(false);
+      setNewCatName(''); setNewCatRequiresPlaca(true); setNewCatIdPrefix(''); setFields([{name: '', isRequired: true, type: 'text', options: [], unit: '', newOptionValue: ''}]); setShowCatModal(false);
       queryClient.invalidateQueries({ queryKey: ['categories'] });
       setTimeout(() => setSuccessMsg(''), 5000);
     },
@@ -112,6 +114,7 @@ export default function Settings() {
         name: newCatName,
         schema: {
           requiresPlacaIkusi: newCatRequiresPlaca,
+          idPrefix: newCatRequiresPlaca ? undefined : (newCatIdPrefix.trim() || undefined),
           fields: cleanFields
         }
       });
@@ -312,6 +315,7 @@ export default function Settings() {
     setEditingCatId(cat.id);
     setNewCatName(cat.name);
     setNewCatRequiresPlaca(cat.schemaDefinition?.requiresPlacaIkusi !== false);
+    setNewCatIdPrefix(cat.schemaDefinition?.idPrefix || '');
     const catFields = cat.schemaDefinition?.fields || [];
     setFields(catFields.length ? catFields.map((f: any) => ({
       ...f,
@@ -594,6 +598,8 @@ export default function Settings() {
           setNewCatName={setNewCatName}
           newCatRequiresPlaca={newCatRequiresPlaca}
           setNewCatRequiresPlaca={setNewCatRequiresPlaca}
+          newCatIdPrefix={newCatIdPrefix}
+          setNewCatIdPrefix={setNewCatIdPrefix}
           fields={fields}
           setFields={setFields}
           onDeleteFieldRequest={(idx) => setDeleteFieldIdx(idx)}

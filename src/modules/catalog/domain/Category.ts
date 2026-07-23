@@ -11,8 +11,14 @@ export interface FieldDefinition {
 export interface CategoryProps {
     id?: number;
     name: string;
-    schemaDefinition: { 
+    schemaDefinition: {
         requiresPlacaIkusi?: boolean; // Default should be true if not provided
+        /**
+         * Prefijo del ID autoincremental para categorías sin Placa Ikusi
+         * (ej. 'PER' para Periféricos ⇒ PER001, PER002...). Si no se define,
+         * el consecutivo se genera sin prefijo, a 6 dígitos.
+         */
+        idPrefix?: string;
         fields: FieldDefinition[];
     };
 }

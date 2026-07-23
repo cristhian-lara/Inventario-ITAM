@@ -42,7 +42,15 @@ export class InMemoryCatalogRepository implements ICatalogRepository {
         return { items: all.slice(start, start + limit), total: all.length };
     }
 
-    async generateIncrementalId(categoryId: number): Promise<string> {
+    async generateIncrementalId(categoryId: number, prefix?: string): Promise<string> {
+        if (prefix) {
+            const pattern = new RegExp(`^${prefix}(\\d+)$`);
+            const max = Array.from(this.assets.values()).reduce((acc, a) => {
+                const match = pattern.exec(a.id);
+                return match ? Math.max(acc, parseInt(match[1], 10)) : acc;
+            }, 0);
+            return `${prefix}${(max + 1).toString().padStart(3, '0')}`;
+        }
         const count = Array.from(this.assets.values()).filter(a => a.categoryId === categoryId).length;
         return (count + 1).toString().padStart(6, '0');
     }

@@ -28,6 +28,7 @@ interface Props {
 export default function AssetFormModal({ newAsset, setNewAsset, categories, isEditing, modalErrorMsg, onClose, onSubmit, isPending }: Props) {
   const selectedCategory = categories?.find((c: any) => c.id === newAsset.categoryId);
   const requiresPlaca = selectedCategory?.schemaDefinition?.requiresPlacaIkusi !== false;
+  const idPrefix: string = selectedCategory?.schemaDefinition?.idPrefix || '';
   const [placaUnlocked, setPlacaUnlocked] = useState(false);
 
   return (
@@ -95,7 +96,7 @@ export default function AssetFormModal({ newAsset, setNewAsset, categories, isEd
                   value={newAsset.id}
                   disabled={(isEditing && !placaUnlocked) || !requiresPlaca}
                   onChange={e => setNewAsset({ ...newAsset, id: e.target.value })}
-                  placeholder={requiresPlaca ? "Ej. AST-2026-050" : "Autogenerado (Ej: 000001)"}
+                  placeholder={requiresPlaca ? "Ej. AST-2026-050" : `Autogenerado (Ej: ${idPrefix ? `${idPrefix}001` : '000001'})`}
                 />
                 {isEditing && requiresPlaca && placaUnlocked && (
                   <div style={{ display: 'flex', gap: '6px', alignItems: 'flex-start', marginTop: '6px', fontSize: '12px', color: 'var(--text-muted)' }}>

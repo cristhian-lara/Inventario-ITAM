@@ -133,7 +133,22 @@ export class PostgresCatalogRepository implements ICatalogRepository {
         return { items, total };
     }
 
-    async generateIncrementalId(categoryId: number): Promise<string> {
+    /**
+     * Con `prefix` el consecutivo se calcula sobre el MAYOR sufijo ya existente
+     * con ese prefijo en TODA la tabla (no sobre el conteo de la categoría): un
+     * conteo se repetiría al dar de baja un activo y chocaría contra la PK.
+     */
+    async generateIncrementalId(categoryId: number, prefix?: string): Promise<string> {
+        if (prefix) {
+            const row = await this.assetRepo
+                .createQueryBuilder('a')
+                .select(`MAX(CAST(SUBSTRING(a.id FROM :len) AS INTEGER))`, 'max')
+                .where('a.id ~ :pattern', { pattern: `^${prefix}[0-9]+$` })
+                .setParameter('len', prefix.length + 1)
+                .getRawOne<{ max: string | null }>();
+            const next = (row?.max ? parseInt(row.max, 10) : 0) + 1;
+            return `${prefix}${next.toString().padStart(3, '0')}`;
+        }
         const count = await this.assetRepo.count({
             where: { category_id: categoryId }
         });

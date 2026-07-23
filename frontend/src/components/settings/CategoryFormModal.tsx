@@ -15,6 +15,8 @@ interface Props {
     setNewCatName: (value: string) => void;
     newCatRequiresPlaca: boolean;
     setNewCatRequiresPlaca: (value: boolean) => void;
+    newCatIdPrefix: string;
+    setNewCatIdPrefix: (value: string) => void;
     fields: FieldConfig[];
     setFields: (fields: FieldConfig[]) => void;
     onDeleteFieldRequest: (idx: number) => void;
@@ -30,6 +32,8 @@ export default function CategoryFormModal({
     setNewCatName,
     newCatRequiresPlaca,
     setNewCatRequiresPlaca,
+    newCatIdPrefix,
+    setNewCatIdPrefix,
     fields,
     setFields,
     onDeleteFieldRequest,
@@ -68,6 +72,23 @@ export default function CategoryFormModal({
                                 ¿Los activos de esta categoría llevan Placa Ikusi? <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>(Desmarcar para Periféricos / ID Autoincremental)</span>
                             </label>
                         </div>
+                        {!newCatRequiresPlaca && (
+                            <div className="form-group" style={{ margin: 0, gridColumn: '1 / -1' }}>
+                                <label>Prefijo del ID autoincremental</label>
+                                <input
+                                    className="glass-input"
+                                    value={newCatIdPrefix}
+                                    maxLength={10}
+                                    onChange={e => setNewCatIdPrefix(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
+                                    placeholder="Ej: PER"
+                                />
+                                <small style={{ color: 'var(--text-muted)', fontSize: '13px' }}>
+                                    {newCatIdPrefix
+                                        ? `Los activos nuevos se numerarán ${newCatIdPrefix}001, ${newCatIdPrefix}002...`
+                                        : 'Sin prefijo, los activos se numerarán 000001, 000002...'}
+                                </small>
+                            </div>
+                        )}
                     </div>
                     <div style={{ background: 'rgba(59, 130, 246, 0.1)', border: '1px solid var(--accent-blue)', borderRadius: '8px', padding: '12px 16px', marginBottom: '24px', display: 'flex', gap: '12px', alignItems: 'center' }}>
                         <div style={{ color: 'var(--accent-blue)' }}><AlertCircle size={20} /></div>
